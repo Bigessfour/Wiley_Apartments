@@ -38,10 +38,10 @@ public sealed class AssetService : IAssetService
             return [];
         }
 
-        var term = serial.Trim();
+        var term = EscapeLikePattern(serial.Trim());
         return await _db.Assets
             .AsNoTracking()
-            .Where(a => EF.Functions.Like(a.Serial, $"%{term}%"))
+            .Where(a => EF.Functions.Like(a.Serial, $"%{term}%", "\\"))
             .OrderBy(a => a.Serial)
             .ToListAsync(cancellationToken);
     }
@@ -142,4 +142,7 @@ public sealed class AssetService : IAssetService
         asset.Serial = asset.Serial.Trim();
         asset.Condition = asset.Condition.Trim();
     }
+
+    private static string EscapeLikePattern(string value) =>
+        value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

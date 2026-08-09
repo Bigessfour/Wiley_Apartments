@@ -31,6 +31,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>wiley-apartments-clerksuite-dev</UserSecretsId>
+    <!-- App.razor is the Blazor Web App document root; scripts belong there (RZ9992 false positive). -->
+    <NoWarn>$(NoWarn);RZ9992</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

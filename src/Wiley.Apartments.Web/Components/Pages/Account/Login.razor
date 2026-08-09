@@ -1,11 +1,13 @@
 @page "/Account/Login"
 @layout EmptyLayout
+@attribute [ExcludeFromInteractiveRouting]
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Identity
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Inputs
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
+@using Wiley.Apartments.Web.Infrastructure
 
 <PageTitle>Sign in — ClerkSuite</PageTitle>
 
@@ -60,7 +62,9 @@
 
         if (result.Succeeded)
         {
-            Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            Navigation.NavigateTo(
+                LoginRedirectHelper.GetSafeReturnUrl(ReturnUrl),
+                forceLoad: true);
             return;
         }
 

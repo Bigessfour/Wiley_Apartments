@@ -5,25 +5,19 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  # No workflow_dispatch inputs (CKV_GHA_7). Self-hosted / model via repo vars:
+  #   CI_USE_SELF_HOSTED=true  → runners labeled self-hosted,linux,clerksuite-ci
+  #   OLLAMA_MODEL             → e.g. qwen2.5-coder:3b (default 1.5b)
   workflow_dispatch:
-    inputs:
-      use_self_hosted:
-        description: "Run on self-hosted runner (label clerksuite-ci). Use for local Actions validation / larger Ollama models."
-        type: boolean
-        default: false
-      ollama_model:
-        description: "Ollama model (1.5b for ubuntu-latest; 3b/7b ok on self-hosted)"
-        type: string
-        default: "qwen2.5-coder:1.5b"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  DOTNET_VERSION: "9.0.x"
-  SOLUTION: "Wiley.Apartments.slnx"
-  OLLAMA_MODEL: ${{ github.event_name == 'workflow_dispatch' && inputs.ollama_model || 'qwen2.5-coder:1.5b' }}
+  DOTNET_VERSION: 9.0.x
+  SOLUTION: Wiley.Apartments.slnx
+  OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'qwen2.5-coder:1.5b' }}
 
 permissions:
   contents: read
@@ -36,7 +30,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-and-test:
     name: Build & Test
-    runs-on: ${{ (github.event_name == 'workflow_dispatch' && inputs.use_self_hosted) && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
 
     steps:
@@ -113,7 +107,7 @@ jobs:
   # ---------------------------------------------------------------------------
   e2e:
     name: E2E (Playwright)
-    runs-on: ${{ (github.event_name == 'workflow_dispatch' && inputs.use_self_hosted) && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
     needs: build-and-test
     if: success()
     timeout-minutes: 30
@@ -197,7 +191,7 @@ jobs:
   # ---------------------------------------------------------------------------
   ollama-ci-review:
     name: Ollama CI Review Agent
-    runs-on: ${{ (github.event_name == 'workflow_dispatch' && inputs.use_self_hosted) && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
     needs: [build-and-test, e2e]
     if: always()
     timeout-minutes: 25
@@ -229,8 +223,9 @@ jobs:
             echo ""
             echo "### Project constraints (must respect)"
             echo "- Blazor Interactive Server + Syncfusion Blazor ONLY (no MudBlazor/Radzen/plain HTML grids)"
-            echo "- Spec Kit feature 001-wiley-apartment-v1; Phase 0 complete, Phase 1 (Units) next"
-            echo "- SQLite default; NAS docs at /volume1/apartments/docs"
+            echo "- Spec Kit feature 001-wiley-apartment-v1; Phase 1 complete — Phase 2 tenants next"
+            echo "- NAS fence: DS225+ ~6GB shared RAM; 2 clerks; app ≤~1.5GiB; host port 8082; linux/amd64"
+            echo "- SQLite default; NAS docs at /volume1/apartments/docs; infrequent NAS image deploys"
             echo "- AuditLog required; no role differentiation in v1"
             echo "- Secrets never in source (Keychain / user-secrets / env only)"
             echo ""
@@ -240,7 +235,11 @@ jobs:
 
           {
             echo "### Failure / warning excerpts (truncated)"
-            grep -r -i -E "(error|fail|exception|assert|timeout|not found)" ci-artifacts --include="*.trx" --include="*.log" --include="*.txt" 2>/dev/null | head -80 || echo "(no obvious failure text found)"
+            echo "(Ignore Fluent Assertions / Xceed license banner lines — not test failures.)"
+            # Prefer real failures; skip Xceed/Fluent Assertions license spam that drowns the 1.5b model.
+            grep -r -i -E "(error|fail|exception|assert|timeout|not found)" ci-artifacts --include="*.trx" --include="*.log" --include="*.txt" 2>/dev/null \
+              | grep -viE "(fluent assertions|xceed|community license|subscription is required)" \
+              | head -80 || echo "(no obvious failure text found)"
           } >> review-context/ci-summary.md
 
           cat review-context/ci-summary.md

@@ -37,14 +37,16 @@ Register the runner with these labels (exact match required by [workflows/ci.yml
 
 ## Run CI on the self-hosted runner
 
-**Actions → CI → Run workflow**
+### Actions → CI → Run workflow
 
-| Input | Value |
-| ----- | ----- |
-| `use_self_hosted` | `true` |
-| `ollama_model` | `qwen2.5-coder:1.5b` (or `3b` / `7b`) |
+Set repository variables (Settings → Secrets and variables → Actions → Variables), then run the workflow manually:
 
-Push/PR events always use `ubuntu-latest` so contributors are not blocked if your runner is offline.
+| Variable             | Value                                 |
+| -------------------- | ------------------------------------- |
+| `CI_USE_SELF_HOSTED` | `true`                                |
+| `OLLAMA_MODEL`       | `qwen2.5-coder:1.5b` (or `3b` / `7b`) |
+
+`workflow_dispatch` has no inputs (Checkov CKV_GHA_7). Push/PR events always use `ubuntu-latest` so contributors are not blocked if your runner is offline.
 
 ## Caching notes
 

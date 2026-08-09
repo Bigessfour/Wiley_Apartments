@@ -101,4 +101,37 @@ public class AssetServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*serial*");
     }
+
+    [Fact]
+    public async Task SearchBySerialAsync_TreatsWildcardsAsLiterals()
+    {
+        await using var db = CreateContext();
+        var unitId = Guid.NewGuid();
+        db.Units.Add(new Unit { Id = unitId, Number = "4", SqFt = 650, Beds = 2, Baths = 1 });
+        db.Assets.Add(new Asset
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unitId,
+            Type = "HVAC",
+            Serial = "SN-100%",
+            Make = "Carrier",
+            Model = "X"
+        });
+        db.Assets.Add(new Asset
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unitId,
+            Type = "HVAC",
+            Serial = "SN-1000",
+            Make = "Carrier",
+            Model = "Y"
+        });
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var results = await service.SearchBySerialAsync("100%");
+
+        results.Should().ContainSingle();
+        results[0].Serial.Should().Be("SN-100%");
+    }
 }
