@@ -52,25 +52,26 @@
 
 ## Phase 1 — Core Domain (Units + Assets)
 
-- [ ] **T1.1** Unit CRUD + status management + unique attributes (sq ft, beds, baths, notes).
+- [x] **T1.1** Unit CRUD + status management + unique attributes (sq ft, beds, baths, notes).
   - **Seed:** **Unit 1–16 placeholders** (Town of Wiley, CO) until real list supplied (G1).
-  - **Done when:** All **16 units** can be entered and edited; status changes (Occupied / Vacant / Maintenance / Make-Ready) visible; cap enforced at 16.
-  - **Paths:** `Domain/Unit.cs`, `Services/UnitService.cs`, `Pages/Units/`
+  - **Done when:** All **16 units** can be entered and edited; status changes (Occupied / Vacant / Maintenance / Make-Ready) visible; cap enforced at 16 — **2026-08-09**
+  - **Paths:** `Domain/Unit.cs`, `Services/UnitService.cs`, `Pages/Units/UnitList.razor`
+  - **UI:** Built with `sf_blazor_assistant` guidance (SfGrid inline CRUD + status dropdown)
 
-- [ ] **T1.2** Asset/Appliance inventory (make, model, serial, install, warranty, photos, attachments).
-  - **Done when:** Assets nested under units; searchable by serial; warranty start/end stored; manuals/receipts attach via Document entity.
-  - **Paths:** `Domain/Asset.cs`, `Pages/Units/UnitDetail.razor` (assets tab)
+- [x] **T1.2** Asset/Appliance inventory (make, model, serial, install, warranty, photos, attachments).
+  - **Done when:** Assets nested under units; searchable by serial; warranty start/end stored; manuals/receipts attach via Document entity — **2026-08-09** (Document attach deferred to T6.1; `PhotoPaths` field ready)
+  - **Paths:** `Domain/Asset.cs`, `Services/AssetService.cs`, `Pages/Units/UnitDetail.razor` (assets tab)
 
-- [ ] **T1.3** Flooring/carpet records linked to units.
-  - **Done when:** Install date, type/material, condition, replacement history captured and shown on unit detail.
-  - **Paths:** `Domain/Flooring.cs`, `Pages/Units/UnitDetail.razor` (flooring tab)
+- [x] **T1.3** Flooring/carpet records linked to units.
+  - **Done when:** Install date, type/material, condition, replacement history captured and shown on unit detail — **2026-08-09**
+  - **Paths:** `Domain/Flooring.cs`, `Services/FlooringService.cs`, `Pages/Units/UnitDetail.razor` (flooring tab)
 
-- [ ] **T1.4** Unit detail page with Syncfusion DataGrid / cards for assets and history.
-  - **Done when:** Clerk opens any unit and sees complete inventory + status in one view (`SfGrid` + cards).
+- [x] **T1.4** Unit detail page with Syncfusion DataGrid / cards for assets and history.
+  - **Done when:** Clerk opens any unit and sees complete inventory + status in one view (`SfGrid` + cards) — **2026-08-09**
   - **Compliance:** UI built/refined via `sf_blazor_assistant`; no non-Syncfusion table/grid controls.
   - **Paths:** `Pages/Units/UnitDetail.razor`, `Pages/Units/UnitList.razor`
 
-**Checkpoint:** FR-1 acceptance criteria pass.
+**Checkpoint:** Phase 1 complete — **FR-1 acceptance criteria pass** (2026-08-09).
 
 ---
 

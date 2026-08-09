@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Wiley.Apartments.IntegrationTests.Support;
 using Wiley.Apartments.Web.Data;
@@ -34,9 +36,12 @@ public class IdentitySeederIntegrationTests : IClassFixture<ClerkSuiteWebApplica
             ]
         });
 
+        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+
         var seeder = new IdentitySeeder(
             userManager,
             options,
+            environment,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<IdentitySeeder>.Instance);
 
         await seeder.SeedAsync();
@@ -60,9 +65,12 @@ public class IdentitySeederIntegrationTests : IClassFixture<ClerkSuiteWebApplica
             ]
         });
 
+        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+
         var seeder = new IdentitySeeder(
             userManager,
             options,
+            environment,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<IdentitySeeder>.Instance);
 
         await seeder.SeedAsync();

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Wiley.Apartments.Web.Data;
 
@@ -10,9 +11,11 @@ using Wiley.Apartments.Web.Data;
 namespace Wiley.Apartments.Web.Data.Migrations
 {
     [DbContext(typeof(ApartmentsDbContext))]
-    partial class ApartmentsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809202333_AddAssets")]
+    partial class AddAssets
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.4");
@@ -248,42 +251,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.ToTable("AuditLogs", (string)null);
                 });
 
-            modelBuilder.Entity("Wiley.Apartments.Domain.Flooring", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Condition")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly?>("InstallDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly?>("ReplacedDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("UnitId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UnitId");
-
-                    b.ToTable("Floorings", (string)null);
-                });
-
             modelBuilder.Entity("Wiley.Apartments.Domain.Unit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -443,17 +410,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                 });
 
             modelBuilder.Entity("Wiley.Apartments.Domain.Asset", b =>
-                {
-                    b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("Wiley.Apartments.Domain.Flooring", b =>
                 {
                     b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
                         .WithMany()

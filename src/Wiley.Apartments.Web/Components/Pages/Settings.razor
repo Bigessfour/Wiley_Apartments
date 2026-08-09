@@ -1,0 +1,54 @@
+@page "/settings"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Settings</PageTitle>
+
+<h1 class="h3 mb-4">Settings</h1>
+
+<section class="settings-panel e-card p-4" aria-labelledby="appearance-heading">
+    <h2 id="appearance-heading" class="h5 mb-3">Appearance</h2>
+    <p class="text-muted mb-4">
+        Choose Fluent light or dark for Syncfusion controls and the ClerkSuite shell.
+        Your preference is saved in this browser.
+    </p>
+
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <span class="@ThemeLabelClass(false)">Light</span>
+        <SfSwitch @bind-Checked="IsDarkMode"
+                  TChecked="bool"
+                  CssClass="clerksuite-theme-switch"
+                  ValueChange="OnThemeChangedAsync" />
+        <span class="@ThemeLabelClass(true)">Dark</span>
+    </div>
+</section>
+
+@code {
+    private bool IsDarkMode { get; set; }
+    private bool _themeLoaded;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            IsDarkMode = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+            _themeLoaded = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnThemeChangedAsync(Syncfusion.Blazor.Buttons.ChangeEventArgs<bool> args)
+    {
+        if (!_themeLoaded)
+        {
+            return;
+        }
+
+        IsDarkMode = args.Checked;
+        await JsRuntime.InvokeVoidAsync("ClerkSuiteTheme.setDarkMode", IsDarkMode);
+    }
+
+    private string ThemeLabelClass(bool forDark) =>
+        forDark == IsDarkMode ? "fw-semibold" : "text-muted";
+}

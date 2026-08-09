@@ -31,3 +31,7 @@ apm_modules/
 
 # Local document mount test dir
 local-docs/
+
+# Syncfusion theme studio downloads (CSS extracted to wwwroot/css/themes)
+fluent2*.zip
+fluent2-dark*.zip

@@ -1,0 +1,212 @@
+@page "/units"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IUnitService UnitService
+@inject NavigationManager Navigation
+
+<PageTitle>Units</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Units</h1>
+        <p class="text-muted mb-0">Town of Wiley — @UnitCount of @UnitService.MaxUnits units</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<SfGrid @ref="GridRef"
+        TValue="Unit"
+        DataSource="@Units"
+        Toolbar="@ToolbarItems"
+        AllowPaging="true"
+        AllowSorting="true"
+        Height="420">
+    <GridEvents TValue="Unit"
+                OnActionBegin="OnActionBeginAsync"
+                OnActionComplete="OnActionCompleteAsync" />
+    <GridEditSettings AllowAdding="@CanAddUnit"
+                      AllowEditing="true"
+                      AllowDeleting="true"
+                      Mode="EditMode.Normal"
+                      ShowDeleteConfirmDialog="true" />
+    <GridColumns>
+        <GridColumn Field="@nameof(Unit.Number)"
+                    HeaderText="Unit #"
+                    IsPrimaryKey="true"
+                    Width="100"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(Unit.SqFt)"
+                    HeaderText="Sq Ft"
+                    TextAlign="TextAlign.Right"
+                    EditType="EditType.NumericEdit"
+                    Format="N0"
+                    Width="110"
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+        <GridColumn Field="@nameof(Unit.Beds)"
+                    HeaderText="Beds"
+                    TextAlign="TextAlign.Right"
+                    EditType="EditType.NumericEdit"
+                    Width="90"
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+        <GridColumn Field="@nameof(Unit.Baths)"
+                    HeaderText="Baths"
+                    TextAlign="TextAlign.Right"
+                    EditType="EditType.NumericEdit"
+                    Width="90"
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+        <GridColumn Field="@nameof(Unit.Status)"
+                    HeaderText="Status"
+                    Width="140"
+                    EditType="EditType.DropDownEdit">
+            <EditTemplate>
+                @{
+                    var unit = context as Unit;
+                }
+                <SfDropDownList TValue="UnitStatus"
+                                TItem="UnitStatusOption"
+                                DataSource="@StatusOptions"
+                                @bind-Value="unit!.Status">
+                    <DropDownListFieldSettings Value="Value" Text="Text" />
+                </SfDropDownList>
+            </EditTemplate>
+            <Template>
+                @{
+                    var row = context as Unit;
+                }
+                <span class="badge @StatusBadgeClass(row!.Status)">@FormatStatus(row.Status)</span>
+            </Template>
+        </GridColumn>
+        <GridColumn Field="@nameof(Unit.Notes)"
+                    HeaderText="Notes"
+                    Width="180" />
+        <GridColumn HeaderText=""
+                    Width="90"
+                    AllowEditing="false"
+                    TextAlign="TextAlign.Center">
+            <Template>
+                @{
+                    var unit = context as Unit;
+                }
+                <SfButton CssClass="e-small e-outline"
+                          Content="Open"
+                          OnClick="@(() => OpenUnit(unit!.Id))" />
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private SfGrid<Unit>? GridRef;
+    private List<Unit> Units { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private int UnitCount => Units.Count;
+    private bool CanAddUnit => UnitCount < UnitService.MaxUnits;
+
+    private readonly List<string> ToolbarItems =
+    [
+        "Add", "Edit", "Delete", "Update", "Cancel", "Search"
+    ];
+
+    private readonly List<UnitStatusOption> StatusOptions =
+    [
+        new(UnitStatus.Vacant, "Vacant"),
+        new(UnitStatus.Occupied, "Occupied"),
+        new(UnitStatus.Maintenance, "Maintenance"),
+        new(UnitStatus.MakeReady, "Make-Ready")
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        Units = (await UnitService.GetAllAsync()).ToList();
+    }
+
+    private void OpenUnit(Guid unitId) => Navigation.NavigateTo($"/units/{unitId}");
+
+    private async Task OnActionBeginAsync(ActionEventArgs<Unit> args)
+    {
+        ErrorMessage = null;
+
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && !CanAddUnit)
+        {
+            args.Cancel = true;
+            ErrorMessage = $"Portfolio is capped at {UnitService.MaxUnits} units.";
+            return;
+        }
+
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null
+            && args.Data.Status == UnitStatus.Occupied)
+        {
+            args.Cancel = true;
+            ErrorMessage = "Occupied units cannot be deleted.";
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task OnActionCompleteAsync(ActionEventArgs<Unit> args)
+    {
+        try
+        {
+            switch (args.RequestType)
+            {
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Add" && args.Data is not null:
+                    await UnitService.CreateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Edit" && args.Data is not null:
+                    await UnitService.UpdateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Delete when args.Data is not null:
+                    await UnitService.DeleteAsync(args.Data.Id);
+                    break;
+                default:
+                    return;
+            }
+
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
+        }
+    }
+
+    private static string FormatStatus(UnitStatus status) => status switch
+    {
+        UnitStatus.MakeReady => "Make-Ready",
+        _ => status.ToString()
+    };
+
+    private static string StatusBadgeClass(UnitStatus status) => status switch
+    {
+        UnitStatus.Occupied => "text-bg-success",
+        UnitStatus.Vacant => "text-bg-secondary",
+        UnitStatus.Maintenance => "text-bg-warning",
+        UnitStatus.MakeReady => "text-bg-info",
+        _ => "text-bg-light"
+    };
+
+    private sealed record UnitStatusOption(UnitStatus Value, string Text);
+}

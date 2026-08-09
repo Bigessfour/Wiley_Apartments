@@ -11,4 +11,5 @@ public class ClerkSuiteOptions
     public bool LateFeesEnabled { get; set; }
     public decimal LateFeeAmount { get; set; }
     public int LateFeeGraceDays { get; set; }
+    public int MaxUnits { get; set; } = 16;
 }

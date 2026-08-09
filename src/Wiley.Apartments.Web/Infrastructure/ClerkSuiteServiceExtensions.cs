@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using Syncfusion.Blazor;
 using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Web.Configuration;
@@ -26,6 +27,10 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddSingleton<IDateTimeService, DateTimeService>();
         builder.Services.AddScoped<AuditSaveChangesInterceptor>();
         builder.Services.AddScoped<IIdentitySeeder, IdentitySeeder>();
+        builder.Services.AddScoped<IUnitSeeder, UnitSeeder>();
+        builder.Services.AddScoped<IUnitService, UnitService>();
+        builder.Services.AddScoped<IAssetService, AssetService>();
+        builder.Services.AddScoped<IFlooringService, FlooringService>();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";
@@ -75,6 +80,12 @@ public static class ClerkSuiteServiceExtensions
 
         var seeder = scope.ServiceProvider.GetRequiredService<IIdentitySeeder>();
         await seeder.SeedAsync();
+
+        var unitSeeder = scope.ServiceProvider.GetRequiredService<IUnitSeeder>();
+        await unitSeeder.SeedAsync();
+
+        var unitCount = await db.Units.CountAsync();
+        Log.Information("Database migrated. {UnitCount} units in portfolio.", unitCount);
     }
 
     public static WebApplication ConfigureClerkSuitePipeline(this WebApplication app)
@@ -89,7 +100,13 @@ public static class ClerkSuiteServiceExtensions
 
         if (!app.Environment.IsEnvironment("Testing"))
         {
-            app.UseHttpsRedirection();
+            var urls = app.Configuration["ASPNETCORE_URLS"]
+                ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
+                ?? string.Empty;
+            if (urls.Contains("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                app.UseHttpsRedirection();
+            }
         }
 
         app.UseAuthentication();

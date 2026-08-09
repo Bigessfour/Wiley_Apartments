@@ -1,0 +1,432 @@
+@page "/units/{UnitId:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Navigations
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IUnitService UnitService
+@inject IAssetService AssetService
+@inject IFlooringService FlooringService
+@inject NavigationManager Navigation
+
+<PageTitle>Unit @Unit?.Number</PageTitle>
+
+@if (LoadError is not null)
+{
+    <div class="alert alert-danger">@LoadError</div>
+}
+else if (Unit is null)
+{
+    <p>Loading unit…</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-1">Unit @Unit.Number</h1>
+            <p class="text-muted mb-0">Complete unit inventory and status</p>
+        </div>
+        <SfButton CssClass="e-outline" Content="Back to units" OnClick="GoToUnitList" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(GridError))
+    {
+        <div class="alert alert-warning">@GridError</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Status & layout" />
+                <CardContent>
+                    <p class="mb-2">
+                        <span class="badge @StatusBadgeClass(Unit.Status)">@FormatStatus(Unit.Status)</span>
+                    </p>
+                    <p class="mb-1">@Unit.Beds bed · @Unit.Baths bath</p>
+                    <p class="mb-0 text-muted">@Unit.SqFt.ToString("N0") sq ft</p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Assets & appliances" />
+                <CardContent>
+                    <p class="unit-summary-value mb-1">@UnitAssets.Count</p>
+                    <p class="mb-0 text-muted">
+                        @if (ExpiringWarrantyCount > 0)
+                        {
+                            <span>@ExpiringWarrantyCount warranty@(ExpiringWarrantyCount == 1 ? "" : "ies") expiring within 90 days</span>
+                        }
+                        else
+                        {
+                            <span>No warranties expiring soon</span>
+                        }
+                    </p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Flooring & carpet" />
+                <CardContent>
+                    <p class="unit-summary-value mb-1">@UnitFloorings.Count</p>
+                    <p class="mb-0 text-muted">@CurrentFlooringSummary</p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Notes" />
+                <CardContent>
+                    <p class="mb-0">@(string.IsNullOrWhiteSpace(Unit.Notes) ? "No unit notes recorded." : Unit.Notes)</p>
+                </CardContent>
+            </SfCard>
+        </div>
+    </div>
+
+    <SfTab>
+        <TabItems>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Overview"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <h2 class="h6 mb-2">Assets & appliances</h2>
+                            <SfGrid TValue="Asset"
+                                    DataSource="@UnitAssets"
+                                    AllowPaging="true"
+                                    AllowSorting="true"
+                                    Height="280">
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(Asset.Type)" HeaderText="Type" Width="120" />
+                                    <GridColumn Field="@nameof(Asset.Make)" HeaderText="Make" Width="100" />
+                                    <GridColumn Field="@nameof(Asset.Model)" HeaderText="Model" Width="100" />
+                                    <GridColumn Field="@nameof(Asset.Serial)" HeaderText="Serial" Width="120" />
+                                    <GridColumn Field="@nameof(Asset.WarrantyEnd)"
+                                                HeaderText="Warranty end"
+                                                Format="d"
+                                                Width="120" />
+                                    <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
+                                </GridColumns>
+                            </SfGrid>
+                        </div>
+                        <div class="col-lg-6">
+                            <h2 class="h6 mb-2">Flooring history</h2>
+                            <SfGrid TValue="Flooring"
+                                    DataSource="@UnitFloorings"
+                                    AllowPaging="true"
+                                    AllowSorting="true"
+                                    Height="280">
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(Flooring.Type)" HeaderText="Type / material" Width="140" />
+                                    <GridColumn Field="@nameof(Flooring.InstallDate)"
+                                                HeaderText="Installed"
+                                                Format="d"
+                                                Width="110" />
+                                    <GridColumn Field="@nameof(Flooring.Condition)" HeaderText="Condition" Width="110" />
+                                    <GridColumn Field="@nameof(Flooring.ReplacedDate)"
+                                                HeaderText="Replaced"
+                                                Format="d"
+                                                Width="110" />
+                                    <GridColumn Field="@nameof(Flooring.Notes)" HeaderText="Notes" Width="160" />
+                                </GridColumns>
+                            </SfGrid>
+                        </div>
+                    </div>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Manage assets"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <SfGrid @ref="AssetGridRef"
+                            TValue="Asset"
+                            DataSource="@UnitAssets"
+                            Toolbar="@AssetToolbar"
+                            AllowPaging="true"
+                            AllowSorting="true"
+                            Height="360">
+                        <GridEvents TValue="Asset"
+                                    OnActionBegin="OnAssetActionBeginAsync"
+                                    OnActionComplete="OnAssetActionCompleteAsync" />
+                        <GridEditSettings AllowAdding="true"
+                                          AllowEditing="true"
+                                          AllowDeleting="true"
+                                          Mode="EditMode.Normal"
+                                          ShowDeleteConfirmDialog="true" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(Asset.Id)"
+                                        IsPrimaryKey="true"
+                                        Visible="false" />
+                            <GridColumn Field="@nameof(Asset.Type)"
+                                        HeaderText="Type"
+                                        Width="120"
+                                        ValidationRules="@(new ValidationRules { Required = true })" />
+                            <GridColumn Field="@nameof(Asset.Make)" HeaderText="Make" Width="110" />
+                            <GridColumn Field="@nameof(Asset.Model)" HeaderText="Model" Width="110" />
+                            <GridColumn Field="@nameof(Asset.Serial)"
+                                        HeaderText="Serial"
+                                        Width="130"
+                                        ValidationRules="@(new ValidationRules { Required = true })" />
+                            <GridColumn Field="@nameof(Asset.InstallDate)"
+                                        HeaderText="Installed"
+                                        EditType="EditType.DatePickerEdit"
+                                        Format="d"
+                                        Width="120" />
+                            <GridColumn Field="@nameof(Asset.WarrantyStart)"
+                                        HeaderText="Warranty start"
+                                        EditType="EditType.DatePickerEdit"
+                                        Format="d"
+                                        Width="130" />
+                            <GridColumn Field="@nameof(Asset.WarrantyEnd)"
+                                        HeaderText="Warranty end"
+                                        EditType="EditType.DatePickerEdit"
+                                        Format="d"
+                                        Width="130" />
+                            <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
+                            <GridColumn Field="@nameof(Asset.Notes)" HeaderText="Notes" Width="180" />
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Manage flooring"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <SfGrid @ref="FlooringGridRef"
+                            TValue="Flooring"
+                            DataSource="@UnitFloorings"
+                            Toolbar="@FlooringToolbar"
+                            AllowPaging="true"
+                            AllowSorting="true"
+                            Height="360">
+                        <GridEvents TValue="Flooring"
+                                    OnActionBegin="OnFlooringActionBeginAsync"
+                                    OnActionComplete="OnFlooringActionCompleteAsync" />
+                        <GridEditSettings AllowAdding="true"
+                                          AllowEditing="true"
+                                          AllowDeleting="true"
+                                          Mode="EditMode.Normal"
+                                          ShowDeleteConfirmDialog="true" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(Flooring.Id)"
+                                        IsPrimaryKey="true"
+                                        Visible="false" />
+                            <GridColumn Field="@nameof(Flooring.Type)"
+                                        HeaderText="Type / material"
+                                        Width="160"
+                                        ValidationRules="@(new ValidationRules { Required = true })" />
+                            <GridColumn Field="@nameof(Flooring.InstallDate)"
+                                        HeaderText="Installed"
+                                        EditType="EditType.DatePickerEdit"
+                                        Format="d"
+                                        Width="120" />
+                            <GridColumn Field="@nameof(Flooring.Condition)"
+                                        HeaderText="Condition"
+                                        Width="120" />
+                            <GridColumn Field="@nameof(Flooring.ReplacedDate)"
+                                        HeaderText="Replaced"
+                                        EditType="EditType.DatePickerEdit"
+                                        Format="d"
+                                        Width="120" />
+                            <GridColumn Field="@nameof(Flooring.Notes)"
+                                        HeaderText="Notes"
+                                        Width="200" />
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
+        </TabItems>
+    </SfTab>
+}
+
+@code {
+    [Parameter]
+    public Guid UnitId { get; set; }
+
+    private Unit? Unit { get; set; }
+    private List<Asset> UnitAssets { get; set; } = [];
+    private List<Flooring> UnitFloorings { get; set; } = [];
+    private SfGrid<Asset>? AssetGridRef;
+    private SfGrid<Flooring>? FlooringGridRef;
+    private string? LoadError { get; set; }
+    private string? GridError { get; set; }
+
+    private int ExpiringWarrantyCount => UnitAssets.Count(a =>
+        a.WarrantyEnd is not null
+        && a.WarrantyEnd >= DateOnly.FromDateTime(DateTime.UtcNow)
+        && a.WarrantyEnd <= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(90)));
+
+    private string CurrentFlooringSummary
+    {
+        get
+        {
+            var current = UnitFloorings.FirstOrDefault(f => f.ReplacedDate is null)
+                ?? UnitFloorings.FirstOrDefault();
+            if (current is null)
+            {
+                return "No flooring records yet.";
+            }
+
+            var installed = current.InstallDate?.ToString("d") ?? "unknown date";
+            return $"{current.Type} · installed {installed}";
+        }
+    }
+
+    private readonly List<string> AssetToolbar =
+    [
+        "Add", "Edit", "Delete", "Update", "Cancel", "Search"
+    ];
+
+    private readonly List<string> FlooringToolbar =
+    [
+        "Add", "Edit", "Delete", "Update", "Cancel", "Search"
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        LoadError = null;
+        Unit = await UnitService.GetByIdAsync(UnitId);
+        if (Unit is null)
+        {
+            LoadError = "Unit not found.";
+            return;
+        }
+
+        UnitAssets = (await AssetService.GetByUnitIdAsync(UnitId)).ToList();
+        UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
+    }
+
+    private void GoToUnitList() => Navigation.NavigateTo("/units");
+
+    private async Task OnAssetActionBeginAsync(ActionEventArgs<Asset> args)
+    {
+        GridError = null;
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && args.Data is not null)
+        {
+            args.Data.UnitId = UnitId;
+            args.Data.Id = Guid.NewGuid();
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task OnAssetActionCompleteAsync(ActionEventArgs<Asset> args)
+    {
+        try
+        {
+            switch (args.RequestType)
+            {
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Add" && args.Data is not null:
+                    args.Data.UnitId = UnitId;
+                    await AssetService.CreateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Edit" && args.Data is not null:
+                    await AssetService.UpdateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Delete when args.Data is not null:
+                    await AssetService.DeleteAsync(args.Data.Id);
+                    break;
+                default:
+                    return;
+            }
+
+            await ReloadInventoryAsync();
+            if (AssetGridRef is not null)
+            {
+                await AssetGridRef.Refresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            GridError = ex.Message;
+            await ReloadInventoryAsync();
+            if (AssetGridRef is not null)
+            {
+                await AssetGridRef.Refresh();
+            }
+        }
+    }
+
+    private async Task OnFlooringActionBeginAsync(ActionEventArgs<Flooring> args)
+    {
+        GridError = null;
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && args.Data is not null)
+        {
+            args.Data.UnitId = UnitId;
+            args.Data.Id = Guid.NewGuid();
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task OnFlooringActionCompleteAsync(ActionEventArgs<Flooring> args)
+    {
+        try
+        {
+            switch (args.RequestType)
+            {
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Add" && args.Data is not null:
+                    args.Data.UnitId = UnitId;
+                    await FlooringService.CreateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Edit" && args.Data is not null:
+                    await FlooringService.UpdateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Delete when args.Data is not null:
+                    await FlooringService.DeleteAsync(args.Data.Id);
+                    break;
+                default:
+                    return;
+            }
+
+            await ReloadInventoryAsync();
+            if (FlooringGridRef is not null)
+            {
+                await FlooringGridRef.Refresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            GridError = ex.Message;
+            await ReloadInventoryAsync();
+            if (FlooringGridRef is not null)
+            {
+                await FlooringGridRef.Refresh();
+            }
+        }
+    }
+
+    private async Task ReloadInventoryAsync()
+    {
+        UnitAssets = (await AssetService.GetByUnitIdAsync(UnitId)).ToList();
+        UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
+    }
+
+    private static string FormatStatus(UnitStatus status) => status switch
+    {
+        UnitStatus.MakeReady => "Make-Ready",
+        _ => status.ToString()
+    };
+
+    private static string StatusBadgeClass(UnitStatus status) => status switch
+    {
+        UnitStatus.Occupied => "text-bg-success",
+        UnitStatus.Vacant => "text-bg-secondary",
+        UnitStatus.Maintenance => "text-bg-warning",
+        UnitStatus.MakeReady => "text-bg-info",
+        _ => "text-bg-light"
+    };
+}

@@ -1,7 +1,6 @@
 @page "/Account/Login"
-@rendermode InteractiveServer
+@layout EmptyLayout
 @using System.ComponentModel.DataAnnotations
-@using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Inputs
@@ -19,17 +18,22 @@
         <div class="alert alert-danger">@ErrorMessage</div>
     }
 
-    <EditForm Model="Input" OnValidSubmit="HandleLogin">
+    @* Static SSR form — Identity cookie sign-in must run outside Interactive Server circuit. *@
+    <EditForm Model="Input" FormName="login" method="post" OnValidSubmit="HandleLoginAsync">
         <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
         <div class="mb-3">
             <label class="form-label">Email</label>
-            <SfTextBox @bind-Value="Input.Email" Placeholder="you@townofwiley.gov" />
+            <InputText @bind-Value="Input.Email" class="form-control" placeholder="you@townofwiley.gov" />
         </div>
         <div class="mb-3">
             <label class="form-label">Password</label>
-            <SfTextBox @bind-Value="Input.Password" Type="InputType.Password" />
+            <InputText @bind-Value="Input.Password" type="password" class="form-control" />
         </div>
-        <SfButton CssClass="e-primary" IsPrimary="true" Type="ButtonType.Submit" Content="Sign in" />
+        <SfButton CssClass="e-primary"
+                  IsPrimary="true"
+                  Content="Sign in"
+                  HtmlAttributes="@SubmitButtonAttributes" />
     </EditForm>
 </div>
 
@@ -37,14 +41,23 @@
     [SupplyParameterFromQuery]
     public string? ReturnUrl { get; set; }
 
+    [SupplyParameterFromForm]
+    public LoginInput Input { get; set; } = new();
+
     private string? ErrorMessage { get; set; }
 
-    private LoginInput Input { get; set; } = new();
+    private static Dictionary<string, object> SubmitButtonAttributes { get; } =
+        new() { ["type"] = "submit" };
 
-    private async Task HandleLogin()
+    private async Task HandleLoginAsync()
     {
         ErrorMessage = null;
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, isPersistent: true, lockoutOnFailure: false);
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email,
+            Input.Password,
+            isPersistent: true,
+            lockoutOnFailure: false);
+
         if (result.Succeeded)
         {
             Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
@@ -54,7 +67,7 @@
         ErrorMessage = "Invalid email or password.";
     }
 
-    private sealed class LoginInput
+    public sealed class LoginInput
     {
         [Required, EmailAddress]
         public string Email { get; set; } = string.Empty;
