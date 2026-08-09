@@ -45,10 +45,11 @@ else
     <h2 class="h5 mt-4">Household</h2>
     <SfGrid TValue="HouseholdMember"
             DataSource="@Tenant.HouseholdMembers"
-            Toolbar="@(new List<string> { "Add", "Delete", "Update", "Cancel" })"
+            Toolbar="@(new List<string> { "Add", "Edit", "Delete", "Update", "Cancel" })"
             Height="220">
         <GridEvents TValue="HouseholdMember" OnActionComplete="OnHouseholdCompleteAsync" />
         <GridEditSettings AllowAdding="@(!Tenant.IsDeleted)"
+                          AllowEditing="@(!Tenant.IsDeleted)"
                           AllowDeleting="@(!Tenant.IsDeleted)"
                           Mode="EditMode.Normal"
                           ShowDeleteConfirmDialog="true" />
@@ -56,16 +57,22 @@ else
             <GridColumn Field="@nameof(HouseholdMember.Id)" IsPrimaryKey="true" Visible="false" />
             <GridColumn Field="@nameof(HouseholdMember.FullName)" HeaderText="Name" ValidationRules="@(new ValidationRules { Required = true })" />
             <GridColumn Field="@nameof(HouseholdMember.Relationship)" HeaderText="Relationship" Width="140" />
+            <GridColumn Field="@nameof(HouseholdMember.DateOfBirth)"
+                        HeaderText="DOB"
+                        Width="130"
+                        Format="d"
+                        EditType="EditType.DatePickerEdit" />
         </GridColumns>
     </SfGrid>
 
     <h2 class="h5 mt-4">Vehicles</h2>
     <SfGrid TValue="Vehicle"
             DataSource="@Tenant.Vehicles"
-            Toolbar="@(new List<string> { "Add", "Delete", "Update", "Cancel" })"
+            Toolbar="@(new List<string> { "Add", "Edit", "Delete", "Update", "Cancel" })"
             Height="220">
         <GridEvents TValue="Vehicle" OnActionComplete="OnVehicleCompleteAsync" />
         <GridEditSettings AllowAdding="@(!Tenant.IsDeleted)"
+                          AllowEditing="@(!Tenant.IsDeleted)"
                           AllowDeleting="@(!Tenant.IsDeleted)"
                           Mode="EditMode.Normal"
                           ShowDeleteConfirmDialog="true" />
@@ -81,10 +88,11 @@ else
     <h2 class="h5 mt-4">Pets</h2>
     <SfGrid TValue="Pet"
             DataSource="@Tenant.Pets"
-            Toolbar="@(new List<string> { "Add", "Delete", "Update", "Cancel" })"
+            Toolbar="@(new List<string> { "Add", "Edit", "Delete", "Update", "Cancel" })"
             Height="220">
         <GridEvents TValue="Pet" OnActionComplete="OnPetCompleteAsync" />
         <GridEditSettings AllowAdding="@(!Tenant.IsDeleted)"
+                          AllowEditing="@(!Tenant.IsDeleted)"
                           AllowDeleting="@(!Tenant.IsDeleted)"
                           Mode="EditMode.Normal"
                           ShowDeleteConfirmDialog="true" />
@@ -123,11 +131,20 @@ else
     {
         try
         {
-            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save
-                && args.Action == "Add"
-                && args.Data is not null)
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save && args.Data is not null)
             {
-                await TenantService.AddHouseholdMemberAsync(TenantId, args.Data);
+                if (args.Action == "Add")
+                {
+                    await TenantService.AddHouseholdMemberAsync(TenantId, args.Data);
+                }
+                else if (args.Action == "Edit")
+                {
+                    await TenantService.UpdateHouseholdMemberAsync(args.Data);
+                }
+                else
+                {
+                    return;
+                }
             }
             else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
             {
@@ -151,11 +168,20 @@ else
     {
         try
         {
-            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save
-                && args.Action == "Add"
-                && args.Data is not null)
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save && args.Data is not null)
             {
-                await TenantService.AddVehicleAsync(TenantId, args.Data);
+                if (args.Action == "Add")
+                {
+                    await TenantService.AddVehicleAsync(TenantId, args.Data);
+                }
+                else if (args.Action == "Edit")
+                {
+                    await TenantService.UpdateVehicleAsync(args.Data);
+                }
+                else
+                {
+                    return;
+                }
             }
             else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
             {
@@ -179,11 +205,20 @@ else
     {
         try
         {
-            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save
-                && args.Action == "Add"
-                && args.Data is not null)
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save && args.Data is not null)
             {
-                await TenantService.AddPetAsync(TenantId, args.Data);
+                if (args.Action == "Add")
+                {
+                    await TenantService.AddPetAsync(TenantId, args.Data);
+                }
+                else if (args.Action == "Edit")
+                {
+                    await TenantService.UpdatePetAsync(args.Data);
+                }
+                else
+                {
+                    return;
+                }
             }
             else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
             {

@@ -93,4 +93,43 @@ public class TenantServiceTests
         var loaded = await service.GetByIdAsync(tenant.Id);
         loaded!.HouseholdMembers.Should().ContainSingle(m => m.FullName == "Kid Parent");
     }
+
+    [Fact]
+    public async Task UpdateHouseholdMemberAsync_PersistsChanges()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+        var tenant = await service.CreateAsync(new Tenant { FirstName = "Jo", LastName = "Parent" });
+        var member = await service.AddHouseholdMemberAsync(tenant.Id, new HouseholdMember
+        {
+            FullName = "Kid Parent",
+            Relationship = "Child"
+        });
+
+        member.FullName = "Kid Updated";
+        member.Relationship = "Dependent";
+        await service.UpdateHouseholdMemberAsync(member);
+
+        var loaded = await service.GetByIdAsync(tenant.Id);
+        loaded!.HouseholdMembers.Should().ContainSingle(m => m.FullName == "Kid Updated" && m.Relationship == "Dependent");
+    }
+
+    [Fact]
+    public async Task UpdateVehicleAsync_PersistsPlate()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+        var tenant = await service.CreateAsync(new Tenant { FirstName = "Al", LastName = "Driver" });
+        var vehicle = await service.AddVehicleAsync(tenant.Id, new Vehicle
+        {
+            Make = "Ford",
+            Model = "F-150",
+            Plate = "ABC-111"
+        });
+
+        vehicle.Plate = "XYZ-999";
+        await service.UpdateVehicleAsync(vehicle);
+
+        (await service.GetByIdAsync(tenant.Id))!.Vehicles.Should().ContainSingle(v => v.Plate == "XYZ-999");
+    }
 }

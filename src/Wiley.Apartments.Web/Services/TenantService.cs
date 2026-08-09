@@ -122,10 +122,30 @@ public sealed class TenantService : ITenantService
         member.Id = Guid.NewGuid();
         member.TenantId = tenantId;
         member.FullName = member.FullName.Trim();
-        member.Relationship = member.Relationship.Trim();
+        member.Relationship = member.Relationship?.Trim() ?? string.Empty;
         _db.HouseholdMembers.Add(member);
         await _db.SaveChangesAsync(cancellationToken);
         return member;
+    }
+
+    public async Task<HouseholdMember> UpdateHouseholdMemberAsync(
+        HouseholdMember member,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(member.FullName))
+        {
+            throw new ArgumentException("Household member name is required.", nameof(member));
+        }
+
+        var existing = await _db.HouseholdMembers.FindAsync([member.Id], cancellationToken)
+            ?? throw new InvalidOperationException($"Household member {member.Id} was not found.");
+        await EnsureActiveTenantAsync(existing.TenantId, cancellationToken);
+
+        existing.FullName = member.FullName.Trim();
+        existing.Relationship = member.Relationship?.Trim() ?? string.Empty;
+        existing.DateOfBirth = member.DateOfBirth;
+        await _db.SaveChangesAsync(cancellationToken);
+        return existing;
     }
 
     public async Task RemoveHouseholdMemberAsync(Guid memberId, CancellationToken cancellationToken = default)
@@ -149,13 +169,34 @@ public sealed class TenantService : ITenantService
 
         vehicle.Id = Guid.NewGuid();
         vehicle.TenantId = tenantId;
-        vehicle.Make = vehicle.Make.Trim();
-        vehicle.Model = vehicle.Model.Trim();
-        vehicle.Color = vehicle.Color.Trim();
+        vehicle.Make = vehicle.Make?.Trim() ?? string.Empty;
+        vehicle.Model = vehicle.Model?.Trim() ?? string.Empty;
+        vehicle.Color = vehicle.Color?.Trim() ?? string.Empty;
         vehicle.Plate = vehicle.Plate.Trim();
         _db.Vehicles.Add(vehicle);
         await _db.SaveChangesAsync(cancellationToken);
         return vehicle;
+    }
+
+    public async Task<Vehicle> UpdateVehicleAsync(
+        Vehicle vehicle,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(vehicle.Plate))
+        {
+            throw new ArgumentException("Vehicle plate is required.", nameof(vehicle));
+        }
+
+        var existing = await _db.Vehicles.FindAsync([vehicle.Id], cancellationToken)
+            ?? throw new InvalidOperationException($"Vehicle {vehicle.Id} was not found.");
+        await EnsureActiveTenantAsync(existing.TenantId, cancellationToken);
+
+        existing.Make = vehicle.Make?.Trim() ?? string.Empty;
+        existing.Model = vehicle.Model?.Trim() ?? string.Empty;
+        existing.Color = vehicle.Color?.Trim() ?? string.Empty;
+        existing.Plate = vehicle.Plate.Trim();
+        await _db.SaveChangesAsync(cancellationToken);
+        return existing;
     }
 
     public async Task RemoveVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
@@ -180,11 +221,32 @@ public sealed class TenantService : ITenantService
         pet.Id = Guid.NewGuid();
         pet.TenantId = tenantId;
         pet.Name = pet.Name.Trim();
-        pet.Type = pet.Type.Trim();
+        pet.Type = pet.Type?.Trim() ?? string.Empty;
         pet.Breed = string.IsNullOrWhiteSpace(pet.Breed) ? null : pet.Breed.Trim();
         _db.Pets.Add(pet);
         await _db.SaveChangesAsync(cancellationToken);
         return pet;
+    }
+
+    public async Task<Pet> UpdatePetAsync(
+        Pet pet,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(pet.Name))
+        {
+            throw new ArgumentException("Pet name is required.", nameof(pet));
+        }
+
+        var existing = await _db.Pets.FindAsync([pet.Id], cancellationToken)
+            ?? throw new InvalidOperationException($"Pet {pet.Id} was not found.");
+        await EnsureActiveTenantAsync(existing.TenantId, cancellationToken);
+
+        existing.Name = pet.Name.Trim();
+        existing.Type = pet.Type?.Trim() ?? string.Empty;
+        existing.Breed = string.IsNullOrWhiteSpace(pet.Breed) ? null : pet.Breed.Trim();
+        existing.Notes = pet.Notes;
+        await _db.SaveChangesAsync(cancellationToken);
+        return existing;
     }
 
     public async Task RemovePetAsync(Guid petId, CancellationToken cancellationToken = default)
