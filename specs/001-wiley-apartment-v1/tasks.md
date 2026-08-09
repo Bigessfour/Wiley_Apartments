@@ -109,9 +109,10 @@
   - **Paths:** `Pages/Leases/LeaseWizard.razor`, `Pages/Leases/LeasePreview.razor`
   - **Progress (2026-08-09):** **PDF-first pivot** — `Syncfusion.Pdf.Net.Core` + `Syncfusion.Blazor.SfPdfViewer`. Bootstraps fillable AcroForm `brookside-*.pdf` from Brookside DOCX; fills named fields; preview via SfPdfViewer2. Generated lease stays **Draft** until T3.3/T3.4. See `deploy/synology/TEMPLATES.md`.
 
-- [ ] **T3.3** Upload/link signed lease + document vault integration.
+- [x] **T3.3** Upload/link signed lease + document vault integration.
   - **Done when:** Signed document on NAS (`/docs/leases/...`) and linked to lease via Document entity; status can move Draft → Active.
   - **Paths:** `Services/DocumentService.cs`, lease detail upload
+  - **Progress (2026-08-09):** `Document` entity + migration `AddDocumentsAndSignedLease`; `IDocumentService` vault upload; `AttachSignedDocumentAsync` → `leases/{unit}/signed/…`, `SignedDocumentId`, status **Active**; SfUploader on `LeasePreview`.
 
 - [ ] **T3.4** Renew / amend / terminate workflows.
   - **Done when:** Status and history update correctly; dashboard expiration feed reflects changes.

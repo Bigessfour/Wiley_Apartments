@@ -7,7 +7,7 @@ maintenance, appliance/carpet inventory, and documents.
 
 **Repository**: [github.com/Bigessfour/Wiley_Apartments](https://github.com/Bigessfour/Wiley_Apartments)
 
-**Status**: Phase 3 **in progress** (T2.3 + T3.1–T3.2 fillable PDF/PdfViewer done) — T3.3 signed upload; Phase 3.5 Scheduler next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
+**Status**: Phase 3 **in progress** (T3.1–T3.3 leases + signed vault upload done) — T3.4 renew/terminate; Phase 3.5 Scheduler next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
 
 ## Users
 

@@ -20,6 +20,7 @@ public sealed class LeaseService : ILeaseService
     private readonly IHostEnvironment _environment;
     private readonly IDateTimeService _clock;
     private readonly LeaseDocumentGenerator _generator;
+    private readonly IDocumentService _documents;
     private readonly ILogger<LeaseService> _logger;
 
     public LeaseService(
@@ -28,6 +29,7 @@ public sealed class LeaseService : ILeaseService
         IHostEnvironment environment,
         IDateTimeService clock,
         LeaseDocumentGenerator generator,
+        IDocumentService documents,
         ILogger<LeaseService> logger)
     {
         _db = db;
@@ -35,6 +37,7 @@ public sealed class LeaseService : ILeaseService
         _environment = environment;
         _clock = clock;
         _generator = generator;
+        _documents = documents;
         _logger = logger;
     }
 
@@ -231,6 +234,52 @@ public sealed class LeaseService : ILeaseService
         await _db.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Generated lease PDF for {LeaseId}: {Pdf}", lease.Id, pdfRel);
+        return (await GetByIdAsync(lease.Id, cancellationToken))!;
+    }
+
+    public async Task<Lease> AttachSignedDocumentAsync(
+        Guid leaseId,
+        string originalFileName,
+        string contentType,
+        Stream content,
+        string uploadedBy,
+        CancellationToken cancellationToken = default)
+    {
+        var lease = await _db.Leases
+            .Include(l => l.Unit)
+            .FirstOrDefaultAsync(l => l.Id == leaseId && !l.IsDeleted, cancellationToken)
+            ?? throw new InvalidOperationException($"Lease {leaseId} was not found.");
+
+        if (lease.Unit is null)
+        {
+            throw new InvalidOperationException("Lease is missing unit.");
+        }
+
+        var ext = Path.GetExtension(originalFileName);
+        if (!ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Signed lease must be a PDF.");
+        }
+
+        var relativeDir = Path.Combine("leases", lease.Unit.Number, "signed").Replace('\\', '/');
+        var doc = await _documents.UploadAsync(
+            DocumentEntityType.Lease,
+            lease.Id,
+            DocumentCategory.SignedLease,
+            originalFileName,
+            contentType,
+            content,
+            uploadedBy,
+            relativeDir,
+            cancellationToken);
+
+        lease.SignedDocumentId = doc.Id;
+        lease.Status = LeaseStatus.Active;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Attached signed lease document {DocumentId} to lease {LeaseId}; status Active.",
+            doc.Id, lease.Id);
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
     }
 

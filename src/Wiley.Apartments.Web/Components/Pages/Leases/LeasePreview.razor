@@ -1,16 +1,21 @@
 @page "/leases/{LeaseId:guid}"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.Extensions.Options
+@using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.SfPdfViewer
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Configuration
 @inject ILeaseService LeaseService
+@inject IDocumentService DocumentService
 @inject IOptions<ClerkSuiteOptions> Options
 @inject IHostEnvironment Environment
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
 
 <PageTitle>Lease preview</PageTitle>
 
@@ -45,23 +50,55 @@ else
     {
         <div class="alert alert-warning">@ErrorMessage</div>
     }
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success">@SuccessMessage</div>
+    }
 
-    @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+    <h2 class="h5 mt-2">Signed lease</h2>
+    @if (Lease.SignedDocumentId is Guid signedId)
+    {
+        <p class="small mb-2">
+            Linked vault document: <code>@signedId</code>
+            @if (SignedInfo is not null)
+            {
+                <span> — @SignedInfo.OriginalFileName (@SignedInfo.FilePathOnNas)</span>
+            }
+            <SfButton CssClass="e-small e-outline ms-2" Content="View signed PDF" OnClick="ViewSignedAsync" />
+        </p>
+    }
+    else
+    {
+        <p class="text-muted small mb-2">Upload the signed PDF to activate this lease (Draft → Active).</p>
+    }
+
+    <div style="max-width: 480px;" class="mb-4">
+        <SfUploader AllowedExtensions=".pdf"
+                    MaxFileSize="25000000"
+                    AutoUpload="false"
+                    Multiple="false">
+            <UploaderEvents ValueChange="OnSignedSelectedAsync" />
+        </SfUploader>
+        <SfButton CssClass="e-primary e-small mt-2"
+                  Content="@(Busy ? "Uploading…" : "Attach signed PDF")"
+                  Disabled="@(Busy || _pendingSigned is null)"
+                  OnClick="AttachSignedAsync" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) || _pdfBytes is not null)
     {
         <p class="small text-muted mb-2">
-            PDF: @Lease.GeneratedPdfRelativePath
+            @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+            {
+                <span>Generated: @Lease.GeneratedPdfRelativePath</span>
+            }
             @if (!string.IsNullOrEmpty(Lease.GeneratedDocxRelativePath))
             {
                 <span> · DOCX archive: @Lease.GeneratedDocxRelativePath</span>
             }
-            <span> · Status remains Draft until signed (T3.3)</span>
         </p>
         <div style="height: 680px; width: 100%;">
-            <SfPdfViewer2 @ref="PdfViewer"
-                          Height="100%"
-                          Width="100%">
-                <PdfViewerEvents DocumentLoaded="OnDocumentLoaded" />
-            </SfPdfViewer2>
+            <SfPdfViewer2 @ref="PdfViewer" Height="100%" Width="100%" />
         </div>
     }
 }
@@ -70,11 +107,14 @@ else
     [Parameter] public Guid LeaseId { get; set; }
 
     private Lease? Lease { get; set; }
+    private Wiley.Apartments.Contracts.DocumentInfo? SignedInfo { get; set; }
     private SfPdfViewer2? PdfViewer { get; set; }
     private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
     private bool Busy { get; set; }
     private byte[]? _pdfBytes;
     private bool _pendingLoad;
+    private (string Name, string ContentType, byte[] Bytes)? _pendingSigned;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -96,33 +136,28 @@ else
             return;
         }
 
-        LoadPdfBytes();
+        SignedInfo = null;
+        if (Lease.SignedDocumentId is Guid sid)
+        {
+            SignedInfo = await DocumentService.GetByIdAsync(sid);
+        }
+
+        await PreferDisplayPdfAsync();
         _pendingLoad = _pdfBytes is not null;
     }
 
-    private async Task GenerateAsync()
-    {
-        Busy = true;
-        ErrorMessage = null;
-        try
-        {
-            Lease = await LeaseService.GenerateDocumentsAsync(LeaseId);
-            LoadPdfBytes();
-            _pendingLoad = true;
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = ex.Message;
-        }
-        finally
-        {
-            Busy = false;
-        }
-    }
-
-    private void LoadPdfBytes()
+    private async Task PreferDisplayPdfAsync()
     {
         _pdfBytes = null;
+        if (Lease?.SignedDocumentId is Guid sid)
+        {
+            _pdfBytes = await DocumentService.ReadBytesAsync(sid);
+            if (_pdfBytes is not null)
+            {
+                return;
+            }
+        }
+
         if (Lease?.GeneratedPdfRelativePath is null)
         {
             return;
@@ -141,8 +176,92 @@ else
             return;
         }
 
-        _pdfBytes = File.ReadAllBytes(path);
+        _pdfBytes = await File.ReadAllBytesAsync(path);
     }
 
-    private Task OnDocumentLoaded(LoadEventArgs args) => Task.CompletedTask;
+    private async Task GenerateAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            Lease = await LeaseService.GenerateDocumentsAsync(LeaseId);
+            await PreferDisplayPdfAsync();
+            _pendingLoad = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task OnSignedSelectedAsync(UploadChangeEventArgs args)
+    {
+        ErrorMessage = null;
+        _pendingSigned = null;
+        var file = args.Files?.FirstOrDefault();
+        if (file?.FileInfo is null)
+        {
+            return;
+        }
+
+        await using var stream = file.File.OpenReadStream(25 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        _pendingSigned = (file.FileInfo.Name, file.FileInfo.Type ?? "application/pdf", ms.ToArray());
+    }
+
+    private async Task AttachSignedAsync()
+    {
+        if (_pendingSigned is null || Lease is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name
+                ?? auth.User.FindFirstValue(ClaimTypes.Email)
+                ?? "clerk";
+            await using var stream = new MemoryStream(_pendingSigned.Value.Bytes);
+            Lease = await LeaseService.AttachSignedDocumentAsync(
+                LeaseId,
+                _pendingSigned.Value.Name,
+                _pendingSigned.Value.ContentType,
+                stream,
+                user);
+            _pendingSigned = null;
+            SuccessMessage = "Signed lease attached. Status is now Active.";
+            await LoadAsync();
+            _pendingLoad = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ViewSignedAsync()
+    {
+        if (Lease?.SignedDocumentId is not Guid sid)
+        {
+            return;
+        }
+
+        _pdfBytes = await DocumentService.ReadBytesAsync(sid);
+        _pendingLoad = _pdfBytes is not null;
+    }
 }

@@ -17,4 +17,6 @@ public class Lease
     public bool IsDeleted { get; set; }
     public string? GeneratedDocxRelativePath { get; set; }
     public string? GeneratedPdfRelativePath { get; set; }
+    /// <summary>Document vault id for the signed lease PDF (T3.3).</summary>
+    public Guid? SignedDocumentId { get; set; }
 }

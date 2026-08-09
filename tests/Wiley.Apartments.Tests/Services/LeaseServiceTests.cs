@@ -52,12 +52,20 @@ public class LeaseServiceTests
 
         var env = new TestHostEnvironment { ContentRootPath = Path.GetTempPath() };
         var opts = Options.Create(new ClerkSuiteOptions { DocumentRoot = documentRoot });
+        var clock = new FixedClock();
+        var documents = new DocumentService(
+            db,
+            opts,
+            env,
+            clock,
+            NullLogger<DocumentService>.Instance);
         var service = new LeaseService(
             db,
             opts,
             env,
-            new FixedClock(),
+            clock,
             new LeaseDocumentGenerator(),
+            documents,
             NullLogger<LeaseService>.Instance);
         return (db, service, documentRoot);
     }
@@ -144,6 +152,60 @@ public class LeaseServiceTests
         {
             // best-effort cleanup
         }
+    }
+
+    [Fact]
+    public async Task AttachSignedDocumentAsync_StoresVaultFile_AndSetsActive()
+    {
+        var root = ResolveTemplatesDir();
+        if (root is null)
+        {
+            return;
+        }
+
+        var workRoot = Path.Combine(Path.GetTempPath(), "clerksuite-signed-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(workRoot, "templates"));
+        File.Copy(
+            Path.Combine(root, "templates", "brookside-year-lease.docx"),
+            Path.Combine(workRoot, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(workRoot);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "7", SqFt = 600, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Pat", LastName = "Nguyen" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.pdf",
+                DateTime.UtcNow,
+                DateTime.UtcNow.AddYears(1),
+                500m,
+                500m);
+
+            var pdfBytes = "%PDF-1.4 signed stub"u8.ToArray();
+            await using var stream = new MemoryStream(pdfBytes);
+            var active = await service.AttachSignedDocumentAsync(
+                draft.Id,
+                "signed-lease.pdf",
+                "application/pdf",
+                stream,
+                "clerk@test");
+
+            active.Status.Should().Be(LeaseStatus.Active);
+            active.SignedDocumentId.Should().NotBeNull();
+            var doc = await db.Documents.AsNoTracking().SingleAsync(d => d.Id == active.SignedDocumentId);
+            doc.Category.Should().Be(DocumentCategory.SignedLease);
+            doc.EntityType.Should().Be(DocumentEntityType.Lease);
+            File.Exists(Path.Combine(workRoot, doc.FilePathOnNas.Replace('/', Path.DirectorySeparatorChar)))
+                .Should().BeTrue();
+        }
+
+        try { Directory.Delete(workRoot, recursive: true); } catch { /* ignore */ }
     }
 
     [Fact]

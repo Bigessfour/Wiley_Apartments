@@ -21,6 +21,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Occupancy> Occupancies => Set<Occupancy>();
     public DbSet<Lease> Leases => Set<Lease>();
+    public DbSet<Document> Documents => Set<Document>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -165,6 +166,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.GeneratedPdfRelativePath).HasMaxLength(512);
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted });
             entity.HasIndex(e => new { e.TenantId, e.IsDeleted });
+            entity.HasIndex(e => e.SignedDocumentId);
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
@@ -173,6 +175,20 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Document>(entity =>
+        {
+            entity.ToTable("Documents");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EntityType).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.FilePathOnNas).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.OriginalFileName).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.ContentType).HasMaxLength(128);
+            entity.Property(e => e.UploadedBy).HasMaxLength(256);
+            entity.HasIndex(e => new { e.EntityType, e.EntityId, e.IsDeleted });
+            entity.HasIndex(e => e.Category);
         });
     }
 }

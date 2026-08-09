@@ -34,6 +34,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IAssetService, AssetService>();
         builder.Services.AddScoped<IFlooringService, FlooringService>();
         builder.Services.AddSingleton<LeaseDocumentGenerator>();
+        builder.Services.AddScoped<IDocumentService, DocumentService>();
         builder.Services.AddScoped<ILeaseService, LeaseService>();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")

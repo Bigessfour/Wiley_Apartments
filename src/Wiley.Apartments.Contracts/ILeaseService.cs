@@ -25,5 +25,14 @@ public interface ILeaseService
     /// <summary>Fill template (prefer fillable PDF) under DocumentRoot/leases. Remains Draft until signed/activated.</summary>
     Task<Lease> GenerateDocumentsAsync(Guid leaseId, CancellationToken cancellationToken = default);
 
+    /// <summary>Store signed PDF in the vault, link to lease, set status Active.</summary>
+    Task<Lease> AttachSignedDocumentAsync(
+        Guid leaseId,
+        string originalFileName,
+        string contentType,
+        Stream content,
+        string uploadedBy,
+        CancellationToken cancellationToken = default);
+
     Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }
