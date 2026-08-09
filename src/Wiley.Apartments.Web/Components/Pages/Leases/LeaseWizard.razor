@@ -1,0 +1,176 @@
+@page "/leases/new"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject ILeaseService LeaseService
+@inject IUnitService UnitService
+@inject ITenantService TenantService
+@inject NavigationManager Navigation
+
+<PageTitle>New lease</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Generate lease</h1>
+        <p class="text-muted mb-0">Fill Brookside blank template from unit + tenant data</p>
+    </div>
+    <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+@if (Templates.Count == 0)
+{
+    <div class="alert alert-info">
+        No Brookside templates found. Copy
+        <code>brookside-year-lease.docx</code> and
+        <code>brookside-month-to-month-lease.docx</code>
+        into DocumentRoot/templates (see deploy/synology/TEMPLATES.md).
+    </div>
+}
+else
+{
+    <div class="row g-3" style="max-width: 720px;">
+        <div class="col-12">
+            <label class="form-label">Template</label>
+            <SfDropDownList TValue="string" TItem="LeaseTemplateInfo"
+                            DataSource="@Templates"
+                            @bind-Value="SelectedTemplate"
+                            Placeholder="Select template">
+                <DropDownListFieldSettings Text="DisplayName" Value="FileName" />
+            </SfDropDownList>
+            @if (!string.IsNullOrEmpty(SelectedTemplate))
+            {
+                var term = Templates.FirstOrDefault(t => t.FileName == SelectedTemplate)?.TermDescription;
+                <p class="text-muted small mt-1 mb-0">@term</p>
+            }
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Unit</label>
+            <SfDropDownList TValue="Guid?" TItem="Unit"
+                            DataSource="@Units"
+                            @bind-Value="SelectedUnitId"
+                            Placeholder="Select unit"
+                            AllowFiltering="true">
+                <DropDownListFieldSettings Text="Number" Value="Id" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Tenant</label>
+            <SfDropDownList TValue="Guid?" TItem="TenantOption"
+                            DataSource="@Tenants"
+                            @bind-Value="SelectedTenantId"
+                            Placeholder="Select tenant"
+                            AllowFiltering="true">
+                <DropDownListFieldSettings Text="DisplayLabel" Value="Id" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Start</label>
+            <SfDatePicker TValue="DateTime?" @bind-Value="StartDate" Placeholder="Lease start" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">End</label>
+            <SfDatePicker TValue="DateTime?" @bind-Value="EndDate" Placeholder="Lease end" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Monthly rent</label>
+            <SfNumericTextBox TValue="decimal?" @bind-Value="Rent" Format="C2" Min="0" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Security deposit</label>
+            <SfNumericTextBox TValue="decimal?" @bind-Value="Deposit" Format="C2" Min="0" />
+        </div>
+        <div class="col-12">
+            <SfButton CssClass="e-primary" Content="@(Busy ? "Generating…" : "Create & generate")"
+                      Disabled="@Busy" OnClick="GenerateAsync" />
+        </div>
+    </div>
+}
+
+@code {
+    private List<LeaseTemplateInfo> Templates { get; set; } = [];
+    private List<Unit> Units { get; set; } = [];
+    private List<TenantOption> Tenants { get; set; } = [];
+    private string? SelectedTemplate { get; set; }
+    private Guid? SelectedUnitId { get; set; }
+    private Guid? SelectedTenantId { get; set; }
+    private DateTime? StartDate { get; set; } = DateTime.Today;
+    private DateTime? EndDate { get; set; } = DateTime.Today.AddYears(1);
+    private decimal? Rent { get; set; } = 0;
+    private decimal? Deposit { get; set; } = 0;
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    private sealed class TenantOption
+    {
+        public Guid Id { get; set; }
+        public string DisplayLabel { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Templates = (await LeaseService.ListTemplatesAsync()).ToList();
+        SelectedTemplate = Templates.FirstOrDefault()?.FileName;
+        Units = (await UnitService.GetAllAsync()).OrderBy(u => u.Number).ToList();
+        Tenants = (await TenantService.SearchAsync())
+            .OrderBy(t => t.LastName)
+            .ThenBy(t => t.FirstName)
+            .Select(t => new TenantOption
+            {
+                Id = t.Id,
+                DisplayLabel = $"{t.LastName}, {t.FirstName}"
+            })
+            .ToList();
+
+        if (SelectedTemplate?.Contains("month-to-month", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            EndDate = DateTime.Today.AddMonths(1);
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        ErrorMessage = null;
+        if (string.IsNullOrEmpty(SelectedTemplate)
+            || SelectedUnitId is null
+            || SelectedTenantId is null
+            || StartDate is null
+            || EndDate is null
+            || Rent is null
+            || Deposit is null)
+        {
+            ErrorMessage = "Select template, unit, tenant, dates, rent, and deposit.";
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            var startUtc = DateTime.SpecifyKind(StartDate.Value.Date, DateTimeKind.Utc);
+            var endUtc = DateTime.SpecifyKind(EndDate.Value.Date, DateTimeKind.Utc);
+            var draft = await LeaseService.CreateDraftAsync(
+                SelectedUnitId.Value,
+                SelectedTenantId.Value,
+                SelectedTemplate,
+                startUtc,
+                endUtc,
+                Rent.Value,
+                Deposit.Value);
+            var lease = await LeaseService.GenerateDocumentsAsync(draft.Id);
+            Navigation.NavigateTo($"/leases/{lease.Id}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}

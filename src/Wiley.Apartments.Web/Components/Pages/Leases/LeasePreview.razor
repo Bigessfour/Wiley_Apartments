@@ -1,0 +1,148 @@
+@page "/leases/{LeaseId:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Syncfusion.Blazor.SfPdfViewer
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Configuration
+@inject ILeaseService LeaseService
+@inject IOptions<ClerkSuiteOptions> Options
+@inject IHostEnvironment Environment
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+
+<PageTitle>Lease preview</PageTitle>
+
+@if (Lease is null)
+{
+    <p class="text-muted">@(ErrorMessage ?? "Loading…")</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+        <div>
+            <h1 class="h3 mb-1">Lease — unit @(Lease.Unit?.Number)</h1>
+            <p class="text-muted mb-0">
+                @(Lease.Tenant is null ? "" : $"{Lease.Tenant.FirstName} {Lease.Tenant.LastName}")
+                · @Lease.Status · @Lease.TemplateUsed
+            </p>
+            <p class="small mb-0">
+                @Clock.ToDisplayTime(Lease.StartUtc).ToString("d") – @Clock.ToDisplayTime(Lease.EndUtc).ToString("d")
+                · Rent @Lease.Rent.ToString("C") · Deposit @Lease.Deposit.ToString("C")
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
+            @if (string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+            {
+                <SfButton CssClass="e-primary" Content="Generate PDF" Disabled="@Busy" OnClick="GenerateAsync" />
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-warning">@ErrorMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+    {
+        <p class="small text-muted mb-2">
+            PDF: @Lease.GeneratedPdfRelativePath
+            @if (!string.IsNullOrEmpty(Lease.GeneratedDocxRelativePath))
+            {
+                <span> · DOCX archive: @Lease.GeneratedDocxRelativePath</span>
+            }
+            <span> · Status remains Draft until signed (T3.3)</span>
+        </p>
+        <div style="height: 680px; width: 100%;">
+            <SfPdfViewer2 @ref="PdfViewer"
+                          Height="100%"
+                          Width="100%">
+                <PdfViewerEvents DocumentLoaded="OnDocumentLoaded" />
+            </SfPdfViewer2>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid LeaseId { get; set; }
+
+    private Lease? Lease { get; set; }
+    private SfPdfViewer2? PdfViewer { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool Busy { get; set; }
+    private byte[]? _pdfBytes;
+    private bool _pendingLoad;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingLoad && PdfViewer is not null && _pdfBytes is not null)
+        {
+            _pendingLoad = false;
+            await PdfViewer.LoadAsync(_pdfBytes);
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        Lease = await LeaseService.GetByIdAsync(LeaseId);
+        if (Lease is null)
+        {
+            ErrorMessage = "Lease not found.";
+            return;
+        }
+
+        LoadPdfBytes();
+        _pendingLoad = _pdfBytes is not null;
+    }
+
+    private async Task GenerateAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            Lease = await LeaseService.GenerateDocumentsAsync(LeaseId);
+            LoadPdfBytes();
+            _pendingLoad = true;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void LoadPdfBytes()
+    {
+        _pdfBytes = null;
+        if (Lease?.GeneratedPdfRelativePath is null)
+        {
+            return;
+        }
+
+        var root = Options.Value.DocumentRoot;
+        if (!Path.IsPathRooted(root))
+        {
+            root = Path.GetFullPath(Path.Combine(Environment.ContentRootPath, root));
+        }
+
+        var path = Path.Combine(root, Lease.GeneratedPdfRelativePath);
+        if (!File.Exists(path))
+        {
+            ErrorMessage = $"Generated PDF missing: {Lease.GeneratedPdfRelativePath}";
+            return;
+        }
+
+        _pdfBytes = File.ReadAllBytes(path);
+    }
+
+    private Task OnDocumentLoaded(LoadEventArgs args) => Task.CompletedTask;
+}

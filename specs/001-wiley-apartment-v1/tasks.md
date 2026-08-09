@@ -88,27 +88,29 @@
   - **Paths:** `Domain/Occupancy.cs`, `IOccupancyService` / `OccupancyService.cs`, migration `AddOccupancies`, `Pages/Units/UnitDetail.razor` (Occupancy tab), history on `Pages/Tenants/TenantDetail.razor`
   - **Progress (2026-08-09):** Start/end sets `Unit.Status` Occupied↔Vacant and `CurrentTenantId`; history retained; unit + tenant views show history. Tests: `OccupancyServiceTests`.
 
-- [ ] **T2.3** Tenant detail page (related records).
+- [x] **T2.3** Tenant detail page (related records).
   - **Done when:** Related leases, payments/ledger, and documents accessible from tenant view.
   - **Paths:** `Pages/Tenants/TenantDetail.razor`
-  - **Progress (2026-08-09):** Detail has contacts (T2.1) + occupancy history (T2.2). Leases / ledger / documents sections wait on Phases 3–4 / 6.
+  - **Progress (2026-08-09):** Leases grid + open/new links (`ILeaseService.GetByTenantAsync`). Payments/ledger: portal deep-link stub (Phase 4 fills ledger). Documents: Phase 6 stub note; lease PDFs via Leases section.
 
-**Checkpoint:** FR-2 core (CRUD + occupancy) **pass** for clerk workflows; screening attach deferred to Phase 6; T2.3 related-record links remain for later phases.
+**Checkpoint:** FR-2 core (CRUD + occupancy + related-record navigation) **pass**; screening attach deferred to Phase 6; ledger/doc vault content wait on Phases 4/6.
 
 ---
 
 ## Phase 3 — Leases
 
-- [ ] **T3.1** Lease entity + key-date tracking + status (Active, Expired, Terminated, etc.).
+- [x] **T3.1** Lease entity + key-date tracking + status (Active, Expired, Terminated, etc.).
   - **Done when:** Leases created and linked to unit + tenant; **soft-delete** retains history; `TemplateUsed` recorded.
   - **Paths:** `Domain/Lease.cs`, `Services/LeaseService.cs`
+  - **Progress (2026-08-09):** `Lease` + `LeaseStatus`, EF migration `AddLeases`, `ILeaseService`/`LeaseService` (draft, soft-delete, list).
 
-- [ ] **T3.2** Lease generator from template (populate unit/tenant data).
+- [x] **T3.2** Lease generator from template (populate unit/tenant data).
   - **Done when:** Clerk generates DOCX/PDF via Syncfusion DocumentEditor + server export with correct merged data; Colorado template in `templates/leases/`.
   - **Paths:** `Pages/Leases/LeaseWizard.razor`, `Pages/Leases/LeasePreview.razor`
+  - **Progress (2026-08-09):** **PDF-first pivot** — `Syncfusion.Pdf.Net.Core` + `Syncfusion.Blazor.SfPdfViewer`. Bootstraps fillable AcroForm `brookside-*.pdf` from Brookside DOCX; fills named fields; preview via SfPdfViewer2. Generated lease stays **Draft** until T3.3/T3.4. See `deploy/synology/TEMPLATES.md`.
 
 - [ ] **T3.3** Upload/link signed lease + document vault integration.
-  - **Done when:** Signed document on NAS (`/docs/leases/...`) and linked to lease via Document entity.
+  - **Done when:** Signed document on NAS (`/docs/leases/...`) and linked to lease via Document entity; status can move Draft → Active.
   - **Paths:** `Services/DocumentService.cs`, lease detail upload
 
 - [ ] **T3.4** Renew / amend / terminate workflows.
@@ -116,6 +118,25 @@
   - **Paths:** `Services/LeaseService.cs` (Renew/Amend/Terminate)
 
 **Checkpoint:** FR-3 acceptance criteria pass.
+
+---
+
+## Phase 3.5 — Operations Calendar (Scheduler)
+
+Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, reminders / action items). Placed after leases so entries can optionally link to lease/vacancy dates; before payments so calendar is not blocked on ledger.
+
+- [ ] **T3.5.1** `ScheduledItem` entity + service (unit optional tenant/lease link; categories; due/start/end; reminder offset; completion).
+  - **Done when:** CRUD persists; soft-delete; filter by unit/category/date range.
+  - **Paths:** `Domain/ScheduledItem.cs`, `IScheduleService` / `ScheduleService.cs`, migration
+
+- [ ] **T3.5.2** Syncfusion `SfSchedule` UI (`Syncfusion.Blazor.Schedule`) — day/week/month/agenda; resource-by-unit optional.
+  - **Done when:** Clerks create/edit/drag items; categories for cleaning / vacancy / inspection / other; reminders surface on dashboard later (T6.2).
+  - **Paths:** `Pages/Schedule/OperationsCalendar.razor`, nav link
+
+- [ ] **T3.5.3** Seed common recurring patterns (e.g. turn-over clean after vacancy) — optional v1 polish.
+  - **Done when:** At least vacancy→clean suggestion or template actions documented.
+
+**Checkpoint:** Clerks can track date-bound unit work with reminders independently of maintenance work orders (Phase 5).
 
 ---
 
@@ -212,8 +233,10 @@ The system is **done** when:
 Phase 0 (blocking)
   → Phase 1 (units/assets)
   → Phase 2 (tenants)
-  → Phase 3, 4, 5 (can overlap after Phase 2; all need Phase 0)
-  → Phase 6 (dashboard needs 3–5 data feeds)
+  → Phase 3 (leases, fillable PDF)
+  → Phase 3.5 (operations calendar / SfSchedule)
+  → Phase 4, 5 (payments + maintenance; can overlap)
+  → Phase 6 (dashboard needs 3–5 + calendar reminders)
   → Phase 7 (after 1–6)
 ```
 

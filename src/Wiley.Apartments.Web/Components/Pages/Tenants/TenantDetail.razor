@@ -7,8 +7,10 @@
 @using Wiley.Apartments.Domain
 @inject ITenantService TenantService
 @inject IOccupancyService OccupancyService
+@inject ILeaseService LeaseService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject Microsoft.Extensions.Options.IOptions<Wiley.Apartments.Web.Configuration.ClerkSuiteOptions> ClerkOptions
 
 <PageTitle>@(Tenant is null ? "Tenant" : $"{Tenant.LastName}, {Tenant.FirstName}")</PageTitle>
 
@@ -148,8 +150,59 @@ else
         </GridColumns>
     </SfGrid>
 
-    <p class="text-muted small mt-4 mb-0">
-        Screening document attach will land with Document vault (Phase 6). Leases / ledger sections are later phases.
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <h2 class="h5 mb-0">Leases</h2>
+        <SfButton CssClass="e-small e-primary" Content="New lease"
+                  OnClick="@(() => Navigation.NavigateTo($"/leases/new"))" />
+    </div>
+    @if (Leases.Count == 0)
+    {
+        <p class="text-muted small">No leases linked yet.</p>
+    }
+    else
+    {
+        <SfGrid TValue="Lease" DataSource="@Leases" AllowPaging="true" Height="200" class="mt-2">
+            <GridColumns>
+                <GridColumn HeaderText="Unit" Width="90">
+                    <Template>
+                        @{
+                            var row = (Lease)context;
+                        }
+                        @(row.Unit?.Number ?? "—")
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(Lease.Status)" HeaderText="Status" Width="100" />
+                <GridColumn HeaderText="Term" Width="180">
+                    <Template>
+                        @{
+                            var row = (Lease)context;
+                        }
+                        <span>@Clock.ToDisplayTime(row.StartUtc).ToString("d") – @Clock.ToDisplayTime(row.EndUtc).ToString("d")</span>
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(Lease.Rent)" HeaderText="Rent" Width="90" Format="C2" />
+                <GridColumn HeaderText="" Width="90" TextAlign="TextAlign.Center">
+                    <Template>
+                        @{
+                            var row = (Lease)context;
+                        }
+                        <SfButton CssClass="e-small e-outline" Content="Open"
+                                  OnClick="@(() => Navigation.NavigateTo($"/leases/{row.Id}"))" />
+                    </Template>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    }
+
+    <h2 class="h5 mt-4">Payments / ledger</h2>
+    <p class="text-muted small mb-1">
+        Ledger posts land in Phase 4.
+        <a href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Open town payment portal</a>
+    </p>
+
+    <h2 class="h5 mt-4">Documents</h2>
+    <p class="text-muted small mb-0">
+        Screening packs and vault files land in Phase 6. Generated lease PDFs appear under Leases above.
     </p>
 }
 
@@ -159,8 +212,13 @@ else
 
     private Tenant? Tenant { get; set; }
     private List<Occupancy> OccupancyHistory { get; set; } = [];
+    private List<Lease> Leases { get; set; } = [];
     private string StatusMessage { get; set; } = "Loading…";
     private string? ErrorMessage { get; set; }
+    private string PaymentPortalUrl =>
+        string.IsNullOrWhiteSpace(ClerkOptions.Value.PaymentPortalUrl)
+            ? "https://www.townofwiley.gov/government/departments/finance/utility-billing"
+            : ClerkOptions.Value.PaymentPortalUrl;
 
     protected override async Task OnParametersSetAsync() => await ReloadAsync();
 
@@ -169,9 +227,15 @@ else
         ErrorMessage = null;
         Tenant = await TenantService.GetByIdAsync(TenantId);
         StatusMessage = Tenant is null ? "Tenant not found." : string.Empty;
-        OccupancyHistory = Tenant is null
-            ? []
-            : (await OccupancyService.GetHistoryForTenantAsync(TenantId)).ToList();
+        if (Tenant is null)
+        {
+            OccupancyHistory = [];
+            Leases = [];
+            return;
+        }
+
+        OccupancyHistory = (await OccupancyService.GetHistoryForTenantAsync(TenantId)).ToList();
+        Leases = (await LeaseService.GetByTenantAsync(TenantId)).ToList();
     }
 
     private async Task OnHouseholdCompleteAsync(ActionEventArgs<HouseholdMember> args)

@@ -20,6 +20,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Pet> Pets => Set<Pet>();
     public DbSet<Occupancy> Occupancies => Set<Occupancy>();
+    public DbSet<Lease> Leases => Set<Lease>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -142,6 +143,28 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.StartUtc).IsRequired();
             entity.HasIndex(e => new { e.UnitId, e.EndUtc });
             entity.HasIndex(e => new { e.TenantId, e.EndUtc });
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Lease>(entity =>
+        {
+            entity.ToTable("Leases");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Rent).HasPrecision(18, 2);
+            entity.Property(e => e.Deposit).HasPrecision(18, 2);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.TemplateUsed).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.GeneratedDocxRelativePath).HasMaxLength(512);
+            entity.Property(e => e.GeneratedPdfRelativePath).HasMaxLength(512);
+            entity.HasIndex(e => new { e.UnitId, e.IsDeleted });
+            entity.HasIndex(e => new { e.TenantId, e.IsDeleted });
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)

@@ -1,0 +1,73 @@
+@page "/leases"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject ILeaseService LeaseService
+@inject NavigationManager Navigation
+
+<PageTitle>Leases</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Leases</h1>
+        <p class="text-muted mb-0">Brookside templates under DocumentRoot/templates</p>
+    </div>
+    <SfButton CssClass="e-primary" Content="New lease" OnClick="@(() => Navigation.NavigateTo("/leases/new"))" />
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<SfGrid TValue="Lease" DataSource="@Leases" AllowPaging="true" AllowSorting="true" Height="420">
+    <GridColumns>
+        <GridColumn Field="@nameof(Lease.Id)" IsPrimaryKey="true" Visible="false" />
+        <GridColumn HeaderText="Unit" Width="90">
+            <Template>
+                @{
+                    var row = (Lease)context;
+                }
+                @(row.Unit?.Number ?? "—")
+            </Template>
+        </GridColumn>
+        <GridColumn HeaderText="Tenant" Width="180">
+            <Template>
+                @{
+                    var row = (Lease)context;
+                }
+                @(row.Tenant is null ? "—" : $"{row.Tenant.LastName}, {row.Tenant.FirstName}")
+            </Template>
+        </GridColumn>
+        <GridColumn Field="@nameof(Lease.Status)" HeaderText="Status" Width="110" />
+        <GridColumn Field="@nameof(Lease.TemplateUsed)" HeaderText="Template" Width="220" />
+        <GridColumn Field="@nameof(Lease.Rent)" HeaderText="Rent" Width="100" Format="C2" />
+        <GridColumn HeaderText="" Width="100" TextAlign="TextAlign.Center">
+            <Template>
+                @{
+                    var row = (Lease)context;
+                }
+                <SfButton CssClass="e-small e-outline" Content="Open"
+                          OnClick="@(() => Navigation.NavigateTo($"/leases/{row.Id}"))" />
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<Lease> Leases { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Leases = (await LeaseService.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+}
