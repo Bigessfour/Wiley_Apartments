@@ -19,6 +19,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Pet> Pets => Set<Pet>();
+    public DbSet<Occupancy> Occupancies => Set<Occupancy>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -132,6 +133,23 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany(t => t.Pets)
                 .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Occupancy>(entity =>
+        {
+            entity.ToTable("Occupancies");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.StartUtc).IsRequired();
+            entity.HasIndex(e => new { e.UnitId, e.EndUtc });
+            entity.HasIndex(e => new { e.TenantId, e.EndUtc });
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

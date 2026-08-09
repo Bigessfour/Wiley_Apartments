@@ -30,6 +30,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IUnitSeeder, UnitSeeder>();
         builder.Services.AddScoped<IUnitService, UnitService>();
         builder.Services.AddScoped<ITenantService, TenantService>();
+        builder.Services.AddScoped<IOccupancyService, OccupancyService>();
         builder.Services.AddScoped<IAssetService, AssetService>();
         builder.Services.AddScoped<IFlooringService, FlooringService>();
 

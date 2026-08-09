@@ -79,18 +79,21 @@
 
 - [x] **T2.1** Tenant full CRUD + household members + contacts (vehicles, pets, emergency).
   - **Done when:** Create / edit / search / **soft-delete** works; screening documents attachable to tenant.
-  - **Paths:** `Domain/Tenant.cs`, `Pages/Tenants/`
-  - **Note (2026-08-09):** CRUD + soft-delete + household/vehicles/pets shipped; screening attach deferred to Document vault (Phase 6).
+  - **Paths:** `Domain/Tenant.cs`, `ITenantService` / `TenantService.cs`, `Pages/Tenants/TenantList.razor`, `Pages/Tenants/TenantDetail.razor` (household/vehicles/pets), migration `AddTenants`
+  - **Tests:** unit (`TenantServiceTests`), integration (`TenantIntegrationTests`), E2E auth redirect (`TenantsPageE2ETests`)
+  - **Progress (2026-08-09):** CRUD + soft-delete + search + nested edit/update for household/vehicles/pets (incl. DOB) on PR `#2`. Screening document attach **deferred** to Document vault (Phase 6 / T6.x).
 
-- [ ] **T2.2** Occupancy linking (start/end) with history.
+- [x] **T2.2** Occupancy linking (start/end) with history.
   - **Done when:** Current tenant on unit detail; past occupancy retained and viewable; unit status updates on start/end.
-  - **Paths:** `Domain/Occupancy.cs`, `Services/OccupancyService.cs`
+  - **Paths:** `Domain/Occupancy.cs`, `IOccupancyService` / `OccupancyService.cs`, migration `AddOccupancies`, `Pages/Units/UnitDetail.razor` (Occupancy tab), history on `Pages/Tenants/TenantDetail.razor`
+  - **Progress (2026-08-09):** Start/end sets `Unit.Status` Occupied↔Vacant and `CurrentTenantId`; history retained; unit + tenant views show history. Tests: `OccupancyServiceTests`.
 
-- [ ] **T2.3** Tenant detail page.
+- [ ] **T2.3** Tenant detail page (related records).
   - **Done when:** Related leases, payments/ledger, and documents accessible from tenant view.
   - **Paths:** `Pages/Tenants/TenantDetail.razor`
+  - **Progress (2026-08-09):** Detail has contacts (T2.1) + occupancy history (T2.2). Leases / ledger / documents sections wait on Phases 3–4 / 6.
 
-**Checkpoint:** FR-2 acceptance criteria pass.
+**Checkpoint:** FR-2 core (CRUD + occupancy) **pass** for clerk workflows; screening attach deferred to Phase 6; T2.3 related-record links remain for later phases.
 
 ---
 

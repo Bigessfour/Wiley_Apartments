@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
@@ -10,6 +11,9 @@
 @inject IUnitService UnitService
 @inject IAssetService AssetService
 @inject IFlooringService FlooringService
+@inject IOccupancyService OccupancyService
+@inject ITenantService TenantService
+@inject IDateTimeService Clock
 @inject NavigationManager Navigation
 
 <PageTitle>Unit @Unit?.Number</PageTitle>
@@ -79,9 +83,21 @@ else
         </div>
         <div class="col-md-6 col-xl-3">
             <SfCard CssClass="unit-summary-card h-100">
-                <CardHeader Title="Notes" />
+                <CardHeader Title="Current tenant" />
                 <CardContent>
-                    <p class="mb-0">@(string.IsNullOrWhiteSpace(Unit.Notes) ? "No unit notes recorded." : Unit.Notes)</p>
+                    @if (CurrentOccupancy?.Tenant is not null)
+                    {
+                        <p class="mb-1">
+                            <a href="@($"/tenants/{CurrentOccupancy.TenantId}")">
+                                @CurrentOccupancy.Tenant.LastName, @CurrentOccupancy.Tenant.FirstName
+                            </a>
+                        </p>
+                        <p class="mb-0 text-muted small">Since @Clock.ToDisplayTime(CurrentOccupancy.StartUtc).ToString("g") MT</p>
+                    }
+                    else
+                    {
+                        <p class="mb-0 text-muted">Vacant — no active occupancy</p>
+                    }
                 </CardContent>
             </SfCard>
         </div>
@@ -89,6 +105,88 @@ else
 
     <SfTab>
         <TabItems>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Occupancy"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    @if (!string.IsNullOrEmpty(OccupancyError))
+                    {
+                        <div class="alert alert-warning">@OccupancyError</div>
+                    }
+
+                    <div class="row g-3 mb-3 align-items-end">
+                        @if (CurrentOccupancy is null)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">Start occupancy</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="TenantOption"
+                                                DataSource="@TenantOptions"
+                                                @bind-Value="SelectedTenantId"
+                                                Placeholder="Select tenant"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="DisplayName" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-md-3">
+                                <SfButton CssClass="e-primary"
+                                          Content="Start occupancy"
+                                          Disabled="@(SelectedTenantId is null)"
+                                          OnClick="StartOccupancyAsync" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-md-6">
+                                <p class="mb-2">
+                                    Active: <strong>@CurrentOccupancy.Tenant!.LastName, @CurrentOccupancy.Tenant.FirstName</strong>
+                                </p>
+                                <SfButton CssClass="e-outline e-danger"
+                                          Content="End occupancy"
+                                          OnClick="EndOccupancyAsync" />
+                            </div>
+                        }
+                    </div>
+
+                    <h2 class="h6 mb-2">Occupancy history</h2>
+                    <SfGrid TValue="Occupancy"
+                            DataSource="@OccupancyHistory"
+                            AllowPaging="true"
+                            AllowSorting="true"
+                            Height="280">
+                        <GridColumns>
+                            <GridColumn HeaderText="Tenant" Width="180">
+                                <Template>
+                                    @{
+                                        var row = (Occupancy)context;
+                                        var name = row.Tenant is null
+                                            ? row.TenantId.ToString()[..8]
+                                            : $"{row.Tenant.LastName}, {row.Tenant.FirstName}";
+                                    }
+                                    <span>@name</span>
+                                </Template>
+                            </GridColumn>
+                            <GridColumn HeaderText="Start (MT)" Width="160">
+                                <Template>
+                                    @{
+                                        var row = (Occupancy)context;
+                                    }
+                                    <span>@Clock.ToDisplayTime(row.StartUtc).ToString("g")</span>
+                                </Template>
+                            </GridColumn>
+                            <GridColumn HeaderText="End (MT)" Width="160">
+                                <Template>
+                                    @{
+                                        var row = (Occupancy)context;
+                                    }
+                                    <span>@(row.EndUtc is null ? "Active" : Clock.ToDisplayTime(row.EndUtc.Value).ToString("g"))</span>
+                                </Template>
+                            </GridColumn>
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
             <TabItem>
                 <ChildContent>
                     <TabHeader Text="Overview"></TabHeader>
@@ -254,10 +352,15 @@ else
     private Unit? Unit { get; set; }
     private List<Asset> UnitAssets { get; set; } = [];
     private List<Flooring> UnitFloorings { get; set; } = [];
+    private Occupancy? CurrentOccupancy { get; set; }
+    private List<Occupancy> OccupancyHistory { get; set; } = [];
+    private List<TenantOption> TenantOptions { get; set; } = [];
+    private Guid? SelectedTenantId { get; set; }
     private SfGrid<Asset>? AssetGridRef;
     private SfGrid<Flooring>? FlooringGridRef;
     private string? LoadError { get; set; }
     private string? GridError { get; set; }
+    private string? OccupancyError { get; set; }
 
     private int ExpiringWarrantyCount => UnitAssets.Count(a =>
         a.WarrantyEnd is not null
@@ -307,6 +410,52 @@ else
 
         UnitAssets = (await AssetService.GetByUnitIdAsync(UnitId)).ToList();
         UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
+        await ReloadOccupancyAsync();
+        TenantOptions = (await TenantService.SearchAsync())
+            .Select(t => new TenantOption(t.Id, $"{t.LastName}, {t.FirstName}"))
+            .ToList();
+    }
+
+    private async Task ReloadOccupancyAsync()
+    {
+        CurrentOccupancy = await OccupancyService.GetCurrentForUnitAsync(UnitId);
+        OccupancyHistory = (await OccupancyService.GetHistoryForUnitAsync(UnitId)).ToList();
+        Unit = await UnitService.GetByIdAsync(UnitId);
+    }
+
+    private async Task StartOccupancyAsync()
+    {
+        OccupancyError = null;
+        if (SelectedTenantId is null)
+        {
+            OccupancyError = "Select a tenant first.";
+            return;
+        }
+
+        try
+        {
+            await OccupancyService.StartAsync(UnitId, SelectedTenantId.Value);
+            SelectedTenantId = null;
+            await ReloadOccupancyAsync();
+        }
+        catch (Exception ex)
+        {
+            OccupancyError = ex.Message;
+        }
+    }
+
+    private async Task EndOccupancyAsync()
+    {
+        OccupancyError = null;
+        try
+        {
+            await OccupancyService.EndAsync(UnitId);
+            await ReloadOccupancyAsync();
+        }
+        catch (Exception ex)
+        {
+            OccupancyError = ex.Message;
+        }
     }
 
     private void GoToUnitList() => Navigation.NavigateTo("/units");
@@ -429,4 +578,6 @@ else
         UnitStatus.MakeReady => "text-bg-info",
         _ => "text-bg-light"
     };
+
+    private sealed record TenantOption(Guid Id, string DisplayName);
 }

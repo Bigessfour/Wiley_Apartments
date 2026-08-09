@@ -7,7 +7,7 @@ maintenance, appliance/carpet inventory, and documents.
 
 **Repository**: [github.com/Bigessfour/Wiley_Apartments](https://github.com/Bigessfour/Wiley_Apartments)
 
-**Status**: Phase 2 **in progress** (T2.1 tenants CRUD) — T2.2 occupancy next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
+**Status**: Phase 2 **in progress** (T2.1–T2.2 done) — T2.3 related records / Phase 3 leases next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
 
 ## Users
 
@@ -31,7 +31,7 @@ maintenance, appliance/carpet inventory, and documents.
 | `/speckit-tasks`        | Done — Phases 0–7                                                                        |
 | `/speckit-analyze`      | Done — [analyze-report](specs/001-wiley-apartment-v1/checklists/analyze-report.md)       |
 | **Planning gate**       | **Passed** 2026-08-09 — [READINESS.md](specs/001-wiley-apartment-v1/READINESS.md)        |
-| `/speckit-implement`    | **Phase 1 done** — T2.1 tenants next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md)) |
+| `/speckit-implement`    | **Phase 2 T2.1–T2.2 done** — T2.3 / Phase 3 leases next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md)) |
 
 ## Stack (from plan)
 
