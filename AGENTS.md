@@ -47,10 +47,27 @@ Setup steps: [READINESS.md §8](specs/001-wiley-apartment-v1/READINESS.md)
 
 ## Stack (summary)
 
-- .NET 8 Blazor Interactive Server + Syncfusion Blazor (sole UI)
-- EF Core + SQLite (default) or Postgres/MariaDB
+- .NET 9 Blazor Interactive Server + Syncfusion Blazor (sole UI)
+- EF Core + SQLite (default) or Postgres/MariaDB override only
 - Synology DS225+ Docker; docs at `/volume1/apartments/docs`
 - Identity; AuditLog append-only
+
+## NAS capability fence (strict for agents)
+
+Target host: **DS225+ `mr-storage`** (~6 GB RAM, shared with TIKR/mail). Canonical limits:
+[deploy/synology/RESOURCE-NOTES.md](deploy/synology/RESOURCE-NOTES.md).
+
+| Rule                 | Do                                                                               |
+| -------------------- | -------------------------------------------------------------------------------- |
+| Scale                | Design for **2 concurrent clerks**, ~16 units, app **≤ ~1.5 GiB** RSS            |
+| Data                 | SQLite on Docker volume; docs on `/volume1/apartments/docs` — not SMB for the DB |
+| Port                 | Host **8082** (8080 is `tikr-web`)                                               |
+| Images               | `linux/amd64` only                                                               |
+| Day-to-day           | Develop and test on **Mac** (`dotnet` / local Docker)                            |
+| NAS deploy           | **Infrequent** — milestone / acceptance only via `./scripts/deploy-to-nas.sh`    |
+| Avoid on NAS runtime | Extra DB containers by default, Ollama for ClerkSuite, multi-instance Blazor     |
+
+Do **not** treat the NAS as a CI box or continuous deploy target.
 
 ## Spec Kit
 

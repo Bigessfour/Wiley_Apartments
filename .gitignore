@@ -13,6 +13,8 @@ node_modules/
 # Secrets and local config
 .env
 .env.*
+!.env.example
+!**/.env.example
 *.pem
 appsettings.Development.json
 appsettings.Local.json

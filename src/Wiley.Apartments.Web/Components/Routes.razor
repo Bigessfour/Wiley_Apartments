@@ -1,6 +1,9 @@
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <Authorizing>
+                <p class="text-muted p-3">Checking sign-in…</p>
+            </Authorizing>
             <NotAuthorized>
                 @if (context.User.Identity?.IsAuthenticated != true)
                 {
