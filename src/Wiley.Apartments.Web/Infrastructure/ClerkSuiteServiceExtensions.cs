@@ -37,6 +37,11 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddSingleton<IElectronicSignatureHook, NullElectronicSignatureHook>();
         builder.Services.AddScoped<IDocumentService, DocumentService>();
         builder.Services.AddScoped<ILeaseService, LeaseService>();
+        builder.Services.AddScoped<IScheduleService, ScheduleService>();
+        builder.Services.AddScoped<ILateFeeSettingsService, LateFeeSettingsService>();
+        builder.Services.AddScoped<ILedgerService, LedgerService>();
+        builder.Services.AddScoped<IRentRollService, RentRollService>();
+        builder.Services.AddScoped<IUnitOperatingCostService, UnitOperatingCostService>();
         builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")

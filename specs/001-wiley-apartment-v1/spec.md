@@ -152,12 +152,15 @@ File Manager navigation works.
 ### User Story 6 - Dashboard and Reporting (Priority: P2) — FR-6
 
 A clerk opens the home dashboard for occupancy, expiring leases, open maintenance,
-delinquencies, and warranty expirations; runs basic reports.
+delinquencies, warranty expirations, and portfolio P/L visuals; runs basic reports
+including city-council-ready monthly/yearly net income.
 
-**Why this priority**: Proactive clerk work — expirations and delinquency before phone calls.
+**Why this priority**: Proactive clerk work — expirations and delinquency before phone calls;
+council review needs clear apartment-level and period P/L without QuickBooks digs.
 
 **Independent Test**: Dashboard loads under 3s on LAN with 16 units seeded; each widget links
-to detail; rent roll prints/exports.
+to detail; rent roll prints/exports; P/L chart shows per-unit and period net income when
+ledger + ops costs exist.
 
 **Acceptance Scenarios**:
 
@@ -167,6 +170,9 @@ to detail; rent roll prints/exports.
    **Then** navigates to the relevant detail view.
 3. **Given** reporting menu, **When** clerk runs rent roll, **Then** at least one printable or
    exportable report is available.
+4. **Given** posted rent income and unit operating costs, **When** clerk or council reviewer
+   opens the P/L dashboard/report, **Then** Syncfusion charts show **P/L per apartment** and
+   **monthly / yearly net income** (portfolio), printable/exportable for council packets.
 
 ---
 
@@ -239,6 +245,8 @@ via Synology reverse proxy.
   per unit and tenant.
 - **FR-014**: System MUST record payments (cash, check, online reference).
 - **FR-015**: System MUST generate rent charges/invoices and apply late-fee rules.
+- **FR-013a**: System MUST track landlord unit operating costs (Utility, Repair, Replace,
+  CommonUpkeep) separately from the tenant ledger so ops expenses never alter tenant balances.
 - **FR-016**: System MUST deep-link to town external online payment portal (cards).
 - **FR-017**: System MUST provide outstanding balance views, rent roll, and delinquency list
   for 16 units.
@@ -255,9 +263,14 @@ via Synology reverse proxy.
 **FR-6 Dashboard & Reporting**
 
 - **FR-022**: Dashboard MUST show occupancy, lease expirations (60/30 day), open maintenance,
-  delinquent accounts, and warranty expirations.
+  delinquent accounts, warranty expirations, and Syncfusion chart widgets for **P/L per unit**
+  plus portfolio **monthly/yearly net income** (for city council review).
 - **FR-023**: System MUST provide reports: rent roll, occupancy, maintenance cost by unit,
-  asset warranty status.
+  unit operating costs by category, asset warranty status, and **exportable/printable P/L**
+  (per apartment and monthly/yearly portfolio net) suitable for council packets.
+  Income from tenant ledger payments/charges; expense from `UnitOperatingCost` (not mixed into
+  tenant balances). QuickBooks remains town finance source of truth — ClerkSuite P/L is
+  operational review, not audited GL.
 
 **FR-7 Auth, Audit & Access**
 
@@ -276,8 +289,10 @@ via Synology reverse proxy.
 - **OccupancyHistory**: tenant-unit spans with start/end
 - **Lease**: lifecycle, key dates, deposit, status, linked signed doc
 - **LedgerEntry** (Charge | Payment): amounts, dates, methods, late-fee flag
+- **UnitOperatingCost**: landlord ops expense per unit (or building-wide CommonUpkeep); categories Utility/Repair/Replace/CommonUpkeep
 - **LateFeeRule**: configuration for overdue rent
 - **MaintenanceRecord**: unit and optional asset link, cost, status
+- **ScheduledItem**: calendar item for cleaning/vacancy/inspection/other with optional unit/tenant/lease links
 - **DocumentMetadata**: NAS path, category, unit/tenant/asset links
 - **AuditEntry**: append-only change log (table: `AuditLog`)
 - **User**: Identity with role
@@ -326,6 +341,7 @@ authoritative spec workup and map to tasks Phases 1–7 and [quickstart.md](./qu
 - [ ] Dashboard loads in under 3 s on local network with real data for 16 units.
 - [ ] All key indicators are accurate and clickable to detail views.
 - [ ] At least one printable/exportable rent-roll report exists.
+- [ ] P/L per apartment and monthly/yearly portfolio net income charts are available for council review.
 
 ### FR-7 Auth, Audit & Access
 

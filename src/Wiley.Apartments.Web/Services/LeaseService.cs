@@ -291,12 +291,190 @@ public sealed class LeaseService : ILeaseService
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
     }
 
+    public async Task<IReadOnlyList<Lease>> GetExpiringWithinAsync(
+        int withinDays,
+        CancellationToken cancellationToken = default)
+    {
+        if (withinDays < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(withinDays));
+        }
+
+        var now = _clock.UtcNow;
+        var until = now.AddDays(withinDays);
+        return await _db.Leases
+            .AsNoTracking()
+            .Include(l => l.Unit)
+            .Include(l => l.Tenant)
+            .Where(l => !l.IsDeleted
+                && (l.Status == LeaseStatus.Active || l.Status == LeaseStatus.Amended)
+                && l.EndUtc >= now
+                && l.EndUtc <= until)
+            .OrderBy(l => l.EndUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Lease> AmendAsync(
+        Guid leaseId,
+        decimal? rent = null,
+        decimal? deposit = null,
+        DateTime? endUtc = null,
+        string? customClauses = null,
+        string? note = null,
+        CancellationToken cancellationToken = default)
+    {
+        var lease = await RequireLifecycleLeaseAsync(leaseId, cancellationToken);
+        if (rent is < 0 || deposit is < 0)
+        {
+            throw new ArgumentException("Rent and deposit cannot be negative.");
+        }
+
+        if (endUtc is not null)
+        {
+            var end = EnsureUtc(endUtc.Value);
+            if (end <= lease.StartUtc)
+            {
+                throw new ArgumentException("Amended end must be after lease start.");
+            }
+
+            lease.EndUtc = end;
+        }
+
+        if (rent is not null)
+        {
+            lease.Rent = rent.Value;
+        }
+
+        if (deposit is not null)
+        {
+            lease.Deposit = deposit.Value;
+        }
+
+        if (customClauses is not null)
+        {
+            var clauses = string.IsNullOrWhiteSpace(customClauses) ? null : customClauses.Trim();
+            if (clauses is { Length: > 4000 })
+            {
+                throw new ArgumentException("Custom clauses cannot exceed 4000 characters.");
+            }
+
+            lease.CustomClauses = clauses;
+        }
+
+        lease.Status = LeaseStatus.Amended;
+        lease.LifecycleNote = TrimNote(note) ?? lease.LifecycleNote;
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Amended lease {LeaseId}.", lease.Id);
+        return (await GetByIdAsync(lease.Id, cancellationToken))!;
+    }
+
+    public async Task<Lease> RenewAsync(
+        Guid leaseId,
+        DateTime newEndUtc,
+        decimal? rent = null,
+        decimal? deposit = null,
+        string? note = null,
+        CancellationToken cancellationToken = default)
+    {
+        var prior = await RequireLifecycleLeaseAsync(leaseId, cancellationToken);
+        var newEnd = EnsureUtc(newEndUtc);
+        var newStart = prior.EndUtc;
+        if (newEnd <= newStart)
+        {
+            throw new ArgumentException("Renewal end must be after the prior lease end (new start).");
+        }
+
+        if (rent is < 0 || deposit is < 0)
+        {
+            throw new ArgumentException("Rent and deposit cannot be negative.");
+        }
+
+        var successor = new Lease
+        {
+            Id = Guid.NewGuid(),
+            UnitId = prior.UnitId,
+            TenantId = prior.TenantId,
+            StartUtc = newStart,
+            EndUtc = newEnd,
+            Rent = rent ?? prior.Rent,
+            Deposit = deposit ?? prior.Deposit,
+            Status = LeaseStatus.Draft,
+            TemplateUsed = prior.TemplateUsed,
+            CustomClauses = prior.CustomClauses,
+            PriorLeaseId = prior.Id,
+            IsDeleted = false,
+            LifecycleNote = TrimNote(note)
+        };
+
+        prior.Status = LeaseStatus.Renewed;
+        prior.SuccessorLeaseId = successor.Id;
+        prior.LifecycleNote = TrimNote(note) ?? prior.LifecycleNote;
+
+        _db.Leases.Add(successor);
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Renewed lease {PriorId} → successor draft {SuccessorId}.",
+            prior.Id, successor.Id);
+        return (await GetByIdAsync(successor.Id, cancellationToken))!;
+    }
+
+    public async Task<Lease> TerminateAsync(
+        Guid leaseId,
+        DateTime effectiveEndUtc,
+        string? note = null,
+        CancellationToken cancellationToken = default)
+    {
+        var lease = await RequireLifecycleLeaseAsync(leaseId, cancellationToken);
+        var effective = EnsureUtc(effectiveEndUtc);
+        if (effective < lease.StartUtc)
+        {
+            throw new ArgumentException("Termination date cannot be before lease start.");
+        }
+
+        if (effective < lease.EndUtc)
+        {
+            lease.EndUtc = effective;
+        }
+
+        lease.Status = LeaseStatus.Terminated;
+        lease.LifecycleNote = TrimNote(note) ?? lease.LifecycleNote;
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Terminated lease {LeaseId} effective {End}.", lease.Id, lease.EndUtc);
+        return (await GetByIdAsync(lease.Id, cancellationToken))!;
+    }
+
     public async Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var lease = await _db.Leases.FindAsync([id], cancellationToken)
             ?? throw new InvalidOperationException($"Lease {id} was not found.");
         lease.IsDeleted = true;
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Lease> RequireLifecycleLeaseAsync(Guid leaseId, CancellationToken cancellationToken)
+    {
+        var lease = await _db.Leases
+            .FirstOrDefaultAsync(l => l.Id == leaseId && !l.IsDeleted, cancellationToken)
+            ?? throw new InvalidOperationException($"Lease {leaseId} was not found.");
+
+        if (lease.Status is not (LeaseStatus.Active or LeaseStatus.Amended))
+        {
+            throw new InvalidOperationException(
+                $"Lease must be Active or Amended to renew/amend/terminate (current: {lease.Status}).");
+        }
+
+        return lease;
+    }
+
+    private static string? TrimNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return null;
+        }
+
+        var trimmed = note.Trim();
+        return trimmed.Length > 2000 ? trimmed[..2000] : trimmed;
     }
 
     /// <summary>

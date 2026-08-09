@@ -22,6 +22,10 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Occupancy> Occupancies => Set<Occupancy>();
     public DbSet<Lease> Leases => Set<Lease>();
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<ScheduledItem> ScheduledItems => Set<ScheduledItem>();
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+    public DbSet<LateFeeSettings> LateFeeSettings => Set<LateFeeSettings>();
+    public DbSet<UnitOperatingCost> UnitOperatingCosts => Set<UnitOperatingCost>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -165,9 +169,12 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.GeneratedDocxRelativePath).HasMaxLength(512);
             entity.Property(e => e.GeneratedPdfRelativePath).HasMaxLength(512);
             entity.Property(e => e.CustomClauses).HasMaxLength(4000);
+            entity.Property(e => e.LifecycleNote).HasMaxLength(2000);
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted });
             entity.HasIndex(e => new { e.TenantId, e.IsDeleted });
             entity.HasIndex(e => e.SignedDocumentId);
+            entity.HasIndex(e => new { e.Status, e.EndUtc });
+            entity.HasIndex(e => e.PriorLeaseId);
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
@@ -190,6 +197,79 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.UploadedBy).HasMaxLength(256);
             entity.HasIndex(e => new { e.EntityType, e.EntityId, e.IsDeleted });
             entity.HasIndex(e => e.Category);
+        });
+
+        builder.Entity<ScheduledItem>(entity =>
+        {
+            entity.ToTable("ScheduledItems");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.UnitId, e.IsDeleted });
+            entity.HasIndex(e => new { e.Category, e.StartUtc });
+            entity.HasIndex(e => new { e.StartUtc, e.EndUtc });
+            entity.HasIndex(e => e.IsCompleted);
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.Lease)
+                .WithMany()
+                .HasForeignKey(e => e.LeaseId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<LedgerEntry>(entity =>
+        {
+            entity.ToTable("LedgerEntries");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EntryType).HasConversion<string>().HasMaxLength(16);
+            entity.Property(e => e.Method).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Amount).HasPrecision(18, 2);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.TenantId, e.IsDeleted, e.DateUtc });
+            entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.DateUtc });
+            entity.HasIndex(e => e.LeaseId);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Lease)
+                .WithMany()
+                .HasForeignKey(e => e.LeaseId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<LateFeeSettings>(entity =>
+        {
+            entity.ToTable("LateFeeSettings");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Amount).HasPrecision(18, 2);
+        });
+
+        builder.Entity<UnitOperatingCost>(entity =>
+        {
+            entity.ToTable("UnitOperatingCosts");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Amount).HasPrecision(18, 2);
+            entity.Property(e => e.Vendor).HasMaxLength(256);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.IncurredUtc });
+            entity.HasIndex(e => new { e.Category, e.IncurredUtc });
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

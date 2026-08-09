@@ -1,3 +1,5 @@
+
+
 # Tasks: ClerkSuite — Wiley Apartment Management v1
 
 **Input**: [spec.md](./spec.md) · [plan.md](./plan.md) · [data-model.md](./data-model.md) · [quickstart.md](./quickstart.md)
@@ -114,9 +116,10 @@
   - **Paths:** `Services/DocumentService.cs`, lease detail upload
   - **Progress (2026-08-09):** `Document` entity + migration `AddDocumentsAndSignedLease`; `IDocumentService` vault upload; `AttachSignedDocumentAsync` → `leases/{unit}/signed/…`, `SignedDocumentId`, status **Active**; SfUploader on `LeasePreview`.
 
-- [ ] **T3.4** Renew / amend / terminate workflows.
+- [x] **T3.4** Renew / amend / terminate workflows.
   - **Done when:** Status and history update correctly; dashboard expiration feed reflects changes.
   - **Paths:** `Services/LeaseService.cs` (Renew/Amend/Terminate)
+  - **Done (2026-08-09):** `AmendAsync` / `RenewAsync` / `TerminateAsync` + `GetExpiringWithinAsync`; Prior/Successor/LifecycleNote; Lease preview lifecycle panels. Dashboard expiration feed remains **T6.2**.
 
 **Checkpoint:** FR-3 acceptance criteria pass.
 
@@ -126,16 +129,19 @@
 
 Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, reminders / action items). Placed after leases so entries can optionally link to lease/vacancy dates; before payments so calendar is not blocked on ledger.
 
-- [ ] **T3.5.1** `ScheduledItem` entity + service (unit optional tenant/lease link; categories; due/start/end; reminder offset; completion).
+- [x] **T3.5.1** `ScheduledItem` entity + service (unit optional tenant/lease link; categories; due/start/end; reminder offset; completion).
   - **Done when:** CRUD persists; soft-delete; filter by unit/category/date range.
   - **Paths:** `Domain/ScheduledItem.cs`, `IScheduleService` / `ScheduleService.cs`, migration
+  - **Done (2026-08-09):** `ScheduledItem` + `ScheduledItemCategory`; `IScheduleService` / `ScheduleService`; migration `AddScheduledItems`; unit tests.
 
-- [ ] **T3.5.2** Syncfusion `SfSchedule` UI (`Syncfusion.Blazor.Schedule`) — day/week/month/agenda; resource-by-unit optional.
+- [x] **T3.5.2** Syncfusion `SfSchedule` UI (`Syncfusion.Blazor.Schedule`) — day/week/month/agenda; resource-by-unit optional.
   - **Done when:** Clerks create/edit/drag items; categories for cleaning / vacancy / inspection / other; reminders surface on dashboard later (T6.2).
   - **Paths:** `Pages/Schedule/OperationsCalendar.razor`, nav link
+  - **Done (2026-08-09):** `/schedule` SfSchedule day/week/month/agenda; editor category + unit; drag/resize persist via `IScheduleService`; nav links. Resource-by-unit deferred; reminders on T6.2.
 
-- [ ] **T3.5.3** Seed common recurring patterns (e.g. turn-over clean after vacancy) — optional v1 polish.
+- [x] **T3.5.3** Seed common recurring patterns (e.g. turn-over clean after vacancy) — optional v1 polish.
   - **Done when:** At least vacancy→clean suggestion or template actions documented.
+  - **Done (2026-08-09):** `/schedule` **Suggest turnover cleans** for Vacant units; `deploy/synology/SCHEDULE-PATTERNS.md`.
 
 **Checkpoint:** Clerks can track date-bound unit work with reminders independently of maintenance work orders (Phase 5).
 
@@ -143,23 +149,37 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 
 ## Phase 4 — Payments & Ledger
 
-- [ ] **T4.1** Charge and Payment entities + running balance ledger.
+- [x] **T4.1** Charge and Payment entities + running balance ledger.
   - **Done when:** Clerk posts rent charges and payments; running balance accurate per tenant/unit (`LedgerEntry` Charge/Payment types).
   - **Paths:** `Domain/LedgerEntry.cs`, `Services/LedgerService.cs`, `Pages/Payments/`
+  - **Done (2026-08-09):** `LedgerEntry` + `ILedgerService` (post charge/payment, running balance, soft-delete); `/payments` SfGrid + post forms; migration `AddLedgerEntries`; unit tests.
 
-- [ ] **T4.2** Late-fee settings and assessment (G2).
+- [x] **T4.2** Late-fee settings and assessment (G2).
   - **Done when:** `LateFeesEnabled` settings toggle **default OFF**; when enabled, configurable **amount + grace days**; staff can assess late fees; charges appear on ledger.
   - **Paths:** `Domain/LateFeeSettings.cs`, `Services/LedgerService.ApplyLateFeesAsync`, settings UI
+  - **Done (2026-08-09):** `LateFeeSettings` + `ILateFeeSettingsService`; Settings UI toggle/amount/grace + Assess; `ApplyLateFeesAsync` (one/month).
 
-- [ ] **T4.3** Deep-link to Town of Wiley PayStar payment portal (G3).
-  - **Done when:** Link on tenant/lease view opens **`PaymentPortalUrl`** (default: townofwiley.gov pay-bill → `secure.paystar.io`); configurable env; no card data in ClerkSuite.
+- [x] **T4.3** Deep-link to Town of Wiley PayStar payment portal (G3).
+  - **Done when:** Link on tenant/lease view opens `PaymentPortalUrl` (default: townofwiley.gov pay-bill → `secure.paystar.io`); configurable env; no card data in ClerkSuite.
   - **Paths:** tenant/lease detail components, `.env.sample` (`PaymentPortalUrl=`)
+  - **Done (2026-08-09):** Tenant detail + lease preview + Settings portal display; `deploy/synology/.env.example` documents `PaymentPortalUrl` / late-fee env keys.
 
-- [ ] **T4.4** Rent roll / delinquency report.
+- [x] **T4.4** Rent roll / delinquency report.
   - **Done when:** Report generated and exportable/printable for all **16 units**.
   - **Paths:** `Pages/Reports/RentRoll.razor`, `Pages/Reports/Delinquency.razor`
+  - **Done (2026-08-09):** `IRentRollService`; `/reports`, rent-roll + delinquency SfGrids with print.
 
-**Checkpoint:** FR-4 acceptance criteria pass.
+- [x] **T4.5** Unit operating costs (landlord P&L) — separate from tenant ledger.
+  - **Done when:** Clerks can record costs per unit with categories **Utility / Repair / Replace / CommonUpkeep**; `UnitId` nullable only for CommonUpkeep (building-wide); soft-delete; filter by unit/category/date; sum-by-unit helper. Does **not** affect tenant `LedgerEntry` balances.
+  - **Paths:** `Domain/UnitOperatingCost.cs`, `Domain/OperatingCostCategory.cs`, `IUnitOperatingCostService` / `UnitOperatingCostService.cs`, migration
+  - **Done (2026-08-09):** Entity + service + migration `AddLateFeesAndOperatingCosts`; unit tests.
+
+- [x] **T4.6** Unit ops-cost UI + report (Syncfusion).
+  - **Done when:** Unit detail shows ops-cost grid; report by unit/category exportable; optional link from Phase 5 maintenance WO cost → ops cost when available.
+  - **Paths:** unit detail tab, `Pages/Reports/OperatingCosts.razor`
+  - **Done (2026-08-09):** Unit detail Ops costs tab; `/reports/operating-costs` record + print. Phase 5 WO link deferred.
+
+**Checkpoint:** FR-4 acceptance criteria pass; T4.5–T4.6 add landlord ops-cost tracking for the 16-unit portfolio.
 
 ---
 
@@ -191,7 +211,11 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
   - **Done when:** Rent roll printable/downloadable; occupancy and warranty status reports available.
   - **Paths:** `Pages/Reports/`
 
-**Checkpoint:** FR-5, FR-6 acceptance criteria pass.
+- [ ] **T6.4** City council P/L data viz (depends on **T4.1** income + **T4.5** ops costs).
+  - **Done when:** Dashboard (or Reports) shows Syncfusion **SfChart** (a) **P/L per apartment** for all 16 units and (b) **monthly and yearly portfolio net income / P/L**; period selector (month/YTD/year); printable/exportable for council review; empty/zero state when no ledger or ops-cost data yet. Does not replace QuickBooks.
+  - **Paths:** `Services/PortfolioProfitLossService.cs` (or DashboardService helpers), `Pages/Dashboard/` chart panels and/or `Pages/Reports/PortfolioProfitLoss.razor`; `Syncfusion.Blazor.Charts`
+
+**Checkpoint:** FR-5, FR-6 acceptance criteria pass (including council P/L viz).
 
 ---
 
@@ -255,9 +279,9 @@ Phase 0 + Phase 1 + Phase 2 + T0.4 = clerks manage 16 units and tenants with aud
 
 ## Notes
 
-- Run **`/speckit-implement`** starting at **T0.1**
-- Use **`/speckit.converge`** during build if scope grows mid-flight
-- Use global **`speckit-done`** skill at **T7.4**
+- Run `/speckit-implement` starting at **T0.1**
+- Use `/speckit.converge` during build if scope grows mid-flight
+- Use global `speckit-done` skill at **T7.4**
 - Do **not** push to GitHub until full spec-kit pass is complete (project policy)
 
 ---

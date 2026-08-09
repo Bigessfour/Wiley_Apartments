@@ -208,6 +208,152 @@ public class LeaseServiceTests
         try { Directory.Delete(workRoot, recursive: true); } catch { /* ignore */ }
     }
 
+    private static async Task<(Unit Unit, Tenant Tenant, Lease Active)> SeedActiveLeaseAsync(
+        ApartmentsDbContext db,
+        FixedClock clock,
+        int daysUntilEnd = 60,
+        string? unitNumber = null)
+    {
+        var unit = new Unit
+        {
+            Id = Guid.NewGuid(),
+            Number = unitNumber ?? Guid.NewGuid().ToString("N")[..6],
+            SqFt = 550,
+            Beds = 1,
+            Baths = 1
+        };
+        var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Lee", LastName = "Ortiz" };
+        var lease = new Lease
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            TenantId = tenant.Id,
+            StartUtc = clock.UtcNow.AddMonths(-6),
+            EndUtc = clock.UtcNow.AddDays(daysUntilEnd),
+            Rent = 700m,
+            Deposit = 700m,
+            Status = LeaseStatus.Active,
+            TemplateUsed = "brookside-year-lease.pdf"
+        };
+        db.Units.Add(unit);
+        db.Tenants.Add(tenant);
+        db.Leases.Add(lease);
+        await db.SaveChangesAsync();
+        return (unit, tenant, lease);
+    }
+
+    [Fact]
+    public async Task AmendAsync_UpdatesTerms_AndSetsAmended()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-lifecycle-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var clock = new FixedClock();
+            var (_, _, active) = await SeedActiveLeaseAsync(db, clock);
+            var amended = await service.AmendAsync(
+                active.Id,
+                rent: 750m,
+                deposit: null,
+                endUtc: active.EndUtc.AddMonths(1),
+                customClauses: "No subletting.",
+                note: "Rent bump");
+
+            amended.Status.Should().Be(LeaseStatus.Amended);
+            amended.Rent.Should().Be(750m);
+            amended.CustomClauses.Should().Be("No subletting.");
+            amended.LifecycleNote.Should().Be("Rent bump");
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task RenewAsync_CreatesDraftSuccessor_AndMarksPriorRenewed()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-renew-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var clock = new FixedClock();
+            var (_, _, active) = await SeedActiveLeaseAsync(db, clock);
+            var newEnd = active.EndUtc.AddYears(1);
+            var successor = await service.RenewAsync(active.Id, newEnd, rent: 725m, note: "Annual renew");
+
+            successor.Status.Should().Be(LeaseStatus.Draft);
+            successor.PriorLeaseId.Should().Be(active.Id);
+            successor.StartUtc.Should().Be(active.EndUtc);
+            successor.EndUtc.Should().Be(newEnd);
+            successor.Rent.Should().Be(725m);
+
+            var prior = await service.GetByIdAsync(active.Id);
+            prior!.Status.Should().Be(LeaseStatus.Renewed);
+            prior.SuccessorLeaseId.Should().Be(successor.Id);
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task TerminateAsync_SetsTerminated_AndShortensEnd()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-term-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var clock = new FixedClock();
+            var (_, _, active) = await SeedActiveLeaseAsync(db, clock, daysUntilEnd: 90);
+            var effective = clock.UtcNow.AddDays(7);
+            var terminated = await service.TerminateAsync(active.Id, effective, "Early move-out");
+
+            terminated.Status.Should().Be(LeaseStatus.Terminated);
+            terminated.EndUtc.Should().Be(effective);
+            terminated.LifecycleNote.Should().Be("Early move-out");
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task GetExpiringWithinAsync_ReturnsActiveInWindow_Only()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-exp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var clock = new FixedClock();
+            await SeedActiveLeaseAsync(db, clock, daysUntilEnd: 20, unitNumber: "A20");
+            await SeedActiveLeaseAsync(db, clock, daysUntilEnd: 90, unitNumber: "A90");
+            var draftUnit = new Unit { Id = Guid.NewGuid(), Number = "2", SqFt = 400, Beds = 1, Baths = 1 };
+            var draftTenant = new Tenant { Id = Guid.NewGuid(), FirstName = "X", LastName = "Y" };
+            db.Units.Add(draftUnit);
+            db.Tenants.Add(draftTenant);
+            db.Leases.Add(new Lease
+            {
+                Id = Guid.NewGuid(),
+                UnitId = draftUnit.Id,
+                TenantId = draftTenant.Id,
+                StartUtc = clock.UtcNow,
+                EndUtc = clock.UtcNow.AddDays(10),
+                Rent = 1,
+                Deposit = 1,
+                Status = LeaseStatus.Draft,
+                TemplateUsed = "brookside-year-lease.pdf"
+            });
+            await db.SaveChangesAsync();
+
+            var expiring = await service.GetExpiringWithinAsync(30);
+            expiring.Should().HaveCount(1);
+            expiring[0].EndUtc.Should().BeCloseTo(clock.UtcNow.AddDays(20), TimeSpan.FromSeconds(1));
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
     [Fact]
     public async Task SoftDeleteAsync_HidesFromGetAll()
     {

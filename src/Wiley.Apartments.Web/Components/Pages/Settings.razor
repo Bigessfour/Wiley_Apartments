@@ -1,13 +1,27 @@
 @page "/settings"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Inputs
+@using Wiley.Apartments.Contracts
 @inject IJSRuntime JsRuntime
+@inject ILateFeeSettingsService LateFeeSettings
+@inject ILedgerService LedgerService
+@inject Microsoft.Extensions.Options.IOptions<Wiley.Apartments.Web.Configuration.ClerkSuiteOptions> ClerkOptions
 
 <PageTitle>Settings</PageTitle>
 
 <h1 class="h3 mb-4">Settings</h1>
 
-<section class="settings-panel e-card p-4" aria-labelledby="appearance-heading">
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success">@SuccessMessage</div>
+}
+
+<section class="settings-panel e-card p-4 mb-4" aria-labelledby="appearance-heading">
     <h2 id="appearance-heading" class="h5 mb-3">Appearance</h2>
     <p class="text-muted mb-4">
         Choose Fluent light or dark for Syncfusion controls and the ClerkSuite shell.
@@ -24,9 +38,65 @@
     </div>
 </section>
 
+<section class="settings-panel e-card p-4 mb-4" aria-labelledby="latefee-heading">
+    <h2 id="latefee-heading" class="h5 mb-3">Late fees (G2)</h2>
+    <p class="text-muted mb-3">
+        Default <strong>off</strong>. When enabled, clerks can assess a flat late fee for tenant/unit
+        balances past the grace period (one assessment per calendar month).
+    </p>
+    <div class="row g-3" style="max-width: 560px;">
+        <div class="col-12 d-flex align-items-center gap-3">
+            <SfSwitch @bind-Checked="LateFeesEnabled" TChecked="bool" />
+            <span>@(LateFeesEnabled ? "Enabled" : "Disabled")</span>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Amount</label>
+            <SfNumericTextBox TValue="decimal" @bind-Value="LateFeeAmount" Format="C2" Min="0" Disabled="@(!LateFeesEnabled)" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Grace days</label>
+            <SfNumericTextBox TValue="int" @bind-Value="LateFeeGraceDays" Min="0" Disabled="@(!LateFeesEnabled)" />
+        </div>
+        <div class="col-12 d-flex gap-2 flex-wrap">
+            <SfButton CssClass="e-primary e-small" Content="Save late-fee settings" Disabled="@Busy" OnClick="SaveLateFeesAsync" />
+            <SfButton CssClass="e-outline e-small" Content="Assess late fees now" Disabled="@(Busy || !LateFeesEnabled)" OnClick="AssessLateFeesAsync" />
+        </div>
+    </div>
+</section>
+
+<section class="settings-panel e-card p-4" aria-labelledby="portal-heading">
+    <h2 id="portal-heading" class="h5 mb-3">Payment portal (G3)</h2>
+    <p class="text-muted mb-2">
+        Staff deep-link only — no card data in ClerkSuite. Configure via
+        <code>ClerkSuite__PaymentPortalUrl</code> / <code>PaymentPortalUrl</code> env.
+    </p>
+    <p class="mb-0">
+        <a href="@PortalUrl" target="_blank" rel="noopener noreferrer">@PortalUrl</a>
+    </p>
+</section>
+
 @code {
     private bool IsDarkMode { get; set; }
     private bool _themeLoaded;
+    private bool LateFeesEnabled { get; set; }
+    private decimal LateFeeAmount { get; set; }
+    private int LateFeeGraceDays { get; set; }
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+
+    private string PortalUrl =>
+        string.IsNullOrWhiteSpace(ClerkOptions.Value.PaymentPortalUrl)
+            ? "https://www.townofwiley.gov/government/departments/finance/utility-billing"
+            : ClerkOptions.Value.PaymentPortalUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var settings = await LateFeeSettings.GetAsync();
+        LateFeesEnabled = settings.Enabled;
+        LateFeeAmount = settings.Amount;
+        LateFeeGraceDays = settings.GraceDays;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -51,4 +121,50 @@
 
     private string ThemeLabelClass(bool forDark) =>
         forDark == IsDarkMode ? "fw-semibold" : "text-muted";
+
+    private async Task SaveLateFeesAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var saved = await LateFeeSettings.UpdateAsync(LateFeesEnabled, LateFeeAmount, LateFeeGraceDays);
+            LateFeesEnabled = saved.Enabled;
+            LateFeeAmount = saved.Amount;
+            LateFeeGraceDays = saved.GraceDays;
+            SuccessMessage = "Late-fee settings saved.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task AssessLateFeesAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            await LateFeeSettings.UpdateAsync(LateFeesEnabled, LateFeeAmount, LateFeeGraceDays);
+            var count = await LedgerService.ApplyLateFeesAsync();
+            SuccessMessage = count == 0
+                ? "No late fees assessed (none eligible or already assessed this month)."
+                : $"Posted {count} late-fee charge(s).";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
 }

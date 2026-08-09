@@ -38,8 +38,9 @@ else
                 · Rent @Lease.Rent.ToString("C") · Deposit @Lease.Deposit.ToString("C")
             </p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
             <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
+            <a class="e-btn e-outline" href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Payment portal</a>
             @if (string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
             {
                 <SfButton CssClass="e-primary" Content="Generate PDF" Disabled="@Busy" OnClick="GenerateAsync" />
@@ -54,6 +55,114 @@ else
     @if (!string.IsNullOrEmpty(SuccessMessage))
     {
         <div class="alert alert-success">@SuccessMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Lease.LifecycleNote))
+    {
+        <p class="small text-muted">Lifecycle note: @Lease.LifecycleNote</p>
+    }
+    @if (Lease.PriorLeaseId is Guid priorId)
+    {
+        <p class="small mb-2">
+            Renewed from
+            <a href="@($"/leases/{priorId}")">prior lease</a>
+        </p>
+    }
+    @if (Lease.SuccessorLeaseId is Guid succId)
+    {
+        <p class="small mb-2">
+            Succeeded by
+            <a href="@($"/leases/{succId}")">renewal lease</a>
+        </p>
+    }
+
+    @if (Lease.Status is LeaseStatus.Active or LeaseStatus.Amended)
+    {
+        <h2 class="h5 mt-3">Lifecycle</h2>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <SfButton CssClass="e-outline e-small" Content="Amend…" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "amend")" />
+            <SfButton CssClass="e-outline e-small" Content="Renew…" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "renew")" />
+            <SfButton CssClass="e-outline e-small e-danger" Content="Terminate…" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "terminate")" />
+        </div>
+
+        @if (ShowPanel == "amend")
+        {
+            <div class="row g-2 mb-4" style="max-width: 640px;">
+                <div class="col-md-4">
+                    <label class="form-label">Rent</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="AmendRent" Format="C2" Min="0" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Deposit</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="AmendDeposit" Format="C2" Min="0" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">End</label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="AmendEnd" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Custom clauses</label>
+                    <SfTextBox @bind-Value="AmendClauses" Multiline="true" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Note</label>
+                    <SfTextBox @bind-Value="LifecycleNote" Placeholder="Optional note" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <SfButton CssClass="e-primary e-small" Content="Save amendment" Disabled="@Busy" OnClick="AmendAsync" />
+                    <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+                </div>
+            </div>
+        }
+        else if (ShowPanel == "renew")
+        {
+            <div class="row g-2 mb-4" style="max-width: 640px;">
+                <div class="col-md-4">
+                    <label class="form-label">New end</label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="RenewEnd" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Rent (optional)</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="RenewRent" Format="C2" Min="0" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Deposit (optional)</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="RenewDeposit" Format="C2" Min="0" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Note</label>
+                    <SfTextBox @bind-Value="LifecycleNote" Placeholder="Optional note" />
+                </div>
+                <div class="col-12">
+                    <p class="text-muted small mb-2">
+                        Creates a Draft successor starting @Clock.ToDisplayTime(Lease.EndUtc).ToString("d").
+                        Generate and attach signed PDF on the new lease.
+                    </p>
+                    <SfButton CssClass="e-primary e-small" Content="Create renewal draft" Disabled="@Busy" OnClick="RenewAsync" />
+                    <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+                </div>
+            </div>
+        }
+        else if (ShowPanel == "terminate")
+        {
+            <div class="row g-2 mb-4" style="max-width: 480px;">
+                <div class="col-md-6">
+                    <label class="form-label">Effective end</label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="TerminateEnd" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Note</label>
+                    <SfTextBox @bind-Value="LifecycleNote" Placeholder="Reason (optional)" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <SfButton CssClass="e-danger e-small" Content="Confirm terminate" Disabled="@Busy" OnClick="TerminateAsync" />
+                    <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+                </div>
+            </div>
+        }
     }
 
     <h2 class="h5 mt-2">Signed lease</h2>
@@ -129,8 +238,33 @@ else
     private byte[]? _pdfBytes;
     private bool _pendingLoad;
     private (string Name, string ContentType, byte[] Bytes)? _pendingSigned;
+    private string? ShowPanel { get; set; }
+    private decimal? AmendRent { get; set; }
+    private decimal? AmendDeposit { get; set; }
+    private DateTime? AmendEnd { get; set; }
+    private string? AmendClauses { get; set; }
+    private DateTime? RenewEnd { get; set; }
+    private decimal? RenewRent { get; set; }
+    private decimal? RenewDeposit { get; set; }
+    private DateTime? TerminateEnd { get; set; }
+    private string? LifecycleNote { get; set; }
+    private Guid? _loadedLeaseId;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private string PaymentPortalUrl =>
+        string.IsNullOrWhiteSpace(Options.Value.PaymentPortalUrl)
+            ? "https://www.townofwiley.gov/government/departments/finance/utility-billing"
+            : Options.Value.PaymentPortalUrl;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedLeaseId != LeaseId)
+        {
+            ShowPanel = null;
+            ErrorMessage = null;
+            SuccessMessage = null;
+            await LoadAsync();
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -144,6 +278,7 @@ else
     private async Task LoadAsync()
     {
         Lease = await LeaseService.GetByIdAsync(LeaseId);
+        _loadedLeaseId = LeaseId;
         if (Lease is null)
         {
             ErrorMessage = "Lease not found.";
@@ -156,8 +291,111 @@ else
             SignedInfo = await DocumentService.GetByIdAsync(sid);
         }
 
+        AmendRent = Lease.Rent;
+        AmendDeposit = Lease.Deposit;
+        AmendEnd = Clock.ToDisplayTime(Lease.EndUtc).Date;
+        AmendClauses = Lease.CustomClauses;
+        RenewEnd = Clock.ToDisplayTime(Lease.EndUtc).Date.AddYears(1);
+        RenewRent = Lease.Rent;
+        RenewDeposit = Lease.Deposit;
+        TerminateEnd = DateTime.Today;
+        LifecycleNote = null;
+
         await PreferDisplayPdfAsync();
         _pendingLoad = _pdfBytes is not null;
+    }
+
+    private async Task AmendAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            DateTime? endUtc = AmendEnd is null
+                ? null
+                : DateTime.SpecifyKind(AmendEnd.Value.Date, DateTimeKind.Utc);
+            Lease = await LeaseService.AmendAsync(
+                LeaseId,
+                AmendRent,
+                AmendDeposit,
+                endUtc,
+                AmendClauses,
+                LifecycleNote);
+            ShowPanel = null;
+            SuccessMessage = "Lease amended.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RenewAsync()
+    {
+        if (RenewEnd is null)
+        {
+            ErrorMessage = "Choose a new end date for the renewal.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var successor = await LeaseService.RenewAsync(
+                LeaseId,
+                DateTime.SpecifyKind(RenewEnd.Value.Date, DateTimeKind.Utc),
+                RenewRent,
+                RenewDeposit,
+                LifecycleNote);
+            Navigation.NavigateTo($"/leases/{successor.Id}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task TerminateAsync()
+    {
+        if (TerminateEnd is null)
+        {
+            ErrorMessage = "Choose an effective termination date.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            Lease = await LeaseService.TerminateAsync(
+                LeaseId,
+                DateTime.SpecifyKind(TerminateEnd.Value.Date, DateTimeKind.Utc),
+                LifecycleNote);
+            ShowPanel = null;
+            SuccessMessage = "Lease terminated.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     private async Task PreferDisplayPdfAsync()

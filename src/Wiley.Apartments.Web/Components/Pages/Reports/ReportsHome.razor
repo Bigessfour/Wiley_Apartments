@@ -1,0 +1,21 @@
+@page "/reports"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+
+<PageTitle>Reports</PageTitle>
+
+<h1 class="h3 mb-3">Reports</h1>
+<p class="text-muted mb-4">Operational reports for clerks and town council packets.</p>
+
+<ul class="list-unstyled">
+    <li class="mb-2">
+        <SfButton CssClass="e-outline" Content="Rent roll" OnClick="@(() => Navigation.NavigateTo("/reports/rent-roll"))" />
+    </li>
+    <li class="mb-2">
+        <SfButton CssClass="e-outline" Content="Delinquency" OnClick="@(() => Navigation.NavigateTo("/reports/delinquency"))" />
+    </li>
+    <li class="mb-2">
+        <SfButton CssClass="e-outline" Content="Operating costs" OnClick="@(() => Navigation.NavigateTo("/reports/operating-costs"))" />
+    </li>
+</ul>

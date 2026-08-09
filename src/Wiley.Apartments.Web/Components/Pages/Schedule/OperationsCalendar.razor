@@ -1,0 +1,403 @@
+@page "/schedule"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Schedule
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IScheduleService ScheduleService
+@inject IUnitService UnitService
+@inject IDateTimeService Clock
+
+<PageTitle>Operations calendar</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 mb-1">Operations calendar</h1>
+        <p class="text-muted mb-0 small">
+            Cleaning, vacancy, inspection, and other unit work. Drag to reschedule. Reminders surface on the dashboard later (T6.2).
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <SfButton CssClass="e-outline e-small" Content="Suggest turnover cleans" Disabled="@Busy"
+                  OnClick="SuggestTurnoverCleansAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Refresh" Disabled="@Busy" OnClick="ReloadAsync" />
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success">@SuccessMessage</div>
+}
+
+<SfSchedule TValue="ScheduleAppointment"
+            Width="100%"
+            Height="700px"
+            @bind-SelectedDate="SelectedDate"
+            AllowDragAndDrop="true"
+            AllowResizing="true"
+            ShowQuickInfo="true">
+    <ScheduleEvents TValue="ScheduleAppointment"
+                    OnActionBegin="OnActionBegin"
+                    ActionCompleted="OnActionCompleted"
+                    EventRendered="OnEventRendered" />
+    <ScheduleTemplates>
+        <EditorTemplate>
+            @{
+                var appt = (ScheduleAppointment)context;
+            }
+            <table class="custom-event-editor w-100" cellpadding="5">
+                <tbody>
+                <tr>
+                    <td class="e-textlabel">Title</td>
+                    <td colspan="4">
+                        <SfTextBox @bind-Value="appt.Subject" Placeholder="Title" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">Category</td>
+                    <td colspan="4">
+                        <SfDropDownList TValue="string" TItem="CategoryOption"
+                                        DataSource="@CategoryOptions"
+                                        @bind-Value="appt.Category">
+                            <DropDownListFieldSettings Text="Text" Value="Value" />
+                        </SfDropDownList>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">Unit</td>
+                    <td colspan="4">
+                        <SfDropDownList TValue="Guid?" TItem="UnitOption"
+                                        DataSource="@UnitOptions"
+                                        Placeholder="Optional unit"
+                                        AllowFiltering="true"
+                                        ShowClearButton="true"
+                                        @bind-Value="appt.UnitId">
+                            <DropDownListFieldSettings Text="Text" Value="Id" />
+                        </SfDropDownList>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">From</td>
+                    <td colspan="4">
+                        <SfDateTimePicker TValue="DateTime" @bind-Value="appt.StartTime" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">To</td>
+                    <td colspan="4">
+                        <SfDateTimePicker TValue="DateTime?" @bind-Value="appt.EndTimeNullable" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">Notes</td>
+                    <td colspan="4">
+                        <SfTextBox Multiline="true" @bind-Value="appt.Description" />
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </EditorTemplate>
+    </ScheduleTemplates>
+    <ScheduleEventSettings DataSource="@DataSource" />
+    <ScheduleViews>
+        <ScheduleView Option="View.Day" />
+        <ScheduleView Option="View.Week" />
+        <ScheduleView Option="View.Month" />
+        <ScheduleView Option="View.Agenda" />
+    </ScheduleViews>
+</SfSchedule>
+
+@code {
+    private DateTime SelectedDate { get; set; } = DateTime.Today;
+    private List<ScheduleAppointment> DataSource { get; set; } = [];
+    private List<UnitOption> UnitOptions { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private bool Busy { get; set; }
+    private bool _persisting;
+
+    private static readonly List<CategoryOption> CategoryOptions =
+    [
+        new() { Value = nameof(ScheduledItemCategory.Cleaning), Text = "Cleaning" },
+        new() { Value = nameof(ScheduledItemCategory.Vacancy), Text = "Vacancy" },
+        new() { Value = nameof(ScheduledItemCategory.Inspection), Text = "Inspection" },
+        new() { Value = nameof(ScheduledItemCategory.Other), Text = "Other" }
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var units = await UnitService.GetAllAsync();
+        UnitOptions = units
+            .OrderBy(u => u.Number)
+            .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .ToList();
+        UnitOptions.Insert(0, new UnitOption { Id = null, Text = "(No unit)" });
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var items = await ScheduleService.QueryAsync(includeCompleted: true);
+            var i = 1;
+            DataSource = items.Select(s => ToAppointment(s, i++)).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>
+    /// T3.5.3 — for each Vacant unit without an open Cleaning item, schedule a turnover clean tomorrow 09:00–11:00 local.
+    /// </summary>
+    private async Task SuggestTurnoverCleansAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var units = await UnitService.GetAllAsync();
+            var vacant = units.Where(u => u.Status == UnitStatus.Vacant).ToList();
+            var openCleans = await ScheduleService.QueryAsync(
+                category: ScheduledItemCategory.Cleaning,
+                includeCompleted: false);
+            var covered = openCleans
+                .Where(i => i.UnitId is not null)
+                .Select(i => i.UnitId!.Value)
+                .ToHashSet();
+
+            var startLocal = DateTime.Today.AddDays(1).AddHours(9);
+            var endLocal = startLocal.AddHours(2);
+            var created = 0;
+            foreach (var unit in vacant.Where(u => !covered.Contains(u.Id)))
+            {
+                await ScheduleService.CreateAsync(
+                    $"Turnover clean — unit {unit.Number}",
+                    ScheduledItemCategory.Cleaning,
+                    Clock.ToUtc(startLocal),
+                    endUtc: Clock.ToUtc(endLocal),
+                    dueUtc: Clock.ToUtc(startLocal),
+                    reminderOffset: TimeSpan.FromDays(1),
+                    unitId: unit.Id,
+                    notes: "Suggested after vacancy (turnover pattern).");
+                created++;
+            }
+
+            SuccessMessage = created == 0
+                ? "No new turnover cleans suggested (no uncovered vacant units)."
+                : $"Created {created} turnover clean item(s) for vacant units.";
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void OnActionBegin(Syncfusion.Blazor.Schedule.ActionEventArgs<ScheduleAppointment> args)
+    {
+        if (args.ActionType is Syncfusion.Blazor.Schedule.ActionType.EventCreate
+            or Syncfusion.Blazor.Schedule.ActionType.EventChange)
+        {
+            var records = args.AddedRecords?.Concat(args.ChangedRecords ?? [])
+                ?? args.ChangedRecords
+                ?? [];
+            foreach (var appt in records)
+            {
+                if (string.IsNullOrWhiteSpace(appt.Subject))
+                {
+                    args.Cancel = true;
+                    ErrorMessage = "Title is required.";
+                    return;
+                }
+
+                if (appt.EndTime < appt.StartTime)
+                {
+                    args.Cancel = true;
+                    ErrorMessage = "End must be on or after start.";
+                    return;
+                }
+            }
+        }
+    }
+
+    private async Task OnActionCompleted(Syncfusion.Blazor.Schedule.ActionEventArgs<ScheduleAppointment> args)
+    {
+        if (_persisting)
+        {
+            return;
+        }
+
+        try
+        {
+            _persisting = true;
+            ErrorMessage = null;
+
+            if (args.ActionType == Syncfusion.Blazor.Schedule.ActionType.EventCreate
+                && args.AddedRecords is { Count: > 0 })
+            {
+                foreach (var appt in args.AddedRecords)
+                {
+                    await ScheduleService.CreateAsync(
+                        appt.Subject,
+                        ParseCategory(appt.Category),
+                        Clock.ToUtc(appt.StartTime),
+                        endUtc: Clock.ToUtc(ResolveEnd(appt)),
+                        dueUtc: Clock.ToUtc(appt.StartTime),
+                        unitId: NormalizeUnitId(appt.UnitId),
+                        notes: appt.Description);
+                }
+
+                await ReloadAsync();
+            }
+            else if (args.ActionType == Syncfusion.Blazor.Schedule.ActionType.EventChange
+                     && args.ChangedRecords is { Count: > 0 })
+            {
+                foreach (var appt in args.ChangedRecords)
+                {
+                    if (appt.ItemId == Guid.Empty)
+                    {
+                        continue;
+                    }
+
+                    await ScheduleService.UpdateAsync(
+                        appt.ItemId,
+                        appt.Subject,
+                        ParseCategory(appt.Category),
+                        Clock.ToUtc(appt.StartTime),
+                        endUtc: Clock.ToUtc(ResolveEnd(appt)),
+                        dueUtc: Clock.ToUtc(appt.StartTime),
+                        unitId: NormalizeUnitId(appt.UnitId),
+                        notes: appt.Description);
+                }
+
+                await ReloadAsync();
+            }
+            else if (args.ActionType == Syncfusion.Blazor.Schedule.ActionType.EventRemove
+                     && args.DeletedRecords is { Count: > 0 })
+            {
+                foreach (var appt in args.DeletedRecords.Where(a => a.ItemId != Guid.Empty))
+                {
+                    await ScheduleService.SoftDeleteAsync(appt.ItemId);
+                }
+
+                await ReloadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+        }
+        finally
+        {
+            _persisting = false;
+        }
+    }
+
+    private void OnEventRendered(Syncfusion.Blazor.Schedule.EventRenderedArgs<ScheduleAppointment> args)
+    {
+        if (args.Data is null)
+        {
+            return;
+        }
+
+        var color = ParseCategory(args.Data.Category) switch
+        {
+            ScheduledItemCategory.Cleaning => "#0d6efd",
+            ScheduledItemCategory.Vacancy => "#fd7e14",
+            ScheduledItemCategory.Inspection => "#198754",
+            _ => "#6c757d"
+        };
+        args.Attributes["style"] = $"background:{color}; border-color:{color};";
+    }
+
+    private ScheduleAppointment ToAppointment(ScheduledItem item, int localId)
+    {
+        var start = Clock.ToDisplayTime(item.StartUtc);
+        var end = item.EndUtc is DateTime e
+            ? Clock.ToDisplayTime(e)
+            : start.AddHours(1);
+        var unitLabel = item.Unit is null ? null : $"Unit {item.Unit.Number}";
+        return new ScheduleAppointment
+        {
+            Id = localId,
+            ItemId = item.Id,
+            Subject = item.Title,
+            StartTime = start,
+            EndTime = end,
+            Description = item.Notes,
+            Category = item.Category.ToString(),
+            UnitId = item.UnitId,
+            Location = unitLabel,
+            IsAllDay = false
+        };
+    }
+
+    private static DateTime ResolveEnd(ScheduleAppointment appt) =>
+        appt.EndTimeNullable ?? appt.EndTime;
+
+    private static Guid? NormalizeUnitId(Guid? unitId) =>
+        unitId is Guid g && g != Guid.Empty ? g : null;
+
+    private static ScheduledItemCategory ParseCategory(string? value) =>
+        Enum.TryParse<ScheduledItemCategory>(value, ignoreCase: true, out var cat)
+            ? cat
+            : ScheduledItemCategory.Other;
+
+    private sealed class ScheduleAppointment
+    {
+        public int Id { get; set; }
+        public Guid ItemId { get; set; }
+        public string Subject { get; set; } = string.Empty;
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public DateTime? EndTimeNullable
+        {
+            get => EndTime;
+            set
+            {
+                if (value is DateTime dt)
+                {
+                    EndTime = dt;
+                }
+            }
+        }
+        public string? Description { get; set; }
+        public string Category { get; set; } = nameof(ScheduledItemCategory.Other);
+        public Guid? UnitId { get; set; }
+        public string? Location { get; set; }
+        public bool IsAllDay { get; set; }
+    }
+
+    private sealed class CategoryOption
+    {
+        public string Value { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+    }
+
+    private sealed class UnitOption
+    {
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = string.Empty;
+    }
+}

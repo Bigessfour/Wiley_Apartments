@@ -21,4 +21,10 @@ public class Lease
     public Guid? SignedDocumentId { get; set; }
     /// <summary>Optional clerk addendum text appended as a PDF page (FR-009 custom clauses).</summary>
     public string? CustomClauses { get; set; }
+    /// <summary>When set, this lease was created by renewing <see cref="PriorLeaseId"/>.</summary>
+    public Guid? PriorLeaseId { get; set; }
+    /// <summary>When set, this lease was renewed into <see cref="SuccessorLeaseId"/>.</summary>
+    public Guid? SuccessorLeaseId { get; set; }
+    /// <summary>Clerk note for terminate / amend / renew actions.</summary>
+    public string? LifecycleNote { get; set; }
 }

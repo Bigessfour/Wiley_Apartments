@@ -24,6 +24,7 @@
     <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Navigations" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.Schedule" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.2" />
     <!-- WordProcessor / DocumentEditor deferred to T6.1 vault editing; leases use SfPdfViewer + DocIO/Pdf. -->

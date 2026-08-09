@@ -1,0 +1,64 @@
+@page "/reports/rent-roll"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@inject IRentRollService RentRollService
+@inject NavigationManager Navigation
+
+<PageTitle>Rent roll</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
+    <div>
+        <h1 class="h3 mb-1">Rent roll</h1>
+        <p class="text-muted mb-0 small">All portfolio units with active lease rent and ledger balance.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+        <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+
+<p class="small text-muted">Generated @GeneratedAt.ToString("g") · @Rows.Count units</p>
+
+<SfGrid TValue="RentRollRow" DataSource="@Rows" AllowSorting="true" AllowPaging="false">
+    <GridColumns>
+        <GridColumn Field="@nameof(RentRollRow.UnitNumber)" HeaderText="Unit" Width="80" />
+        <GridColumn Field="@nameof(RentRollRow.Status)" HeaderText="Status" Width="110" />
+        <GridColumn Field="@nameof(RentRollRow.TenantName)" HeaderText="Tenant" Width="180" />
+        <GridColumn Field="@nameof(RentRollRow.Rent)" HeaderText="Rent" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+        <GridColumn Field="@nameof(RentRollRow.Balance)" HeaderText="Balance" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+
+    private List<RentRollRow> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private DateTime GeneratedAt { get; set; } = DateTime.Now;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            Rows = (await RentRollService.GetRentRollAsync()).ToList();
+            GeneratedAt = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+}

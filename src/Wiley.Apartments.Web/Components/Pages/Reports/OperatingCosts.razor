@@ -1,0 +1,232 @@
+@page "/reports/operating-costs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IUnitOperatingCostService OpsCosts
+@inject IUnitService UnitService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Operating costs</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
+    <div>
+        <h1 class="h3 mb-1">Operating costs</h1>
+        <p class="text-muted mb-0 small">
+            Landlord P&amp;L expenses by unit/category (not tenant ledger).
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+        <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success d-print-none">@SuccessMessage</div>
+}
+
+<div class="row g-2 mb-3 d-print-none" style="max-width: 900px;">
+    <div class="col-md-3">
+        <label class="form-label">Category</label>
+        <SfDropDownList TValue="string" TItem="CatOption" DataSource="@CatOptions" @bind-Value="FilterCategory"
+                        ShowClearButton="true" Placeholder="All">
+            <DropDownListFieldSettings Text="Text" Value="Value" />
+        </SfDropDownList>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <SfButton CssClass="e-primary e-small" Content="Apply" OnClick="LoadAsync" />
+    </div>
+</div>
+
+<div class="border rounded p-3 mb-4 d-print-none" style="max-width: 900px;">
+    <h2 class="h6">Record cost</h2>
+    <div class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label">Category</label>
+            <SfDropDownList TValue="OperatingCostCategory" TItem="CatOptionEnum" DataSource="@CatEnumOptions"
+                            @bind-Value="FormCategory">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Unit</label>
+            <SfDropDownList TValue="Guid?" TItem="UnitOption" DataSource="@UnitOptions" @bind-Value="FormUnitId"
+                            Placeholder="Required except CommonUpkeep" ShowClearButton="true" AllowFiltering="true">
+                <DropDownListFieldSettings Text="Text" Value="Id" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Amount</label>
+            <SfNumericTextBox TValue="decimal?" @bind-Value="FormAmount" Format="C2" Min="0.01m" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Date</label>
+            <SfDatePicker TValue="DateTime?" @bind-Value="FormDate" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Vendor</label>
+            <SfTextBox @bind-Value="FormVendor" />
+        </div>
+        <div class="col-12">
+            <SfTextBox @bind-Value="FormNotes" Placeholder="Notes" />
+        </div>
+        <div class="col-12">
+            <SfButton CssClass="e-primary e-small" Content="Save cost" Disabled="@Busy" OnClick="SaveAsync" />
+        </div>
+    </div>
+</div>
+
+<p class="small text-muted">Total (filter): @Total.ToString("C")</p>
+
+<SfGrid TValue="CostRow" DataSource="@Rows" AllowSorting="true" AllowPaging="true">
+    <GridPageSettings PageSize="25" />
+    <GridColumns>
+        <GridColumn Field="@nameof(CostRow.DateDisplay)" HeaderText="Date" Width="110" />
+        <GridColumn Field="@nameof(CostRow.UnitNumber)" HeaderText="Unit" Width="90" />
+        <GridColumn Field="@nameof(CostRow.Category)" HeaderText="Category" Width="120" />
+        <GridColumn Field="@nameof(CostRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+        <GridColumn Field="@nameof(CostRow.Vendor)" HeaderText="Vendor" Width="140" />
+        <GridColumn Field="@nameof(CostRow.Notes)" HeaderText="Notes" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<CostRow> Rows { get; set; } = [];
+    private List<UnitOption> UnitOptions { get; set; } = [];
+    private string? FilterCategory { get; set; }
+    private decimal Total { get; set; }
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private OperatingCostCategory FormCategory { get; set; } = OperatingCostCategory.Utility;
+    private Guid? FormUnitId { get; set; }
+    private decimal? FormAmount { get; set; }
+    private DateTime? FormDate { get; set; } = DateTime.Today;
+    private string? FormVendor { get; set; }
+    private string? FormNotes { get; set; }
+
+    private static readonly List<CatOption> CatOptions =
+    [
+        new() { Value = nameof(OperatingCostCategory.Utility), Text = "Utility" },
+        new() { Value = nameof(OperatingCostCategory.Repair), Text = "Repair" },
+        new() { Value = nameof(OperatingCostCategory.Replace), Text = "Replace" },
+        new() { Value = nameof(OperatingCostCategory.CommonUpkeep), Text = "Common upkeep" }
+    ];
+
+    private static readonly List<CatOptionEnum> CatEnumOptions =
+    [
+        new() { Value = OperatingCostCategory.Utility, Text = "Utility" },
+        new() { Value = OperatingCostCategory.Repair, Text = "Repair" },
+        new() { Value = OperatingCostCategory.Replace, Text = "Replace" },
+        new() { Value = OperatingCostCategory.CommonUpkeep, Text = "Common upkeep" }
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var units = await UnitService.GetAllAsync();
+        UnitOptions = units.OrderBy(u => u.Number)
+            .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .ToList();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            OperatingCostCategory? cat = Enum.TryParse<OperatingCostCategory>(FilterCategory, out var c) ? c : null;
+            var costs = await OpsCosts.QueryAsync(category: cat);
+            Rows = costs.Select(x => new CostRow
+            {
+                DateDisplay = Clock.ToDisplayTime(x.IncurredUtc).ToString("d"),
+                UnitNumber = x.Unit?.Number ?? (x.UnitId is null ? "(Building)" : ""),
+                Category = x.Category.ToString(),
+                Amount = x.Amount,
+                Vendor = x.Vendor ?? "",
+                Notes = x.Notes ?? ""
+            }).ToList();
+            Total = Rows.Sum(r => r.Amount);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (FormAmount is null || FormDate is null)
+        {
+            ErrorMessage = "Amount and date are required.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            await OpsCosts.CreateAsync(
+                FormCategory,
+                FormAmount.Value,
+                Clock.ToUtc(FormDate.Value.Date),
+                unitId: FormUnitId,
+                vendor: FormVendor,
+                notes: FormNotes);
+            SuccessMessage = "Operating cost recorded.";
+            FormAmount = null;
+            FormNotes = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    private sealed class CostRow
+    {
+        public string DateDisplay { get; set; } = "";
+        public string UnitNumber { get; set; } = "";
+        public string Category { get; set; } = "";
+        public decimal Amount { get; set; }
+        public string Vendor { get; set; } = "";
+        public string Notes { get; set; } = "";
+    }
+
+    private sealed class UnitOption
+    {
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class CatOption
+    {
+        public string Value { get; set; } = "";
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class CatOptionEnum
+    {
+        public OperatingCostCategory Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+}

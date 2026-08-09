@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Wiley.Apartments.Web.Data;
 
@@ -10,9 +11,11 @@ using Wiley.Apartments.Web.Data;
 namespace Wiley.Apartments.Web.Data.Migrations
 {
     [DbContext(typeof(ApartmentsDbContext))]
-    partial class ApartmentsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809221018_AddScheduledItems")]
+    partial class AddScheduledItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.4");
@@ -367,27 +370,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.ToTable("HouseholdMembers", (string)null);
                 });
 
-            modelBuilder.Entity("Wiley.Apartments.Domain.LateFeeSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("GraceDays")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("LateFeeSettings", (string)null);
-                });
-
             modelBuilder.Entity("Wiley.Apartments.Domain.Lease", b =>
                 {
                     b.Property<Guid>("Id")
@@ -465,58 +447,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.HasIndex("UnitId", "IsDeleted");
 
                     b.ToTable("Leases", (string)null);
-                });
-
-            modelBuilder.Entity("Wiley.Apartments.Domain.LedgerEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("DateUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("EntryType")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsLateFee")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid?>("LeaseId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Method")
-                        .HasMaxLength(32)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("UnitId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LeaseId");
-
-                    b.HasIndex("TenantId", "IsDeleted", "DateUtc");
-
-                    b.HasIndex("UnitId", "IsDeleted", "DateUtc");
-
-                    b.ToTable("LedgerEntries", (string)null);
                 });
 
             modelBuilder.Entity("Wiley.Apartments.Domain.Occupancy", b =>
@@ -732,50 +662,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.ToTable("Units", (string)null);
                 });
 
-            modelBuilder.Entity("Wiley.Apartments.Domain.UnitOperatingCost", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("IncurredUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid?>("MaintenanceRequestId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Vendor")
-                        .HasMaxLength(256)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Category", "IncurredUtc");
-
-                    b.HasIndex("UnitId", "IsDeleted", "IncurredUtc");
-
-                    b.ToTable("UnitOperatingCosts", (string)null);
-                });
-
             modelBuilder.Entity("Wiley.Apartments.Domain.Vehicle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -982,32 +868,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Navigation("Unit");
                 });
 
-            modelBuilder.Entity("Wiley.Apartments.Domain.LedgerEntry", b =>
-                {
-                    b.HasOne("Wiley.Apartments.Domain.Lease", "Lease")
-                        .WithMany()
-                        .HasForeignKey("LeaseId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Wiley.Apartments.Domain.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Lease");
-
-                    b.Navigation("Tenant");
-
-                    b.Navigation("Unit");
-                });
-
             modelBuilder.Entity("Wiley.Apartments.Domain.Occupancy", b =>
                 {
                     b.HasOne("Wiley.Apartments.Domain.Tenant", "Tenant")
@@ -1058,16 +918,6 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Navigation("Lease");
 
                     b.Navigation("Tenant");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("Wiley.Apartments.Domain.UnitOperatingCost", b =>
-                {
-                    b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Unit");
                 });

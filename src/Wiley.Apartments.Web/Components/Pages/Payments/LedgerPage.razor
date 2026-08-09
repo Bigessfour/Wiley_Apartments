@@ -1,0 +1,295 @@
+@page "/payments"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject ILedgerService LedgerService
+@inject ITenantService TenantService
+@inject IUnitService UnitService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+
+<PageTitle>Ledger</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 mb-1">Tenant ledger</h1>
+        <p class="text-muted mb-0 small">
+            Charges and payments with running balance. Landlord ops costs are separate (T4.5).
+        </p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success">@SuccessMessage</div>
+}
+
+<div class="row g-3 mb-4" style="max-width: 960px;">
+    <div class="col-md-4">
+        <label class="form-label">Tenant</label>
+        <SfDropDownList TValue="Guid?" TItem="TenantOption"
+                        DataSource="@TenantOptions"
+                        Placeholder="All tenants"
+                        AllowFiltering="true"
+                        ShowClearButton="true"
+                        @bind-Value="FilterTenantId">
+            <DropDownListFieldSettings Text="Text" Value="Id" />
+        </SfDropDownList>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Unit</label>
+        <SfDropDownList TValue="Guid?" TItem="UnitOption"
+                        DataSource="@UnitOptions"
+                        Placeholder="All units"
+                        AllowFiltering="true"
+                        ShowClearButton="true"
+                        @bind-Value="FilterUnitId">
+            <DropDownListFieldSettings Text="Text" Value="Id" />
+        </SfDropDownList>
+    </div>
+    <div class="col-md-5 d-flex align-items-end gap-2">
+        <SfButton CssClass="e-primary e-small" Content="Apply" Disabled="@Busy" OnClick="LoadAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Post charge…" Disabled="@Busy"
+                  OnClick="@(() => ShowForm = "charge")" />
+        <SfButton CssClass="e-outline e-small" Content="Post payment…" Disabled="@Busy"
+                  OnClick="@(() => ShowForm = "payment")" />
+    </div>
+</div>
+
+@if (ShowForm is "charge" or "payment")
+{
+    <div class="border rounded p-3 mb-4" style="max-width: 720px;">
+        <h2 class="h6">@(ShowForm == "charge" ? "Post charge" : "Post payment")</h2>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label class="form-label">Tenant</label>
+                <SfDropDownList TValue="Guid?" TItem="TenantOption"
+                                DataSource="@TenantOptions.Where(t => t.Id is not null)"
+                                @bind-Value="FormTenantId"
+                                Placeholder="Required">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Unit</label>
+                <SfDropDownList TValue="Guid?" TItem="UnitOption"
+                                DataSource="@UnitOptions.Where(u => u.Id is not null)"
+                                @bind-Value="FormUnitId"
+                                Placeholder="Required">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Amount</label>
+                <SfNumericTextBox TValue="decimal?" @bind-Value="FormAmount" Format="C2" Min="0.01m" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Date</label>
+                <SfDatePicker TValue="DateTime?" @bind-Value="FormDate" />
+            </div>
+            @if (ShowForm == "payment")
+            {
+                <div class="col-md-4">
+                    <label class="form-label">Method</label>
+                    <SfDropDownList TValue="PaymentMethod" TItem="MethodOption"
+                                    DataSource="@MethodOptions"
+                                    @bind-Value="FormMethod">
+                        <DropDownListFieldSettings Text="Text" Value="Value" />
+                    </SfDropDownList>
+                </div>
+            }
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <SfTextBox @bind-Value="FormNotes" />
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <SfButton CssClass="e-primary e-small" Content="Save" Disabled="@Busy" OnClick="SaveFormAsync" />
+                <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowForm = null)" />
+            </div>
+        </div>
+    </div>
+}
+
+<p class="small text-muted">Balance (filter): @Balance.ToString("C")</p>
+
+<SfGrid TValue="LedgerRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true">
+    <GridPageSettings PageSize="25" />
+    <GridColumns>
+        <GridColumn Field="@nameof(LedgerRow.DateDisplay)" HeaderText="Date" Width="110" />
+        <GridColumn Field="@nameof(LedgerRow.TenantName)" HeaderText="Tenant" Width="140" />
+        <GridColumn Field="@nameof(LedgerRow.UnitNumber)" HeaderText="Unit" Width="80" />
+        <GridColumn Field="@nameof(LedgerRow.EntryType)" HeaderText="Type" Width="100" />
+        <GridColumn Field="@nameof(LedgerRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+        <GridColumn Field="@nameof(LedgerRow.RunningBalance)" HeaderText="Balance" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+        <GridColumn Field="@nameof(LedgerRow.Method)" HeaderText="Method" Width="120" />
+        <GridColumn Field="@nameof(LedgerRow.Notes)" HeaderText="Notes" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<LedgerRow> Rows { get; set; } = [];
+    private List<TenantOption> TenantOptions { get; set; } = [];
+    private List<UnitOption> UnitOptions { get; set; } = [];
+    private Guid? FilterTenantId { get; set; }
+    private Guid? FilterUnitId { get; set; }
+    private decimal Balance { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private bool Busy { get; set; }
+    private string? ShowForm { get; set; }
+    private Guid? FormTenantId { get; set; }
+    private Guid? FormUnitId { get; set; }
+    private decimal? FormAmount { get; set; }
+    private DateTime? FormDate { get; set; } = DateTime.Today;
+    private PaymentMethod FormMethod { get; set; } = PaymentMethod.Cash;
+    private string? FormNotes { get; set; }
+
+    private static readonly List<MethodOption> MethodOptions =
+    [
+        new() { Value = PaymentMethod.Cash, Text = "Cash" },
+        new() { Value = PaymentMethod.Check, Text = "Check" },
+        new() { Value = PaymentMethod.OnlineReference, Text = "Online reference" },
+        new() { Value = PaymentMethod.Other, Text = "Other" }
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tenants = await TenantService.SearchAsync();
+        TenantOptions = tenants
+            .OrderBy(t => t.LastName)
+            .Select(t => new TenantOption { Id = t.Id, Text = $"{t.LastName}, {t.FirstName}" })
+            .ToList();
+        TenantOptions.Insert(0, new TenantOption { Id = null, Text = "(All tenants)" });
+
+        var units = await UnitService.GetAllAsync();
+        UnitOptions = units
+            .OrderBy(u => u.Number)
+            .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .ToList();
+        UnitOptions.Insert(0, new UnitOption { Id = null, Text = "(All units)" });
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var lines = await LedgerService.GetLedgerAsync(FilterTenantId, FilterUnitId);
+            Rows = lines.Select(l => new LedgerRow
+            {
+                DateDisplay = Clock.ToDisplayTime(l.Entry.DateUtc).ToString("d"),
+                TenantName = l.Entry.Tenant is null
+                    ? ""
+                    : $"{l.Entry.Tenant.LastName}, {l.Entry.Tenant.FirstName}",
+                UnitNumber = l.Entry.Unit?.Number ?? "",
+                EntryType = l.Entry.EntryType.ToString(),
+                Amount = l.Entry.Amount,
+                RunningBalance = l.RunningBalance,
+                Method = l.Entry.Method?.ToString() ?? "",
+                Notes = l.Entry.Notes ?? ""
+            }).ToList();
+            Balance = lines.Count == 0 ? 0m : lines[^1].RunningBalance;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SaveFormAsync()
+    {
+        if (FormTenantId is null || FormUnitId is null || FormAmount is null || FormDate is null)
+        {
+            ErrorMessage = "Tenant, unit, amount, and date are required.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var dateUtc = Clock.ToUtc(FormDate.Value.Date);
+            if (ShowForm == "charge")
+            {
+                await LedgerService.PostChargeAsync(
+                    FormTenantId.Value,
+                    FormUnitId.Value,
+                    FormAmount.Value,
+                    dateUtc,
+                    notes: FormNotes);
+                SuccessMessage = "Charge posted.";
+            }
+            else
+            {
+                await LedgerService.PostPaymentAsync(
+                    FormTenantId.Value,
+                    FormUnitId.Value,
+                    FormAmount.Value,
+                    dateUtc,
+                    FormMethod,
+                    notes: FormNotes);
+                SuccessMessage = "Payment posted.";
+            }
+
+            ShowForm = null;
+            FormAmount = null;
+            FormNotes = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private sealed class LedgerRow
+    {
+        public string DateDisplay { get; set; } = "";
+        public string TenantName { get; set; } = "";
+        public string UnitNumber { get; set; } = "";
+        public string EntryType { get; set; } = "";
+        public decimal Amount { get; set; }
+        public decimal RunningBalance { get; set; }
+        public string Method { get; set; } = "";
+        public string Notes { get; set; } = "";
+    }
+
+    private sealed class TenantOption
+    {
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class UnitOption
+    {
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class MethodOption
+    {
+        public PaymentMethod Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+}

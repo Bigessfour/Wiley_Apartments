@@ -13,6 +13,7 @@
 @inject IFlooringService FlooringService
 @inject IOccupancyService OccupancyService
 @inject ITenantService TenantService
+@inject IUnitOperatingCostService OpsCostService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 
@@ -341,6 +342,30 @@ else
                     </SfGrid>
                 </ContentTemplate>
             </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Ops costs"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <p class="text-muted small mb-0">
+                            Landlord expenses for this unit (Utility / Repair / Replace / CommonUpkeep).
+                            Full portfolio entry: <a href="/reports/operating-costs">Operating costs report</a>.
+                        </p>
+                        <span class="fw-semibold">Total @OpsCostTotal.ToString("C")</span>
+                    </div>
+                    <SfGrid TValue="OpsCostRow" DataSource="@OpsCostRows" AllowPaging="true" AllowSorting="true" Height="360">
+                        <GridPageSettings PageSize="10" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(OpsCostRow.DateDisplay)" HeaderText="Date" Width="110" />
+                            <GridColumn Field="@nameof(OpsCostRow.Category)" HeaderText="Category" Width="120" />
+                            <GridColumn Field="@nameof(OpsCostRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+                            <GridColumn Field="@nameof(OpsCostRow.Vendor)" HeaderText="Vendor" Width="140" />
+                            <GridColumn Field="@nameof(OpsCostRow.Notes)" HeaderText="Notes" />
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
         </TabItems>
     </SfTab>
 }
@@ -352,6 +377,8 @@ else
     private Unit? Unit { get; set; }
     private List<Asset> UnitAssets { get; set; } = [];
     private List<Flooring> UnitFloorings { get; set; } = [];
+    private List<OpsCostRow> OpsCostRows { get; set; } = [];
+    private decimal OpsCostTotal { get; set; }
     private Occupancy? CurrentOccupancy { get; set; }
     private List<Occupancy> OccupancyHistory { get; set; } = [];
     private List<TenantOption> TenantOptions { get; set; } = [];
@@ -410,10 +437,23 @@ else
 
         UnitAssets = (await AssetService.GetByUnitIdAsync(UnitId)).ToList();
         UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
+        await ReloadOpsCostsAsync();
         await ReloadOccupancyAsync();
         TenantOptions = (await TenantService.SearchAsync())
             .Select(t => new TenantOption(t.Id, $"{t.LastName}, {t.FirstName}"))
             .ToList();
+    }
+
+    private async Task ReloadOpsCostsAsync()
+    {
+        var costs = await OpsCostService.QueryAsync(unitId: UnitId);
+        OpsCostRows = costs.Select(c => new OpsCostRow(
+            Clock.ToDisplayTime(c.IncurredUtc).ToString("d"),
+            c.Category.ToString(),
+            c.Amount,
+            c.Vendor ?? "",
+            c.Notes ?? "")).ToList();
+        OpsCostTotal = OpsCostRows.Sum(r => r.Amount);
     }
 
     private async Task ReloadOccupancyAsync()
@@ -580,4 +620,11 @@ else
     };
 
     private sealed record TenantOption(Guid Id, string DisplayName);
+
+    private sealed record OpsCostRow(
+        string DateDisplay,
+        string Category,
+        decimal Amount,
+        string Vendor,
+        string Notes);
 }
