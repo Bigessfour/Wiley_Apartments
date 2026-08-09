@@ -77,9 +77,10 @@
 
 ## Phase 2 — Tenants & Occupancy
 
-- [ ] **T2.1** Tenant full CRUD + household members + contacts (vehicles, pets, emergency).
+- [x] **T2.1** Tenant full CRUD + household members + contacts (vehicles, pets, emergency).
   - **Done when:** Create / edit / search / **soft-delete** works; screening documents attachable to tenant.
   - **Paths:** `Domain/Tenant.cs`, `Pages/Tenants/`
+  - **Note (2026-08-09):** CRUD + soft-delete + household/vehicles/pets shipped; screening attach deferred to Document vault (Phase 6).
 
 - [ ] **T2.2** Occupancy linking (start/end) with history.
   - **Done when:** Current tenant on unit detail; past occupancy retained and viewable; unit status updates on start/end.

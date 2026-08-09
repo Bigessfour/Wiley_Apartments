@@ -1,0 +1,205 @@
+@page "/tenants/{TenantId:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject ITenantService TenantService
+@inject NavigationManager Navigation
+
+<PageTitle>@(Tenant is null ? "Tenant" : $"{Tenant.LastName}, {Tenant.FirstName}")</PageTitle>
+
+@if (Tenant is null)
+{
+    <p class="text-muted p-3">@StatusMessage</p>
+}
+else
+{
+    <div class="mb-3">
+        <SfButton CssClass="e-outline e-small" Content="← Tenants" OnClick="@(() => Navigation.NavigateTo("/tenants"))" />
+    </div>
+
+    <h1 class="h3">@Tenant.LastName, @Tenant.FirstName</h1>
+    <p class="text-muted">
+        @Tenant.Phone
+        @if (!string.IsNullOrWhiteSpace(Tenant.Email))
+        {
+            <span> · @Tenant.Email</span>
+        }
+    </p>
+    @if (!string.IsNullOrWhiteSpace(Tenant.EmergencyContact))
+    {
+        <p><strong>Emergency:</strong> @Tenant.EmergencyContact</p>
+    }
+    @if (Tenant.IsDeleted)
+    {
+        <div class="alert alert-warning">This tenant is soft-deleted.</div>
+    }
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-warning">@ErrorMessage</div>
+    }
+
+    <h2 class="h5 mt-4">Household</h2>
+    <SfGrid TValue="HouseholdMember"
+            DataSource="@Tenant.HouseholdMembers"
+            Toolbar="@(new List<string> { "Add", "Delete", "Update", "Cancel" })"
+            Height="220">
+        <GridEvents TValue="HouseholdMember" OnActionComplete="OnHouseholdCompleteAsync" />
+        <GridEditSettings AllowAdding="@(!Tenant.IsDeleted)"
+                          AllowDeleting="@(!Tenant.IsDeleted)"
+                          Mode="EditMode.Normal"
+                          ShowDeleteConfirmDialog="true" />
+        <GridColumns>
+            <GridColumn Field="@nameof(HouseholdMember.Id)" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field="@nameof(HouseholdMember.FullName)" HeaderText="Name" ValidationRules="@(new ValidationRules { Required = true })" />
+            <GridColumn Field="@nameof(HouseholdMember.Relationship)" HeaderText="Relationship" Width="140" />
+        </GridColumns>
+    </SfGrid>
+
+    <h2 class="h5 mt-4">Vehicles</h2>
+    <SfGrid TValue="Vehicle"
+            DataSource="@Tenant.Vehicles"
+            Toolbar="@(new List<string> { "Add", "Delete", "Update", "Cancel" })"
+            Height="220">
+        <GridEvents TValue="Vehicle" OnActionComplete="OnVehicleCompleteAsync" />
+        <GridEditSettings AllowAdding="@(!Tenant.IsDeleted)"
+                          AllowDeleting="@(!Tenant.IsDeleted)"
+                          Mode="EditMode.Normal"
+                          ShowDeleteConfirmDialog="true" />
+        <GridColumns>
+            <GridColumn Field="@nameof(Vehicle.Id)" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field="@nameof(Vehicle.Make)" HeaderText="Make" Width="120" />
+            <GridColumn Field="@nameof(Vehicle.Model)" HeaderText="Model" Width="120" />
+            <GridColumn Field="@nameof(Vehicle.Color)" HeaderText="Color" Width="100" />
+            <GridColumn Field="@nameof(Vehicle.Plate)" HeaderText="Plate" ValidationRules="@(new ValidationRules { Required = true })" />
+        </GridColumns>
+    </SfGrid>
+
+    <h2 class="h5 mt-4">Pets</h2>
+    <SfGrid TValue="Pet"
+            DataSource="@Tenant.Pets"
+            Toolbar="@(new List<string> { "Add", "Delete", "Update", "Cancel" })"
+            Height="220">
+        <GridEvents TValue="Pet" OnActionComplete="OnPetCompleteAsync" />
+        <GridEditSettings AllowAdding="@(!Tenant.IsDeleted)"
+                          AllowDeleting="@(!Tenant.IsDeleted)"
+                          Mode="EditMode.Normal"
+                          ShowDeleteConfirmDialog="true" />
+        <GridColumns>
+            <GridColumn Field="@nameof(Pet.Id)" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field="@nameof(Pet.Name)" HeaderText="Name" ValidationRules="@(new ValidationRules { Required = true })" />
+            <GridColumn Field="@nameof(Pet.Type)" HeaderText="Type" Width="120" />
+            <GridColumn Field="@nameof(Pet.Breed)" HeaderText="Breed" Width="140" />
+            <GridColumn Field="@nameof(Pet.Notes)" HeaderText="Notes" />
+        </GridColumns>
+    </SfGrid>
+
+    <p class="text-muted small mt-4 mb-0">
+        Screening document attach will land with Document vault (Phase 6). Occupancy linking is T2.2.
+    </p>
+}
+
+@code {
+    [Parameter]
+    public Guid TenantId { get; set; }
+
+    private Tenant? Tenant { get; set; }
+    private string StatusMessage { get; set; } = "Loading…";
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        ErrorMessage = null;
+        Tenant = await TenantService.GetByIdAsync(TenantId);
+        StatusMessage = Tenant is null ? "Tenant not found." : string.Empty;
+    }
+
+    private async Task OnHouseholdCompleteAsync(ActionEventArgs<HouseholdMember> args)
+    {
+        try
+        {
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save
+                && args.Action == "Add"
+                && args.Data is not null)
+            {
+                await TenantService.AddHouseholdMemberAsync(TenantId, args.Data);
+            }
+            else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
+            {
+                await TenantService.RemoveHouseholdMemberAsync(args.Data.Id);
+            }
+            else
+            {
+                return;
+            }
+
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task OnVehicleCompleteAsync(ActionEventArgs<Vehicle> args)
+    {
+        try
+        {
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save
+                && args.Action == "Add"
+                && args.Data is not null)
+            {
+                await TenantService.AddVehicleAsync(TenantId, args.Data);
+            }
+            else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
+            {
+                await TenantService.RemoveVehicleAsync(args.Data.Id);
+            }
+            else
+            {
+                return;
+            }
+
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task OnPetCompleteAsync(ActionEventArgs<Pet> args)
+    {
+        try
+        {
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save
+                && args.Action == "Add"
+                && args.Data is not null)
+            {
+                await TenantService.AddPetAsync(TenantId, args.Data);
+            }
+            else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
+            {
+                await TenantService.RemovePetAsync(args.Data.Id);
+            }
+            else
+            {
+                return;
+            }
+
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+        }
+    }
+}

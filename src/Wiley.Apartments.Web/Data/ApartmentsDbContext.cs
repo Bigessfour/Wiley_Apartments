@@ -15,6 +15,10 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<Asset> Assets => Set<Asset>();
     public DbSet<Flooring> Floorings => Set<Flooring>();
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+    public DbSet<Pet> Pets => Set<Pet>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -71,6 +75,62 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Tenant>(entity =>
+        {
+            entity.ToTable("Tenants");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FirstName).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.LastName).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Phone).HasMaxLength(64);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.EmergencyContact).HasMaxLength(512);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.LastName, e.IsDeleted });
+        });
+
+        builder.Entity<HouseholdMember>(entity =>
+        {
+            entity.ToTable("HouseholdMembers");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FullName).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.Relationship).HasMaxLength(128);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasOne(e => e.Tenant)
+                .WithMany(t => t.HouseholdMembers)
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Vehicle>(entity =>
+        {
+            entity.ToTable("Vehicles");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Make).HasMaxLength(128);
+            entity.Property(e => e.Model).HasMaxLength(128);
+            entity.Property(e => e.Color).HasMaxLength(64);
+            entity.Property(e => e.Plate).HasMaxLength(32).IsRequired();
+            entity.HasIndex(e => e.TenantId);
+            entity.HasOne(e => e.Tenant)
+                .WithMany(t => t.Vehicles)
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Pet>(entity =>
+        {
+            entity.ToTable("Pets");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Type).HasMaxLength(64);
+            entity.Property(e => e.Breed).HasMaxLength(128);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasOne(e => e.Tenant)
+                .WithMany(t => t.Pets)
+                .HasForeignKey(e => e.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

@@ -1,0 +1,130 @@
+@page "/tenants"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject ITenantService TenantService
+@inject NavigationManager Navigation
+
+<PageTitle>Tenants</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Tenants</h1>
+        <p class="text-muted mb-0">@TenantCount active tenants (soft-delete hides from this list)</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<SfGrid @ref="GridRef"
+        TValue="Tenant"
+        DataSource="@Tenants"
+        Toolbar="@ToolbarItems"
+        AllowPaging="true"
+        AllowSorting="true"
+        Height="420">
+    <GridEvents TValue="Tenant"
+                OnActionComplete="OnActionCompleteAsync" />
+    <GridEditSettings AllowAdding="true"
+                      AllowEditing="true"
+                      AllowDeleting="true"
+                      Mode="EditMode.Normal"
+                      ShowDeleteConfirmDialog="true" />
+    <GridColumns>
+        <GridColumn Field="@nameof(Tenant.Id)" IsPrimaryKey="true" Visible="false" />
+        <GridColumn Field="@nameof(Tenant.LastName)"
+                    HeaderText="Last name"
+                    Width="140"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(Tenant.FirstName)"
+                    HeaderText="First name"
+                    Width="140"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(Tenant.Phone)"
+                    HeaderText="Phone"
+                    Width="130" />
+        <GridColumn Field="@nameof(Tenant.Email)"
+                    HeaderText="Email"
+                    Width="200" />
+        <GridColumn Field="@nameof(Tenant.EmergencyContact)"
+                    HeaderText="Emergency"
+                    Width="180" />
+        <GridColumn Field="@nameof(Tenant.Notes)"
+                    HeaderText="Notes"
+                    Width="160" />
+        <GridColumn HeaderText=""
+                    Width="90"
+                    AllowEditing="false"
+                    TextAlign="TextAlign.Center">
+            <Template>
+                @{
+                    var tenant = context as Tenant;
+                }
+                <SfButton CssClass="e-small e-outline"
+                          Content="Open"
+                          OnClick="@(() => OpenTenant(tenant!.Id))" />
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private SfGrid<Tenant>? GridRef;
+    private List<Tenant> Tenants { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private int TenantCount => Tenants.Count;
+
+    private readonly List<string> ToolbarItems =
+    [
+        "Add", "Edit", "Delete", "Update", "Cancel", "Search"
+    ];
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync() =>
+        Tenants = (await TenantService.SearchAsync()).ToList();
+
+    private void OpenTenant(Guid tenantId) => Navigation.NavigateTo($"/tenants/{tenantId}");
+
+    private async Task OnActionCompleteAsync(ActionEventArgs<Tenant> args)
+    {
+        try
+        {
+            switch (args.RequestType)
+            {
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Add" && args.Data is not null:
+                    await TenantService.CreateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Edit" && args.Data is not null:
+                    await TenantService.UpdateAsync(args.Data);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Delete when args.Data is not null:
+                    await TenantService.SoftDeleteAsync(args.Data.Id);
+                    break;
+                default:
+                    return;
+            }
+
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
+        }
+    }
+}

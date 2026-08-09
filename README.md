@@ -7,7 +7,7 @@ maintenance, appliance/carpet inventory, and documents.
 
 **Repository**: [github.com/Bigessfour/Wiley_Apartments](https://github.com/Bigessfour/Wiley_Apartments)
 
-**Status**: Phase 1 **complete** (T1.1–T1.4) — Phase 2 tenants next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
+**Status**: Phase 2 **in progress** (T2.1 tenants CRUD) — T2.2 occupancy next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
 
 ## Users
 
