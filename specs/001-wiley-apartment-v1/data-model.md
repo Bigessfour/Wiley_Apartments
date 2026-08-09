@@ -210,7 +210,7 @@ erDiagram
 ├── uploads/{unitNumber}/{category}/{filename}
 ├── leases/{unitNumber}/{leaseId}.pdf
 ├── appliances/{unitNumber}/{assetId}/{filename}
-├── templates/leases/{templateName}.sfdt
+├── templates/brookside-*.docx|.pdf   (legal masters + fillable AcroForm)
 └── photos/units/{unitNumber}/{filename}
 ```
 

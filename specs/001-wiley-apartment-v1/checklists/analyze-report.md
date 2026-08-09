@@ -22,7 +22,7 @@
 | IV Minimal parts     | NFR 2 users                  | 1 container default                       | Phase 0 focus          | PASS    |
 | V Syncfusion mandate | Strict Syncfusion-only + MCP | AGENTS.md, plan § Mandate                 | T0.1, T1.4+            | PASS    |
 | VI Security          | FR-7                         | Identity, reverse proxy                   | T0.4                   | PASS    |
-| VII Colorado         | FR-3, assumptions            | SFDT templates                            | T3.2                   | PASS    |
+| VII Colorado         | FR-3, assumptions            | Brookside fillable PDF templates          | T3.2                   | PASS    |
 | VIII Demonstrable    | FR acceptance, SC-*          | quickstart                                | T7.1                   | PASS    |
 
 ---

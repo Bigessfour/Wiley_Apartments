@@ -111,6 +111,7 @@ public sealed class LeaseService : ILeaseService
         DateTime endUtc,
         decimal rent,
         decimal deposit,
+        string? customClauses = null,
         CancellationToken cancellationToken = default)
     {
         EnsureFillablePdfTemplates();
@@ -156,6 +157,12 @@ public sealed class LeaseService : ILeaseService
                 $"Template '{templateFileName}' not found under DocumentRoot/templates. See deploy/synology/TEMPLATES.md.");
         }
 
+        var clauses = string.IsNullOrWhiteSpace(customClauses) ? null : customClauses.Trim();
+        if (clauses is { Length: > 4000 })
+        {
+            throw new ArgumentException("Custom clauses cannot exceed 4000 characters.", nameof(customClauses));
+        }
+
         var lease = new Lease
         {
             Id = Guid.NewGuid(),
@@ -167,6 +174,7 @@ public sealed class LeaseService : ILeaseService
             Deposit = deposit,
             Status = LeaseStatus.Draft,
             TemplateUsed = selected.FileName,
+            CustomClauses = clauses,
             IsDeleted = false
         };
 
@@ -352,7 +360,8 @@ public sealed class LeaseService : ILeaseService
             LeaseEnd = endLocal,
             MonthlyRent = lease.Rent,
             RentStart = startLocal,
-            SecurityDeposit = lease.Deposit
+            SecurityDeposit = lease.Deposit,
+            CustomClauses = lease.CustomClauses
         };
     }
 

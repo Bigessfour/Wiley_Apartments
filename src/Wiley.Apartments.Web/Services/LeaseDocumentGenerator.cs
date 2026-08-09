@@ -72,7 +72,8 @@ public sealed class LeaseDocumentGenerator
 
         using var output = new MemoryStream();
         loaded.Save(output);
-        return output.ToArray();
+        var filled = output.ToArray();
+        return AppendCustomClausesIfNeeded(filled, data.CustomClauses);
     }
 
     /// <summary>
@@ -147,7 +148,8 @@ public sealed class LeaseDocumentGenerator
         using var pdfDocument = pdfRenderer.ConvertToPDF(document);
         using var pdfStream = new MemoryStream();
         pdfDocument.Save(pdfStream);
-        return (docxBytes, pdfStream.ToArray());
+        var pdfBytes = AppendCustomClausesIfNeeded(pdfStream.ToArray(), data.CustomClauses);
+        return (docxBytes, pdfBytes);
     }
 
     /// <summary>Preferred generate: fillable PDF when template is PDF; else DOCX→fillable→fill.</summary>
@@ -172,6 +174,34 @@ public sealed class LeaseDocumentGenerator
         using var forDocx = new MemoryStream(docxBytes);
         var (filledDocx, _) = GenerateFromDocx(forDocx, data);
         return (filledDocx, filledPdf);
+    }
+
+    /// <summary>Append an Additional Clauses page when the clerk provided custom text (FR-009).</summary>
+    public byte[] AppendCustomClausesIfNeeded(byte[] pdfBytes, string? customClauses)
+    {
+        if (string.IsNullOrWhiteSpace(customClauses))
+        {
+            return pdfBytes;
+        }
+
+        using var input = new MemoryStream(pdfBytes);
+        using var loaded = new PdfLoadedDocument(input);
+        var page = loaded.Pages.Add();
+        var graphics = page.Graphics;
+        var titleFont = new PdfStandardFont(PdfFontFamily.Helvetica, 14, PdfFontStyle.Bold);
+        var bodyFont = new PdfStandardFont(PdfFontFamily.Helvetica, 11);
+        graphics.DrawString("Additional Clauses (Addendum)", titleFont, PdfBrushes.Black, new PointF(40, 40));
+        graphics.DrawString(
+            "The following clauses are incorporated into and made part of this lease:",
+            bodyFont,
+            PdfBrushes.Black,
+            new PointF(40, 70));
+        var pageSize = page.Size;
+        var bounds = new RectangleF(40, 100, pageSize.Width - 80, pageSize.Height - 140);
+        graphics.DrawString(customClauses.Trim(), bodyFont, PdfBrushes.Black, bounds);
+        using var output = new MemoryStream();
+        loaded.Save(output);
+        return output.ToArray();
     }
 
     private static Dictionary<string, string> ToFieldValues(LeaseMergeData data)

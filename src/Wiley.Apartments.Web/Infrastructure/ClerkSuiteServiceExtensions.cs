@@ -34,8 +34,10 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IAssetService, AssetService>();
         builder.Services.AddScoped<IFlooringService, FlooringService>();
         builder.Services.AddSingleton<LeaseDocumentGenerator>();
+        builder.Services.AddSingleton<IElectronicSignatureHook, NullElectronicSignatureHook>();
         builder.Services.AddScoped<IDocumentService, DocumentService>();
         builder.Services.AddScoped<ILeaseService, LeaseService>();
+        builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";

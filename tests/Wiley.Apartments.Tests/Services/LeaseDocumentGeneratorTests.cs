@@ -79,6 +79,28 @@ public class LeaseDocumentGeneratorTests
     }
 
     [Fact]
+    public void Generate_WithCustomClauses_AppendsAddendumPage()
+    {
+        var templatePath = ResolveTemplatePath();
+        if (templatePath is null)
+        {
+            return;
+        }
+
+        var data = SampleData();
+        data.CustomClauses = "Pets require prior written approval from the Housing Authority.";
+        var generator = new LeaseDocumentGenerator();
+        using var template = File.OpenRead(templatePath);
+        var (_, pdf) = generator.Generate(template, "brookside-year-lease.docx", data);
+
+        using var loaded = new PdfLoadedDocument(pdf);
+        loaded.Pages.Count.Should().BeGreaterThan(4);
+        var lastText = loaded.Pages[loaded.Pages.Count - 1].ExtractText();
+        lastText.Should().Contain("Additional Clauses");
+        lastText.Should().Contain("Pets require prior written approval");
+    }
+
+    [Fact]
     public void FillPdf_SetsAcroFormValues()
     {
         var templatePath = ResolveTemplatePath();

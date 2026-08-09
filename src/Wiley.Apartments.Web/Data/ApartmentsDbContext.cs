@@ -164,6 +164,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.TemplateUsed).HasMaxLength(256).IsRequired();
             entity.Property(e => e.GeneratedDocxRelativePath).HasMaxLength(512);
             entity.Property(e => e.GeneratedPdfRelativePath).HasMaxLength(512);
+            entity.Property(e => e.CustomClauses).HasMaxLength(4000);
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted });
             entity.HasIndex(e => new { e.TenantId, e.IsDeleted });
             entity.HasIndex(e => e.SignedDocumentId);

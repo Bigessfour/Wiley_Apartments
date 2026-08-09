@@ -159,10 +159,12 @@ clerk-suite-app  →  clerk-suite-db (postgres:16 or mariadb:11)
 | ----------------------------- | ---------------------------------- |
 | Units, tenants, ledger, audit | SfGrid                             |
 | Dashboard                     | SfDashboardLayout, SfCard, SfChart |
-| Lease templates               | DocumentEditor (SFDT)              |
+| Lease templates               | Fillable AcroForm PDF (`templates/brookside-*.pdf` bootstrapped from Brookside DOCX); DocIO for conversion |
+| Lease preview / signed PDF    | SfPdfViewer2                       |
 | PDF viewing                   | SfPdfViewer                        |
-| Document vault                | FileManager (custom NAS adapter)   |
+| Document vault                | FileManager (custom NAS adapter); DocumentEditor deferred to T6.1 if in-app Office edit needed |
 | Forms / dialogs               | SfDataForm, SfDialog               |
+| Operations calendar (Phase 3.5) | SfSchedule                       |
 
 ---
 
@@ -293,7 +295,7 @@ See [deploy/synology/SYNCFUSION-SECRETS.md](../../../deploy/synology/SYNCFUSION-
 3. **Documents on NAS, metadata in DB** — files never stored as blobs in DB; `Document.FilePathOnNas` + category only.
 4. **Payment portal** — Town of Wiley PayStar (`PaymentPortalUrl`); deep-link only; no card processing in ClerkSuite.
 5. **Late fees** — settings toggle default OFF; configurable amount + grace days when enabled (T4.2).
-5. **Lease generation** — Syncfusion DocumentEditor for template edit/preview; server-side export to DOCX/PDF from merged template.
+5. **Lease generation** — Fillable AcroForm PDF from Brookside templates (DocIO bootstrap + Pdf fill); preview via SfPdfViewer2; optional custom-clause addendum page.
 6. **UTC storage, local display** — all `DateTime` persisted UTC; UI displays `America/Denver`.
 7. **Soft deletes** — `Tenant` and `Lease` use soft delete where history matters; hard delete forbidden for governed entities.
 
@@ -350,7 +352,7 @@ volumes:
 | IV. Minimal parts     | 1 container default; max 2 with Postgres/MariaDB                       | PASS   |
 | V. Syncfusion mandate | Syncfusion-only UI; MCP/Agentic Builder; keys not in git               | PASS   |
 | VI. Security          | Identity login (audit); no roles v1; Tailscale optional; HTTPS at edge | PASS   |
-| VII. Colorado leases  | Editable SFDT templates; merge + preview                               | PASS   |
+| VII. Colorado leases  | Brookside fillable PDF templates; merge + PdfViewer preview            | PASS   |
 | VIII. Demonstrable    | quickstart.md on real NAS + Win11                                      | PASS   |
 
 Post-design re-check: No violations.
@@ -388,7 +390,7 @@ deploy/
 ├── docker-compose.postgres.yml # optional override
 ├── Dockerfile
 └── synology/                   # NAS setup, reverse proxy notes
-templates/leases/
+# Lease blanks live on NAS DocumentRoot/templates/ (not in git)
 tests/Wiley.Apartments.Tests/
 ```
 

@@ -11,6 +11,7 @@
 @using Wiley.Apartments.Web.Configuration
 @inject ILeaseService LeaseService
 @inject IDocumentService DocumentService
+@inject IElectronicSignatureHook ESignHook
 @inject IOptions<ClerkSuiteOptions> Options
 @inject IHostEnvironment Environment
 @inject IDateTimeService Clock
@@ -56,6 +57,14 @@ else
     }
 
     <h2 class="h5 mt-2">Signed lease</h2>
+    <p class="text-muted small mb-2">
+        E-sign: @(ESignHook.IsConfigured ? "provider configured" : "not configured (v1) — print/wet-ink or upload signed PDF").
+        Hook: <code>IElectronicSignatureHook</code>.
+    </p>
+    @if (!string.IsNullOrWhiteSpace(Lease.CustomClauses))
+    {
+        <p class="small mb-2"><strong>Custom clauses:</strong> included as PDF addendum.</p>
+    }
     @if (Lease.SignedDocumentId is Guid signedId)
     {
         <p class="small mb-2">
@@ -70,6 +79,11 @@ else
     else
     {
         <p class="text-muted small mb-2">Upload the signed PDF to activate this lease (Draft → Active).</p>
+        @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+        {
+            <SfButton CssClass="e-small e-outline mb-2" Content="Request e-sign (hook)"
+                      Disabled="@Busy" OnClick="RequestESignAsync" />
+        }
     }
 
     <div style="max-width: 480px;" class="mb-4">
@@ -263,5 +277,44 @@ else
 
         _pdfBytes = await DocumentService.ReadBytesAsync(sid);
         _pendingLoad = _pdfBytes is not null;
+    }
+
+    private async Task RequestESignAsync()
+    {
+        if (Lease?.GeneratedPdfRelativePath is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name
+                ?? auth.User.FindFirstValue(ClaimTypes.Email)
+                ?? "clerk";
+            var result = await ESignHook.RequestSignatureAsync(
+                Lease.Id,
+                Lease.GeneratedPdfRelativePath,
+                user);
+            if (result.Status == "NotConfigured")
+            {
+                SuccessMessage = result.Message;
+            }
+            else
+            {
+                SuccessMessage = $"{result.Status}: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 }

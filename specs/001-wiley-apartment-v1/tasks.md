@@ -105,9 +105,9 @@
   - **Progress (2026-08-09):** `Lease` + `LeaseStatus`, EF migration `AddLeases`, `ILeaseService`/`LeaseService` (draft, soft-delete, list).
 
 - [x] **T3.2** Lease generator from template (populate unit/tenant data).
-  - **Done when:** Clerk generates DOCX/PDF via Syncfusion DocumentEditor + server export with correct merged data; Colorado template in `templates/leases/`.
-  - **Paths:** `Pages/Leases/LeaseWizard.razor`, `Pages/Leases/LeasePreview.razor`
-  - **Progress (2026-08-09):** **PDF-first pivot** — `Syncfusion.Pdf.Net.Core` + `Syncfusion.Blazor.SfPdfViewer`. Bootstraps fillable AcroForm `brookside-*.pdf` from Brookside DOCX; fills named fields; preview via SfPdfViewer2. Generated lease stays **Draft** until T3.3/T3.4. See `deploy/synology/TEMPLATES.md`.
+  - **Done when:** Clerk generates filled PDF from Brookside fillable templates (AcroForm) with unit/tenant data; optional custom-clause addendum page; preview via SfPdfViewer2. Source blanks under `DocumentRoot/templates/brookside-*.docx` (PDF siblings auto-bootstrapped).
+  - **Paths:** `Pages/Leases/LeaseWizard.razor`, `Pages/Leases/LeasePreview.razor`, `Services/LeaseDocumentGenerator.cs`
+  - **Progress (2026-08-09):** **PDF-first** — `Syncfusion.Pdf.Net.Core` + `Syncfusion.Blazor.SfPdfViewer`. See `deploy/synology/TEMPLATES.md`.
 
 - [x] **T3.3** Upload/link signed lease + document vault integration.
   - **Done when:** Signed document on NAS (`/docs/leases/...`) and linked to lease via Document entity; status can move Draft → Active.
@@ -259,3 +259,30 @@ Phase 0 + Phase 1 + Phase 2 + T0.4 = clerks manage 16 units and tenants with aud
 - Use **`/speckit.converge`** during build if scope grows mid-flight
 - Use global **`speckit-done`** skill at **T7.4**
 - Do **not** push to GitHub until full spec-kit pass is complete (project policy)
+
+---
+
+## Phase 8: Convergence
+
+Mid-flight converge (2026-08-09) after fillable-PDF lease pivot + early Document vault. Open work already tasked in T3.4–T7.x is **not** duplicated here.
+
+- [x] **T008** CRITICAL: Enforce AuditLog append-only (reject Update/Delete of `AuditLog` rows in interceptor or EF config) per Constitution III (`missing`)
+  - **Done (2026-08-09):** `AuditSaveChangesInterceptor.EnforceAuditLogAppendOnly`; unit tests.
+
+- [x] **T009** Reconcile lease-template artifacts with fillable PDF + SfPdfViewer implementation per plan: Syncfusion surface map / FR-009 (`contradicts`)
+  - **Done (2026-08-09):** Updated `plan.md` surface map, `research.md` Decision 7, T3.2 Done-when; `TEMPLATES.md` remains canonical.
+
+- [x] **T010** Add clerk-queryable AuditLog viewer (SfGrid, filter by entity/user/date) per FR-025 / Constitution III / SC-003 (`missing`)
+  - **Done (2026-08-09):** `IAuditQueryService` + `/audit` SfGrid; nav links in MainLayout + NavMenu.
+
+- [x] **T011** Support custom lease clauses at generate time per FR-009 (`partial`)
+  - **Done (2026-08-09):** `Lease.CustomClauses` + wizard field; PDF addendum page via `AppendCustomClausesIfNeeded`.
+
+- [x] **T012** Add e-signature readiness stub per FR-012 (`partial`)
+  - **Done (2026-08-09):** `IElectronicSignatureHook` + `NullElectronicSignatureHook`; lease preview exposes hook status / request.
+
+- [x] **T013** Remove or rewire unused Blazor template nav (`NavMenu` Counter/Weather) per Constitution I (`unrequested`)
+  - **Done (2026-08-09):** `NavMenu.razor` mirrors live ClerkSuite routes.
+
+- [x] **T014** Justify or trim `Syncfusion.Blazor.WordProcessor` until DocumentEditor is required (T6.1) (`unrequested`)
+  - **Done (2026-08-09):** Removed WordProcessor package + DocumentEditor script/usings; DocIO/Pdf + SfPdfViewer retained; re-add at T6.1 if needed.

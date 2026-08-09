@@ -78,7 +78,7 @@ Authoritative detail: [research.md](./research.md) Decisions 4, 9, 10, 17, 20–
 
 | #   | Item                                   | Status     | When                                 |
 | --- | -------------------------------------- | ---------- | ------------------------------------ |
-| G8  | Colorado lease template counsel review | Deferred   | T3.2 — ship blank SFDT               |
+| G8  | Colorado lease template counsel review | Deferred   | T3.2 — Brookside fillable PDF on NAS |
 | G9  | Spreadsheet data import                | Deferred   | Manual entry v1                      |
 | G10 | App URL / hostname                     | Deferred   | T0.2, T7.1 — LAN / Tailscale first   |
 | G11 | Account naming                         | **Closed** | Merged with G7 — passwords at deploy |

@@ -19,4 +19,6 @@ public class Lease
     public string? GeneratedPdfRelativePath { get; set; }
     /// <summary>Document vault id for the signed lease PDF (T3.3).</summary>
     public Guid? SignedDocumentId { get; set; }
+    /// <summary>Optional clerk addendum text appended as a PDF page (FR-009 custom clauses).</summary>
+    public string? CustomClauses { get; set; }
 }

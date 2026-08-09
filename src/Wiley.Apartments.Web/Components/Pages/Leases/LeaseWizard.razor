@@ -86,6 +86,14 @@ else
             <SfNumericTextBox TValue="decimal?" @bind-Value="Deposit" Format="C2" Min="0" />
         </div>
         <div class="col-12">
+            <label class="form-label">Custom clauses (optional addendum)</label>
+            <SfTextBox @bind-Value="CustomClauses"
+                       Multiline="true"
+                       RowCount="4"
+                       Placeholder="Additional clauses appended as a PDF addendum page" />
+            <p class="text-muted small mb-0">Max 4000 characters. Leave blank for the Brookside form only.</p>
+        </div>
+        <div class="col-12">
             <SfButton CssClass="e-primary" Content="@(Busy ? "Generating…" : "Create & generate")"
                       Disabled="@Busy" OnClick="GenerateAsync" />
         </div>
@@ -103,6 +111,7 @@ else
     private DateTime? EndDate { get; set; } = DateTime.Today.AddYears(1);
     private decimal? Rent { get; set; } = 0;
     private decimal? Deposit { get; set; } = 0;
+    private string? CustomClauses { get; set; }
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
 
@@ -160,7 +169,8 @@ else
                 startUtc,
                 endUtc,
                 Rent.Value,
-                Deposit.Value);
+                Deposit.Value,
+                CustomClauses);
             var lease = await LeaseService.GenerateDocumentsAsync(draft.Id);
             Navigation.NavigateTo($"/leases/{lease.Id}");
         }

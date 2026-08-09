@@ -37,7 +37,22 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
             return;
         }
 
+        EnforceAuditLogAppendOnly(context);
+
         var userId = _httpContextAccessor.HttpContext?.User?.Identity?.Name ?? "system";
         AuditLogAppender.Append(context, userId, DateTime.UtcNow);
+    }
+
+    /// <summary>Constitution III — AuditLog rows may only be inserted, never updated or deleted.</summary>
+    internal static void EnforceAuditLogAppendOnly(DbContext context)
+    {
+        foreach (var entry in context.ChangeTracker.Entries<AuditLog>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new InvalidOperationException(
+                    "AuditLog is append-only and cannot be updated or deleted (Constitution III).");
+            }
+        }
     }
 }

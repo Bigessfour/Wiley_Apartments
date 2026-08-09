@@ -20,6 +20,7 @@ public interface ILeaseService
         DateTime endUtc,
         decimal rent,
         decimal deposit,
+        string? customClauses = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Fill template (prefer fillable PDF) under DocumentRoot/leases. Remains Draft until signed/activated.</summary>

@@ -15,4 +15,6 @@ public sealed class LeaseMergeData
     public decimal MonthlyRent { get; set; }
     public DateTime RentStart { get; set; }
     public decimal SecurityDeposit { get; set; }
+    /// <summary>Optional addendum; when non-empty, generator appends an Additional Clauses PDF page.</summary>
+    public string? CustomClauses { get; set; }
 }
