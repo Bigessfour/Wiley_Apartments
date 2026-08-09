@@ -208,41 +208,13 @@ jobs:
 
       - name: Collect CI summary
         id: summary
+        env:
+          BUILD_RESULT: ${{ needs.build-and-test.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
         run: |
-          mkdir -p review-context
-          {
-            echo "## CI Run Context"
-            echo "- Repo: ${{ github.repository }}"
-            echo "- Ref: ${{ github.ref }}"
-            echo "- SHA: ${{ github.sha }}"
-            echo "- Event: ${{ github.event_name }}"
-            echo "- Runner: ${{ runner.name }} (${{ runner.os }})"
-            echo "- Build & Test conclusion: ${{ needs.build-and-test.result }}"
-            echo "- E2E conclusion: ${{ needs.e2e.result }}"
-            echo "- Ollama model: ${{ env.OLLAMA_MODEL }}"
-            echo ""
-            echo "### Project constraints (must respect)"
-            echo "- Blazor Interactive Server + Syncfusion Blazor ONLY (no MudBlazor/Radzen/plain HTML grids)"
-            echo "- Spec Kit feature 001-wiley-apartment-v1; Phase 1 complete — Phase 2 tenants next"
-            echo "- NAS fence: DS225+ ~6GB shared RAM; 2 clerks; app ≤~1.5GiB; host port 8082; linux/amd64"
-            echo "- SQLite default; NAS docs at /volume1/apartments/docs; infrequent NAS image deploys"
-            echo "- AuditLog required; no role differentiation in v1"
-            echo "- Secrets never in source (Keychain / user-secrets / env only)"
-            echo ""
-            echo "### Test result files present:"
-            find ci-artifacts -type f \( -name "*.trx" -o -name "*.log" -o -name "*.txt" \) 2>/dev/null | head -40 || true
-          } > review-context/ci-summary.md
-
-          {
-            echo "### Failure / warning excerpts (truncated)"
-            echo "(Ignore Fluent Assertions / Xceed license banner lines — not test failures.)"
-            # Prefer real failures; skip Xceed/Fluent Assertions license spam that drowns the 1.5b model.
-            grep -r -i -E "(error|fail|exception|assert|timeout|not found)" ci-artifacts --include="*.trx" --include="*.log" --include="*.txt" 2>/dev/null \
-              | grep -viE "(fluent assertions|xceed|community license|subscription is required)" \
-              | head -80 || echo "(no obvious failure text found)"
-          } >> review-context/ci-summary.md
-
-          cat review-context/ci-summary.md
+          set -euo pipefail
+          python3 scripts/ci-collect-ollama-summary.py review-context
+          echo "REVIEW_MODE=$(tr -d '\n' < review-context/review-mode.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Ollama models
         id: ollama-cache
@@ -262,7 +234,6 @@ jobs:
 
       - name: Start Ollama server
         run: |
-          # Prefer existing local daemon on self-hosted; otherwise start one.
           if curl -sf http://127.0.0.1:11434/api/tags >/dev/null; then
             echo "Ollama already running"
             exit 0
@@ -287,41 +258,67 @@ jobs:
         id: review
         env:
           MODEL: ${{ env.OLLAMA_MODEL }}
+          REVIEW_MODE: ${{ steps.summary.outputs.REVIEW_MODE }}
         run: |
           set -euo pipefail
 
-          SYSTEM_PROMPT=$(cat <<'EOF'
-          You are an expert .NET / Blazor / Spec-Kit CI review agent for the WileyApartments / ClerkSuite project.
-          Be honest, accurate, and direct. Do not sugar-coat. Do not invent problems that are not supported by the CI data.
-          Prefer concrete, prioritized actions a developer can take in the next 1–2 hours.
+          if [ "${REVIEW_MODE}" = "GREEN_RUN" ]; then
+            SYSTEM_PROMPT=$(cat <<'EOF'
+          You review CI results for WileyApartments / ClerkSuite (.NET 9 Blazor + Syncfusion).
+          This is a GREEN_RUN: jobs succeeded and no failed tests were parsed.
 
-          Output strictly in this Markdown structure:
+          Output EXACTLY this Markdown (nothing else):
 
           ## Verdict
-          One short paragraph: overall health of this CI run.
+          One sentence: CI is green; cite TRX pass counts if present.
 
           ## Critical / Blocking
-          Numbered list of real failures that must be fixed before merge. Include file/test name when visible. If none, write "None".
+          None
 
-          ## High-priority improvements
-          Concrete improvements that would make the suite more reliable or the code safer (missing asserts, flaky patterns, Syncfusion compliance risk, missing audit coverage, secret handling, etc.).
+          ## Actionable findings
+          None — no failing tests or job failures in the evidence.
 
-          ## Medium / Nice-to-have
-          Optional clean-ups, better logging, test coverage gaps that are not currently failing.
+          ## Next
+          No CI follow-up required. Continue Spec Kit Phase 2 (tenants) when product work resumes.
 
-          ## Recommended next actions (ordered)
-          1. ...
-          2. ...
-          3. ...
-
-          Rules:
-          - Respect the Syncfusion-only UI mandate and Spec Kit Phase 0 → Phase 1 focus.
-          - Never recommend adding non-Syncfusion UI libraries.
-          - Never recommend committing license keys or secrets.
-          - If the only issues are environmental (Playwright browser, timeout), say so clearly.
-          - Keep the whole response under ~600 words.
+          Hard rules:
+          - Do NOT invent coverage gaps, refactors, audit logging, or secret-handling tasks.
+          - Do NOT mention Fluent Assertions / Xceed license banners.
+          - Do NOT recommend non-Syncfusion UI libraries or committing secrets.
+          - Keep under 120 words.
           EOF
           )
+            NUM_PREDICT=220
+          else
+            SYSTEM_PROMPT=$(cat <<'EOF'
+          You review CI failures for WileyApartments / ClerkSuite (.NET 9 Blazor Interactive Server + Syncfusion only).
+          Be blunt and evidence-only. Every finding must quote a failed test name, error message, or job conclusion from the input.
+
+          Output EXACTLY this Markdown:
+
+          ## Verdict
+          One short paragraph: what failed and how bad it is for merge.
+
+          ## Critical / Blocking
+          Numbered list. Each item: test/job name + one-line cause + one concrete fix. If none, write "None".
+
+          ## Actionable findings
+          Numbered list of evidence-backed next fixes only (file/test names when present). Max 5.
+          If the failure looks environmental (Playwright browsers, OOM, timeout, missing artifact), say so and give the exact retry/setup step.
+
+          ## Next
+          Ordered 1–3 commands or edits a developer should do in the next hour.
+
+          Hard rules:
+          - Use ONLY the provided CI evidence. No repo archaeology. No generic advice.
+          - Never recommend: adding MudBlazor/Radzen, inventing audit/secrets systems, "improve coverage", "refactor for readability", or committing secrets.
+          - Fluent Assertions / Xceed license text is NOT a failure — ignore it.
+          - Respect NAS fence (2 clerks, ≤~1.5GiB, SQLite, rare NAS deploys) — do not suggest heavy infra.
+          - Keep under 350 words.
+          EOF
+          )
+            NUM_PREDICT=700
+          fi
 
           USER_CONTENT=$(cat review-context/ci-summary.md)
 
@@ -330,20 +327,25 @@ jobs:
               --arg model "$MODEL" \
               --arg system "$SYSTEM_PROMPT" \
               --arg prompt "$USER_CONTENT" \
+              --argjson num "$NUM_PREDICT" \
               '{
                 model: $model,
                 system: $system,
                 prompt: $prompt,
                 stream: false,
-                options: { temperature: 0.15, num_predict: 1200 }
+                options: { temperature: 0.1, num_predict: $num }
               }')" | jq -r '.response // empty')
 
           if [ -z "$RESPONSE" ]; then
-            RESPONSE="$(printf '%s\n' '## Verdict' 'Ollama returned an empty response. Check model availability and runner resources.')"
+            RESPONSE="$(printf '%s\n' '## Verdict' 'Ollama returned an empty response. Check model availability and runner resources.' '## Critical / Blocking' 'None' '## Actionable findings' 'None' '## Next' 'Re-run the Ollama CI Review job.')"
           fi
 
           echo "$RESPONSE" > review-context/ollama-review.md
-          echo "$RESPONSE" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Ollama CI Findings Review (\`${REVIEW_MODE}\`)"
+            echo ""
+            echo "$RESPONSE"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           {
             echo "### Ollama CI Findings Review"
@@ -351,7 +353,7 @@ jobs:
             echo "$RESPONSE"
             echo ""
             echo "---"
-            echo "*Generated by Ollama (\`${MODEL}\`) on the CI findings. Treat as advisory.*"
+            echo "*Evidence-only review by Ollama (\`${MODEL}\`, mode \`${REVIEW_MODE}\`). Ignore if it invents work not backed by TRX/job evidence.*"
           } > review-context/pr-comment.md
 
       - name: Upload review artifact
@@ -371,7 +373,23 @@ jobs:
             const truncated = body.length > 65000
               ? body.substring(0, 65000) + '\n\n…(truncated)'
               : body;
-            github.rest.issues.createComment({
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100
+            });
+            const marker = '### Ollama CI Findings Review';
+            const prior = comments.filter(c =>
+              c.user?.type === 'Bot' && c.body?.includes(marker));
+            for (const c of prior) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: c.id
+              });
+            }
+            await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
