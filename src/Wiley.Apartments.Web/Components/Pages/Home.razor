@@ -1,21 +1,260 @@
 ﻿@page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Layouts
+@using Wiley.Apartments.Contracts
+@inject IDashboardService DashboardService
+@inject IPortfolioProfitLossService ProfitLoss
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
-<h1>ClerkSuite</h1>
-<p class="lead">Town of Wiley apartment management — 16 units.</p>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 mb-1">ClerkSuite dashboard</h1>
+        <p class="text-muted mb-0 small">
+            Occupancy, expirations, work orders, delinquencies, warranties · Mountain Time @DisplayTime
+        </p>
+    </div>
+    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+</div>
 
-<SfButton CssClass="e-primary" Content="Syncfusion Ready" />
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+else if (Snap is null)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <SfCard>
+                <CardContent>
+                    <div class="text-muted small">Occupied</div>
+                    <a class="h3 text-decoration-none" href="units">@Snap.Occupied / @Snap.TotalUnits</a>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-6 col-md-3">
+            <SfCard>
+                <CardContent>
+                    <div class="text-muted small">Vacant</div>
+                    <div class="h3 mb-0">@Snap.Vacant</div>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-6 col-md-3">
+            <SfCard>
+                <CardContent>
+                    <div class="text-muted small">Open work orders</div>
+                    <a class="h3 text-decoration-none" href="maintenance">@Snap.OpenWorkOrders.Count</a>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-6 col-md-3">
+            <SfCard>
+                <CardContent>
+                    <div class="text-muted small">Delinquent accounts</div>
+                    <a class="h3 text-decoration-none" href="reports/delinquency">@Snap.Delinquencies.Count</a>
+                </CardContent>
+            </SfCard>
+        </div>
+    </div>
 
-<p class="text-muted mt-3">
-    Mountain Time: @DisplayTime
-</p>
+    <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 12, 12 })" AllowResizing="false" AllowDragging="false">
+        <DashboardLayoutPanels>
+            <DashboardLayoutPanel Id="expiring" SizeX="3" SizeY="2" Row="0" Column="0">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Leases expiring (60 days)</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ExpiringLeases.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None in window.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var l in Snap.ExpiringLeases)
+                                {
+                                    <li class="mb-1">
+                                        <a href="@($"/leases/{l.LeaseId}")">Unit @l.UnitNumber</a>
+                                        — @l.TenantName · @Clock.ToDisplayTime(l.EndUtc).ToString("d")
+                                        (@l.DaysRemaining d)
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="0" Column="3">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Open maintenance</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.OpenWorkOrders.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No open work orders.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var m in Snap.OpenWorkOrders)
+                                {
+                                    <li class="mb-1">
+                                        <a href="maintenance">Unit @m.UnitNumber</a>
+                                        · @m.Priority · @m.Description
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="2" Column="0">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Delinquencies</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.Delinquencies.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var d in Snap.Delinquencies)
+                                {
+                                    <li class="mb-1">
+                                        <a href="reports/delinquency">Unit @d.UnitNumber</a>
+                                        — @d.TenantName · @d.Balance.ToString("C")
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="2" Column="3">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Warranties (90 days)</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ExpiringWarranties.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None expiring soon.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var w in Snap.ExpiringWarranties)
+                                {
+                                    <li class="mb-1">
+                                        <a href="@($"/units/{w.UnitId}")">Unit @w.UnitNumber</a>
+                                        — @w.AssetLabel · @w.WarrantyEnd.ToString("d")
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="4" Column="0">
+                <HeaderTemplate>
+                    <div class="fw-semibold px-2 py-1 d-flex justify-content-between">
+                        <span>P/L by unit (YTD)</span>
+                        <a class="small" href="reports/profit-loss">Full report</a>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        @if (UnitChart.Count == 0)
+                        {
+                            <p class="text-muted small p-2 mb-0">No ledger/ops-cost data yet.</p>
+                        }
+                        else
+                        {
+                            <SfChart Width="100%" Height="100%">
+                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
+                                <ChartSeriesCollection>
+                                    <ChartSeries DataSource="@UnitChart" XName="Label" YName="Net" Type="ChartSeriesType.Column" Name="Net" />
+                                </ChartSeriesCollection>
+                            </SfChart>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="plSeries" SizeX="3" SizeY="3" Row="4" Column="3">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Portfolio net (YTD by month)</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        @if (SeriesChart.Count == 0)
+                        {
+                            <p class="text-muted small p-2 mb-0">No period series yet.</p>
+                        }
+                        else
+                        {
+                            <SfChart Width="100%" Height="100%">
+                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
+                                <ChartSeriesCollection>
+                                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
+                                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Expense" Type="ChartSeriesType.Line" Name="Expense" />
+                                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Net" Type="ChartSeriesType.Column" Name="Net" />
+                                </ChartSeriesCollection>
+                                <ChartLegendSettings Visible="true" />
+                            </SfChart>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+        </DashboardLayoutPanels>
+    </SfDashboardLayout>
+}
 
 @code {
-    [Inject]
-    private Wiley.Apartments.Contracts.IDateTimeService DateTimeService { get; set; } = default!;
+    private DashboardSnapshot? Snap { get; set; }
+    private string? ErrorMessage { get; set; }
+    private List<ChartPoint> UnitChart { get; set; } = [];
+    private List<ChartPoint> SeriesChart { get; set; } = [];
+    private string DisplayTime => Clock.ToDisplayTime(Clock.UtcNow).ToString("f");
 
-    private string DisplayTime => DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            Snap = await DashboardService.GetSnapshotAsync();
+            var pl = await ProfitLoss.GetAsync(ProfitLossPeriod.YearToDate);
+            UnitChart = pl.ByUnit
+                .Where(u => u.UnitId is not null)
+                .Select(u => new ChartPoint { Label = u.UnitLabel, Net = (double)u.Net })
+                .ToList();
+            SeriesChart = pl.Series
+                .Select(s => new ChartPoint
+                {
+                    Label = s.Label,
+                    Income = (double)s.Income,
+                    Expense = (double)s.Expense,
+                    Net = (double)s.Net
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private sealed class ChartPoint
+    {
+        public string Label { get; set; } = "";
+        public double Net { get; set; }
+        public double Income { get; set; }
+        public double Expense { get; set; }
+    }
 }

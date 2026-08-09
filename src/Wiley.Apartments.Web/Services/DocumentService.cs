@@ -49,6 +49,31 @@ public sealed class DocumentService : IDocumentService
         return rows.Select(Map).ToList();
     }
 
+    public async Task<IReadOnlyList<DocumentInfo>> QueryAsync(
+        DocumentEntityType? entityType = null,
+        DocumentCategory? category = null,
+        int take = 200,
+        CancellationToken cancellationToken = default)
+    {
+        take = Math.Clamp(take, 1, 500);
+        var query = _db.Documents.AsNoTracking().Where(d => !d.IsDeleted);
+        if (entityType is DocumentEntityType et)
+        {
+            query = query.Where(d => d.EntityType == et);
+        }
+
+        if (category is DocumentCategory cat)
+        {
+            query = query.Where(d => d.Category == cat);
+        }
+
+        var rows = await query
+            .OrderByDescending(d => d.UploadedAtUtc)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+        return rows.Select(Map).ToList();
+    }
+
     public async Task<DocumentInfo?> GetByIdAsync(
         Guid documentId,
         CancellationToken cancellationToken = default)
@@ -56,6 +81,23 @@ public sealed class DocumentService : IDocumentService
         var row = await _db.Documents.AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == documentId && !d.IsDeleted, cancellationToken);
         return row is null ? null : Map(row);
+    }
+
+    public async Task<string?> ResolveAbsolutePathAsync(
+        Guid documentId,
+        CancellationToken cancellationToken = default)
+    {
+        var doc = await _db.Documents.AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == documentId && !d.IsDeleted, cancellationToken);
+        if (doc is null)
+        {
+            return null;
+        }
+
+        var abs = Path.Combine(
+            ResolveDocumentRoot(),
+            doc.FilePathOnNas.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(abs) ? abs : null;
     }
 
     public async Task<DocumentInfo> UploadAsync(

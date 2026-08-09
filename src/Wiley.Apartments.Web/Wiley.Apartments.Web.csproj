@@ -20,9 +20,12 @@
     <PackageReference Include="Syncfusion.Blazor.Buttons" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Calendars" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Cards" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.FileManager" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.Layouts" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Navigations" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Schedule" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="34.2.2" />

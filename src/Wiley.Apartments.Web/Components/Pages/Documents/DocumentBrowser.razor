@@ -1,0 +1,358 @@
+@page "/documents"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.SfPdfViewer
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IDocumentService DocumentService
+@inject IUnitService UnitService
+@inject ITenantService TenantService
+@inject IDateTimeService Clock
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>Document vault</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 mb-1">Document vault</h1>
+        <p class="text-muted mb-0 small">
+            NAS-backed metadata vault (PDF viewer in-browser; download for Word/images or large files).
+        </p>
+    </div>
+    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success">@SuccessMessage</div>
+}
+
+<div class="row g-2 mb-3" style="max-width: 960px;">
+    <div class="col-md-3">
+        <label class="form-label">Entity type</label>
+        <SfDropDownList TValue="DocumentEntityType" TItem="EntityTypeOption" DataSource="@EntityTypeOptions"
+                        @bind-Value="FilterEntityType">
+            <DropDownListFieldSettings Text="Text" Value="Value" />
+        </SfDropDownList>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Category</label>
+        <SfDropDownList TValue="string" TItem="CatOption" DataSource="@CategoryOptions" @bind-Value="FilterCategory"
+                        ShowClearButton="true" Placeholder="All">
+            <DropDownListFieldSettings Text="Text" Value="Value" />
+        </SfDropDownList>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <SfButton CssClass="e-primary e-small" Content="Apply" OnClick="LoadAsync" />
+    </div>
+</div>
+
+<div class="border rounded p-3 mb-4" style="max-width: 960px;">
+    <h2 class="h6">Upload</h2>
+    <div class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label">Link to</label>
+            <SfDropDownList TValue="DocumentEntityType" TItem="EntityTypeOption" DataSource="@EntityTypeOptions"
+                            @bind-Value="UploadEntityType" ValueChange="OnUploadEntityTypeChanged">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">@(UploadEntityType == DocumentEntityType.Unit ? "Unit" : "Tenant")</label>
+            @if (UploadEntityType == DocumentEntityType.Unit)
+            {
+                <SfDropDownList TValue="Guid?" TItem="IdOption" DataSource="@UnitOptions" @bind-Value="UploadEntityId"
+                                Placeholder="Required" AllowFiltering="true">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            }
+            else
+            {
+                <SfDropDownList TValue="Guid?" TItem="IdOption" DataSource="@TenantOptions" @bind-Value="UploadEntityId"
+                                Placeholder="Required" AllowFiltering="true">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            }
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Category</label>
+            <SfDropDownList TValue="DocumentCategory" TItem="CatEnumOption" DataSource="@CategoryEnumOptions"
+                            @bind-Value="UploadCategory">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-12">
+            <SfUploader AutoUpload="false" Multiple="false">
+                <UploaderEvents ValueChange="OnFileSelectedAsync" />
+            </SfUploader>
+            <SfButton CssClass="e-primary e-small mt-2" Content="Upload" Disabled="@(Busy || _pending is null)"
+                      OnClick="UploadAsync" />
+        </div>
+    </div>
+</div>
+
+<SfGrid TValue="DocRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true">
+    <GridPageSettings PageSize="20" />
+    <GridColumns>
+        <GridColumn Field="@nameof(DocRow.UploadedDisplay)" HeaderText="Uploaded" Width="120" />
+        <GridColumn Field="@nameof(DocRow.EntityType)" HeaderText="Entity" Width="100" />
+        <GridColumn Field="@nameof(DocRow.Category)" HeaderText="Category" Width="120" />
+        <GridColumn Field="@nameof(DocRow.OriginalFileName)" HeaderText="File" />
+        <GridColumn Field="@nameof(DocRow.UploadedBy)" HeaderText="By" Width="120" />
+        <GridColumn HeaderText="" Width="200">
+            <Template>
+                @{
+                    var row = (DocRow)context;
+                }
+                <div class="d-flex gap-1">
+                    <SfButton CssClass="e-small e-outline" Content="View" OnClick="@(() => ViewAsync(row))" />
+                    <a class="e-btn e-small e-flat" href="@($"/api/documents/{row.Id}/download")" target="_blank">Download</a>
+                </div>
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@if (_pdfBytes is not null)
+{
+    <h2 class="h6 mt-4">Viewer</h2>
+    <p class="small text-muted">@_viewLabel</p>
+    <div style="height: 640px; width: 100%;">
+        <SfPdfViewer2 @ref="PdfViewer" Height="100%" Width="100%" />
+    </div>
+}
+else if (!string.IsNullOrEmpty(ViewerHint))
+{
+    <p class="alert alert-info mt-3">@ViewerHint</p>
+}
+
+@code {
+    private const long ViewerMaxBytes = 8 * 1024 * 1024;
+
+    private List<DocRow> Rows { get; set; } = [];
+    private List<IdOption> UnitOptions { get; set; } = [];
+    private List<IdOption> TenantOptions { get; set; } = [];
+    private DocumentEntityType FilterEntityType { get; set; } = DocumentEntityType.Unit;
+    private string? FilterCategory { get; set; }
+    private DocumentEntityType UploadEntityType { get; set; } = DocumentEntityType.Unit;
+    private Guid? UploadEntityId { get; set; }
+    private DocumentCategory UploadCategory { get; set; } = DocumentCategory.Other;
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private string? ViewerHint { get; set; }
+    private string? _viewLabel;
+    private byte[]? _pdfBytes;
+    private bool _pendingLoad;
+    private SfPdfViewer2? PdfViewer;
+    private (string Name, string ContentType, byte[] Bytes)? _pending;
+
+    private static readonly List<EntityTypeOption> EntityTypeOptions =
+    [
+        new() { Value = DocumentEntityType.Unit, Text = "Unit" },
+        new() { Value = DocumentEntityType.Tenant, Text = "Tenant" },
+        new() { Value = DocumentEntityType.Lease, Text = "Lease" },
+        new() { Value = DocumentEntityType.Asset, Text = "Asset" }
+    ];
+
+    private static readonly List<CatOption> CategoryOptions =
+        Enum.GetValues<DocumentCategory>()
+            .Select(c => new CatOption { Value = c.ToString(), Text = c.ToString() })
+            .ToList();
+
+    private static readonly List<CatEnumOption> CategoryEnumOptions =
+        Enum.GetValues<DocumentCategory>()
+            .Select(c => new CatEnumOption { Value = c, Text = c.ToString() })
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        UnitOptions = (await UnitService.GetAllAsync())
+            .OrderBy(u => u.Number)
+            .Select(u => new IdOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .ToList();
+        TenantOptions = (await TenantService.SearchAsync())
+            .OrderBy(t => t.LastName)
+            .Select(t => new IdOption { Id = t.Id, Text = $"{t.LastName}, {t.FirstName}" })
+            .ToList();
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingLoad && PdfViewer is not null && _pdfBytes is not null)
+        {
+            _pendingLoad = false;
+            await PdfViewer.LoadAsync(_pdfBytes);
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            DocumentCategory? cat = Enum.TryParse<DocumentCategory>(FilterCategory, out var c) ? c : null;
+            var docs = await DocumentService.QueryAsync(FilterEntityType, cat);
+            Rows = docs.Select(d => new DocRow
+            {
+                Id = d.Id,
+                UploadedDisplay = Clock.ToDisplayTime(d.UploadedAtUtc).ToString("g"),
+                EntityType = d.EntityType.ToString(),
+                Category = d.Category.ToString(),
+                OriginalFileName = d.OriginalFileName,
+                UploadedBy = d.UploadedBy,
+                ContentType = d.ContentType
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task OnUploadEntityTypeChanged(ChangeEventArgs<DocumentEntityType, EntityTypeOption> args)
+    {
+        UploadEntityType = args.Value;
+        UploadEntityId = null;
+        await Task.CompletedTask;
+    }
+
+    private async Task OnFileSelectedAsync(UploadChangeEventArgs args)
+    {
+        _pending = null;
+        var file = args.Files?.FirstOrDefault();
+        if (file?.FileInfo is null)
+        {
+            return;
+        }
+
+        await using var stream = file.File.OpenReadStream(25 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        _pending = (file.FileInfo.Name, file.FileInfo.Type ?? "application/octet-stream", ms.ToArray());
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_pending is null || UploadEntityId is null)
+        {
+            ErrorMessage = "Choose a file and entity.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name
+                ?? auth.User.FindFirstValue(ClaimTypes.Email)
+                ?? "clerk";
+            var relative = UploadEntityType switch
+            {
+                DocumentEntityType.Unit => $"units/{UploadEntityId:N}",
+                DocumentEntityType.Tenant => $"tenants/{UploadEntityId:N}",
+                DocumentEntityType.Lease => $"leases/misc/{UploadEntityId:N}",
+                _ => $"misc/{UploadEntityId:N}"
+            };
+            await using var stream = new MemoryStream(_pending.Value.Bytes);
+            await DocumentService.UploadAsync(
+                UploadEntityType,
+                UploadEntityId.Value,
+                UploadCategory,
+                _pending.Value.Name,
+                _pending.Value.ContentType,
+                stream,
+                user,
+                relative);
+            SuccessMessage = "Document uploaded.";
+            _pending = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ViewAsync(DocRow row)
+    {
+        ViewerHint = null;
+        _pdfBytes = null;
+        _viewLabel = row.OriginalFileName;
+        var isPdf = row.ContentType.Contains("pdf", StringComparison.OrdinalIgnoreCase)
+            || row.OriginalFileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+        if (!isPdf)
+        {
+            ViewerHint = "In-browser preview is PDF-only. Use Download for Word/images (DocumentEditor deferred).";
+            return;
+        }
+
+        var bytes = await DocumentService.ReadBytesAsync(row.Id);
+        if (bytes is null)
+        {
+            ErrorMessage = "File missing on document root.";
+            return;
+        }
+
+        if (bytes.Length > ViewerMaxBytes)
+        {
+            ViewerHint = $"File is {(bytes.Length / (1024 * 1024.0)):0.0} MB — use Download (viewer limit {ViewerMaxBytes / (1024 * 1024)} MB).";
+            return;
+        }
+
+        _pdfBytes = bytes;
+        _pendingLoad = true;
+    }
+
+    private sealed class DocRow
+    {
+        public Guid Id { get; set; }
+        public string UploadedDisplay { get; set; } = "";
+        public string EntityType { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string OriginalFileName { get; set; } = "";
+        public string UploadedBy { get; set; } = "";
+        public string ContentType { get; set; } = "";
+    }
+
+    private sealed class IdOption
+    {
+        public Guid Id { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class EntityTypeOption
+    {
+        public DocumentEntityType Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class CatOption
+    {
+        public string Value { get; set; } = "";
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class CatEnumOption
+    {
+        public DocumentCategory Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+}

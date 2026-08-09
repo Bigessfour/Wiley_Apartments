@@ -9,7 +9,15 @@ public interface IDocumentService
         Guid entityId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<DocumentInfo>> QueryAsync(
+        DocumentEntityType? entityType = null,
+        DocumentCategory? category = null,
+        int take = 200,
+        CancellationToken cancellationToken = default);
+
     Task<DocumentInfo?> GetByIdAsync(Guid documentId, CancellationToken cancellationToken = default);
+
+    Task<string?> ResolveAbsolutePathAsync(Guid documentId, CancellationToken cancellationToken = default);
 
     Task<DocumentInfo> UploadAsync(
         DocumentEntityType entityType,

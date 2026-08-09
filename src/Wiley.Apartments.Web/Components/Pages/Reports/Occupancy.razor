@@ -1,0 +1,101 @@
+@page "/reports/occupancy"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IUnitService UnitService
+@inject ILeaseService LeaseService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Occupancy report</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
+    <div>
+        <h1 class="h3 mb-1">Occupancy</h1>
+        <p class="text-muted mb-0 small">
+            @OccupiedCount occupied · @VacantCount vacant · @TotalUnits units · as of @AsOfDisplay
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick='() => Navigation.NavigateTo("/reports")' />
+        <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+
+<SfGrid TValue="OccRow" DataSource="@Rows" AllowPaging="false" AllowSorting="true">
+    <GridColumns>
+        <GridColumn Field="@nameof(OccRow.UnitNumber)" HeaderText="Unit" Width="90" />
+        <GridColumn Field="@nameof(OccRow.Status)" HeaderText="Status" Width="110" />
+        <GridColumn Field="@nameof(OccRow.TenantName)" HeaderText="Tenant" />
+        <GridColumn Field="@nameof(OccRow.LeaseEndDisplay)" HeaderText="Lease end" Width="120" />
+        <GridColumn Field="@nameof(OccRow.MonthlyRentDisplay)" HeaderText="Rent" Width="100" TextAlign="TextAlign.Right" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<OccRow> Rows { get; set; } = [];
+    private int TotalUnits { get; set; }
+    private int OccupiedCount { get; set; }
+    private int VacantCount { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string AsOfDisplay => Clock.ToDisplayTime(Clock.UtcNow).ToString("g");
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var units = await UnitService.GetAllAsync();
+            var leases = await LeaseService.GetAllAsync();
+            var activeByUnit = leases
+                .Where(l => l.Status == LeaseStatus.Active)
+                .GroupBy(l => l.UnitId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StartUtc).First());
+
+            TotalUnits = units.Count;
+            OccupiedCount = units.Count(u => u.Status == UnitStatus.Occupied);
+            VacantCount = units.Count(u => u.Status == UnitStatus.Vacant);
+
+            Rows = units.OrderBy(u => u.Number).Select(u =>
+            {
+                activeByUnit.TryGetValue(u.Id, out var lease);
+                return new OccRow
+                {
+                    UnitNumber = u.Number,
+                    Status = u.Status.ToString(),
+                    TenantName = lease?.Tenant is null
+                        ? "—"
+                        : $"{lease.Tenant.LastName}, {lease.Tenant.FirstName}",
+                    LeaseEndDisplay = lease is null ? "—" : Clock.ToDisplayTime(lease.EndUtc).ToString("d"),
+                    MonthlyRentDisplay = lease is null ? "—" : lease.Rent.ToString("C")
+                };
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    private sealed class OccRow
+    {
+        public string UnitNumber { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string TenantName { get; set; } = "";
+        public string LeaseEndDisplay { get; set; } = "";
+        public string MonthlyRentDisplay { get; set; } = "";
+    }
+}

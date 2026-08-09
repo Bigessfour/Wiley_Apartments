@@ -1,0 +1,173 @@
+@page "/reports/profit-loss"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@inject IPortfolioProfitLossService ProfitLoss
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Portfolio P/L</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
+    <div>
+        <h1 class="h3 mb-1">Council portfolio P/L</h1>
+        <p class="text-muted mb-0 small">
+            Income from ledger payments · expenses from unit operating costs (common upkeep allocated)
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-end">
+        <div style="min-width: 160px;">
+            <label class="form-label">Period</label>
+            <SfDropDownList TValue="ProfitLossPeriod" TItem="PeriodOption" DataSource="@PeriodOptions"
+                            @bind-Value="Period" ValueChange="OnPeriodChanged">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
+        </div>
+        <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick='() => Navigation.NavigateTo("/reports")' />
+        <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+        <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+else if (Report is null)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="report-print-area">
+        <div class="row g-3 mb-3">
+            <div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Income</div><div class="h4 mb-0">@Report.TotalIncome.ToString("C")</div></div></div>
+            <div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Expense</div><div class="h4 mb-0">@Report.TotalExpense.ToString("C")</div></div></div>
+            <div class="col-md-4"><div class="border rounded p-3"><div class="text-muted small">Net</div><div class="h4 mb-0">@Report.NetIncome.ToString("C")</div></div></div>
+        </div>
+
+        <h2 class="h6">By unit</h2>
+        <div style="height: 320px;" class="mb-4">
+            <SfChart Width="100%" Height="100%">
+                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
+                <ChartSeriesCollection>
+                    <ChartSeries DataSource="@UnitChart" XName="Label" YName="Income" Type="ChartSeriesType.StackingColumn" Name="Income" />
+                    <ChartSeries DataSource="@UnitChart" XName="Label" YName="Expense" Type="ChartSeriesType.StackingColumn" Name="Expense" />
+                </ChartSeriesCollection>
+                <ChartLegendSettings Visible="true" />
+            </SfChart>
+        </div>
+
+        <SfGrid TValue="UnitPlRow" DataSource="@UnitRows" AllowPaging="false" AllowSorting="true" class="mb-4">
+            <GridColumns>
+                <GridColumn Field="@nameof(UnitPlRow.UnitLabel)" HeaderText="Unit" Width="120" />
+                <GridColumn Field="@nameof(UnitPlRow.IncomeDisplay)" HeaderText="Income" Width="120" TextAlign="TextAlign.Right" />
+                <GridColumn Field="@nameof(UnitPlRow.ExpenseDisplay)" HeaderText="Expense" Width="120" TextAlign="TextAlign.Right" />
+                <GridColumn Field="@nameof(UnitPlRow.NetDisplay)" HeaderText="Net" Width="120" TextAlign="TextAlign.Right" />
+            </GridColumns>
+        </SfGrid>
+
+        <h2 class="h6">Period series</h2>
+        <div style="height: 280px;" class="mb-3">
+            <SfChart Width="100%" Height="100%">
+                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
+                <ChartSeriesCollection>
+                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
+                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Expense" Type="ChartSeriesType.Line" Name="Expense" />
+                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Net" Type="ChartSeriesType.Column" Name="Net" />
+                </ChartSeriesCollection>
+                <ChartLegendSettings Visible="true" />
+            </SfChart>
+        </div>
+    </div>
+}
+
+@code {
+    private ProfitLossPeriod Period { get; set; } = ProfitLossPeriod.YearToDate;
+    private PortfolioProfitLossReport? Report { get; set; }
+    private List<ChartPoint> UnitChart { get; set; } = [];
+    private List<ChartPoint> SeriesChart { get; set; } = [];
+    private List<UnitPlRow> UnitRows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    private static readonly List<PeriodOption> PeriodOptions =
+    [
+        new() { Value = ProfitLossPeriod.Month, Text = "This month" },
+        new() { Value = ProfitLossPeriod.YearToDate, Text = "Year to date" },
+        new() { Value = ProfitLossPeriod.Year, Text = "Full year" }
+    ];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task OnPeriodChanged(ChangeEventArgs<ProfitLossPeriod, PeriodOption> args)
+    {
+        Period = args.Value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            Report = await ProfitLoss.GetAsync(Period);
+            UnitChart = Report.ByUnit
+                .Where(u => u.UnitId is not null)
+                .Select(u => new ChartPoint
+                {
+                    Label = u.UnitLabel,
+                    Income = (double)u.Income,
+                    Expense = (double)u.Expense,
+                    Net = (double)u.Net
+                })
+                .ToList();
+            SeriesChart = Report.Series
+                .Select(s => new ChartPoint
+                {
+                    Label = s.Label,
+                    Income = (double)s.Income,
+                    Expense = (double)s.Expense,
+                    Net = (double)s.Net
+                })
+                .ToList();
+            UnitRows = Report.ByUnit.Select(u => new UnitPlRow
+            {
+                UnitLabel = u.UnitLabel,
+                IncomeDisplay = u.Income.ToString("C"),
+                ExpenseDisplay = u.Expense.ToString("C"),
+                NetDisplay = u.Net.ToString("C")
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    private sealed class ChartPoint
+    {
+        public string Label { get; set; } = "";
+        public double Income { get; set; }
+        public double Expense { get; set; }
+        public double Net { get; set; }
+    }
+
+    private sealed class UnitPlRow
+    {
+        public string UnitLabel { get; set; } = "";
+        public string IncomeDisplay { get; set; } = "";
+        public string ExpenseDisplay { get; set; } = "";
+        public string NetDisplay { get; set; } = "";
+    }
+
+    private sealed class PeriodOption
+    {
+        public ProfitLossPeriod Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+}

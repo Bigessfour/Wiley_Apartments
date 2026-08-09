@@ -201,21 +201,25 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 
 ## Phase 6 — Documents & Dashboard
 
-- [ ] **T6.1** Document metadata + FileManager / upload to NAS shared folder.
+- [x] **T6.1** Document metadata + FileManager / upload to NAS shared folder.
   - **Done when:** Upload, categorize, open via Syncfusion PdfViewer/DocumentEditor; polymorphic `EntityType` + `EntityId`; **fallback** download for oversized files.
   - **Paths:** `Domain/Document.cs`, `Pages/Documents/DocumentBrowser.razor`
+  - **Done (2026-08-09):** `/documents` vault UI (filter/upload/grid); SfPdfViewer2 for PDF; download API for Word/images/large files; DocumentEditor deferred.
 
-- [ ] **T6.2** Clerk home dashboard (occupancy, expirations, open work orders, delinquencies, warranties).
+- [x] **T6.2** Clerk home dashboard (occupancy, expirations, open work orders, delinquencies, warranties).
   - **Done when:** SfDashboardLayout default landing page; live accurate data for 16 units; loads **< 3 s** on LAN; widgets clickable to detail.
   - **Paths:** `Pages/Dashboard/Home.razor`, `Services/DashboardService.cs`
+  - **Done (2026-08-09):** `/` Home.razor SfDashboardLayout + cards; `IDashboardService` snapshot; links to units/leases/maintenance/reports.
 
-- [ ] **T6.3** Basic exportable reports (rent roll, occupancy, warranty list).
+- [x] **T6.3** Basic exportable reports (rent roll, occupancy, warranty list).
   - **Done when:** Rent roll printable/downloadable; occupancy and warranty status reports available.
   - **Paths:** `Pages/Reports/`
+  - **Done (2026-08-09):** Occupancy + Warranty status reports with print; hub links on Reports home.
 
-- [ ] **T6.4** City council P/L data viz (depends on **T4.1** income + **T4.5** ops costs).
+- [x] **T6.4** City council P/L data viz (depends on **T4.1** income + **T4.5** ops costs).
   - **Done when:** Dashboard (or Reports) shows Syncfusion **SfChart** (a) **P/L per apartment** for all 16 units and (b) **monthly and yearly portfolio net income / P/L**; period selector (month/YTD/year); printable/exportable for council review; empty/zero state when no ledger or ops-cost data yet. Does not replace QuickBooks.
   - **Paths:** `Services/PortfolioProfitLossService.cs` (or DashboardService helpers), `Pages/Dashboard/` chart panels and/or `Pages/Reports/PortfolioProfitLoss.razor`; `Syncfusion.Blazor.Charts`
+  - **Done (2026-08-09):** `PortfolioProfitLossService` + dashboard YTD charts + `/reports/profit-loss` period selector.
 
 **Checkpoint:** FR-5, FR-6 acceptance criteria pass (including council P/L viz).
 
