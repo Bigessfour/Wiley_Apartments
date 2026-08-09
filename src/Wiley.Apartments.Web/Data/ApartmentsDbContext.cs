@@ -26,6 +26,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<LateFeeSettings> LateFeeSettings => Set<LateFeeSettings>();
     public DbSet<UnitOperatingCost> UnitOperatingCosts => Set<UnitOperatingCost>();
+    public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -269,6 +270,28 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<MaintenanceRequest>(entity =>
+        {
+            entity.ToTable("MaintenanceRequests");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Priority).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Cost).HasPrecision(18, 2);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.Status });
+            entity.HasIndex(e => new { e.AssetId, e.IsDeleted });
+            entity.HasIndex(e => e.OperatingCostId);
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Asset)
+                .WithMany()
+                .HasForeignKey(e => e.AssetId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }

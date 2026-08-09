@@ -40,7 +40,8 @@ public interface ILedgerService
 
     /// <summary>
     /// When late fees are enabled, posts one late-fee charge per tenant/unit with positive balance
-    /// whose oldest non-late charge is past grace days and that has no late fee in the as-of month.
+    /// that has at least one non-late charge past its due window (charge date + grace days)
+    /// and no late fee already in the as-of calendar month.
     /// </summary>
     /// <returns>Number of late-fee charges posted.</returns>
     Task<int> ApplyLateFeesAsync(

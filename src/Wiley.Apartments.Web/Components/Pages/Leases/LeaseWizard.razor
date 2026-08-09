@@ -6,6 +6,7 @@
 @inject ILeaseService LeaseService
 @inject IUnitService UnitService
 @inject ITenantService TenantService
+@inject IDateTimeService Clock
 @inject NavigationManager Navigation
 
 <PageTitle>New lease</PageTitle>
@@ -160,8 +161,8 @@ else
         Busy = true;
         try
         {
-            var startUtc = DateTime.SpecifyKind(StartDate.Value.Date, DateTimeKind.Utc);
-            var endUtc = DateTime.SpecifyKind(EndDate.Value.Date, DateTimeKind.Utc);
+            var startUtc = Clock.ToUtc(StartDate.Value.Date);
+            var endUtc = Clock.ToUtc(EndDate.Value.Date);
             var draft = await LeaseService.CreateDraftAsync(
                 SelectedUnitId.Value,
                 SelectedTenantId.Value,

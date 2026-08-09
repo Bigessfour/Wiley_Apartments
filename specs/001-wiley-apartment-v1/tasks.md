@@ -185,13 +185,15 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 
 ## Phase 5 — Maintenance
 
-- [ ] **T5.1** Work-order / maintenance request CRUD linked to unit and optional asset.
+- [x] **T5.1** Work-order / maintenance request CRUD linked to unit and optional asset.
   - **Done when:** Requests created; status assigned; cost recorded (`MaintenanceRequest`).
   - **Paths:** `Domain/MaintenanceRequest.cs`, `Services/MaintenanceService.cs`
+  - **Done (2026-08-09):** `MaintenanceRequest` + `IMaintenanceService`; `/maintenance` list/create/complete; complete with cost posts Repair `UnitOperatingCost` (T4.6 link).
 
-- [ ] **T5.2** History visible on unit and asset pages.
+- [x] **T5.2** History visible on unit and asset pages.
   - **Done when:** Past maintenance in chronological order with costs on unit detail and asset detail.
   - **Paths:** `Pages/Maintenance/`, unit/asset detail tabs
+  - **Done (2026-08-09):** Unit detail Maintenance tab with asset filter (asset-level history); nav links.
 
 **Checkpoint:** FR-5 maintenance portions + FR-1 maintenance history pass.
 

@@ -1,0 +1,326 @@
+@page "/maintenance"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IMaintenanceService MaintenanceService
+@inject IUnitService UnitService
+@inject IAssetService AssetService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+
+<PageTitle>Maintenance</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 mb-1">Maintenance</h1>
+        <p class="text-muted mb-0 small">Work orders linked to units and optional assets.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <SfButton CssClass="e-outline e-small" Content="@(OpenOnly ? "Show all" : "Open only")"
+                  OnClick="ToggleOpenAsync" />
+        <SfButton CssClass="e-primary e-small" Content="New work order" OnClick="@(() => ShowForm = true)" />
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success">@SuccessMessage</div>
+}
+
+@if (ShowForm)
+{
+    <div class="border rounded p-3 mb-4" style="max-width: 720px;">
+        <h2 class="h6">New work order</h2>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label class="form-label">Unit</label>
+                <SfDropDownList TValue="Guid?" TItem="UnitOption" DataSource="@UnitOptions" @bind-Value="FormUnitId"
+                                Placeholder="Required" AllowFiltering="true" ValueChange="OnUnitChanged">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Asset (optional)</label>
+                <SfDropDownList TValue="Guid?" TItem="AssetOption" DataSource="@AssetOptions" @bind-Value="FormAssetId"
+                                Placeholder="Unit-level" ShowClearButton="true" AllowFiltering="true">
+                    <DropDownListFieldSettings Text="Text" Value="Id" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                <SfDropDownList TValue="MaintenancePriority" TItem="PriorityOption" DataSource="@PriorityOptions"
+                                @bind-Value="FormPriority">
+                    <DropDownListFieldSettings Text="Text" Value="Value" />
+                </SfDropDownList>
+            </div>
+            <div class="col-12">
+                <label class="form-label">Description</label>
+                <SfTextBox Multiline="true" @bind-Value="FormDescription" />
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <SfButton CssClass="e-primary e-small" Content="Create" Disabled="@Busy" OnClick="CreateAsync" />
+                <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowForm = false)" />
+            </div>
+        </div>
+    </div>
+}
+
+<SfGrid TValue="Row" DataSource="@Rows" AllowPaging="true" AllowSorting="true">
+    <GridPageSettings PageSize="20" />
+    <GridColumns>
+        <GridColumn Field="@nameof(Row.CreatedDisplay)" HeaderText="Created" Width="110" />
+        <GridColumn Field="@nameof(Row.UnitNumber)" HeaderText="Unit" Width="80" />
+        <GridColumn Field="@nameof(Row.AssetLabel)" HeaderText="Asset" Width="140" />
+        <GridColumn Field="@nameof(Row.Priority)" HeaderText="Priority" Width="100" />
+        <GridColumn Field="@nameof(Row.Status)" HeaderText="Status" Width="110" />
+        <GridColumn Field="@nameof(Row.Description)" HeaderText="Description" />
+        <GridColumn Field="@nameof(Row.Cost)" HeaderText="Cost" Format="C2" Width="100" TextAlign="TextAlign.Right" />
+        <GridColumn HeaderText="" Width="200">
+            <Template>
+                @{
+                    var row = (Row)context;
+                }
+                <div class="d-flex gap-1 flex-wrap">
+                    @if (row.Status is not (nameof(MaintenanceStatus.Completed) or nameof(MaintenanceStatus.Cancelled)))
+                    {
+                        <SfButton CssClass="e-small e-outline" Content="Start"
+                                  Disabled="@(Busy || row.Status == nameof(MaintenanceStatus.InProgress))"
+                                  OnClick="@(() => SetStatusAsync(row.Id, MaintenanceStatus.InProgress))" />
+                        <SfButton CssClass="e-small e-primary" Content="Complete"
+                                  Disabled="@Busy"
+                                  OnClick="@(() => BeginComplete(row))" />
+                    }
+                    <SfButton CssClass="e-small e-flat" Content="Unit"
+                              OnClick="@(() => Navigation.NavigateTo($"/units/{row.UnitId}"))" />
+                </div>
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@if (CompletingId is Guid)
+{
+    <div class="border rounded p-3 mt-3" style="max-width: 480px;">
+        <h2 class="h6">Complete work order</h2>
+        <label class="form-label">Cost (posts Repair ops cost when &gt; 0)</label>
+        <SfNumericTextBox TValue="decimal?" @bind-Value="CompleteCost" Format="C2" Min="0" />
+        <div class="d-flex gap-2 mt-2">
+            <SfButton CssClass="e-primary e-small" Content="Confirm complete" Disabled="@Busy" OnClick="ConfirmCompleteAsync" />
+            <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => CompletingId = null)" />
+        </div>
+    </div>
+}
+
+@code {
+    private List<Row> Rows { get; set; } = [];
+    private List<UnitOption> UnitOptions { get; set; } = [];
+    private List<AssetOption> AssetOptions { get; set; } = [];
+    private bool OpenOnly { get; set; } = true;
+    private bool ShowForm { get; set; }
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private Guid? FormUnitId { get; set; }
+    private Guid? FormAssetId { get; set; }
+    private MaintenancePriority FormPriority { get; set; } = MaintenancePriority.Normal;
+    private string FormDescription { get; set; } = "";
+    private Guid? CompletingId { get; set; }
+    private decimal? CompleteCost { get; set; }
+
+    private static readonly List<PriorityOption> PriorityOptions =
+    [
+        new() { Value = MaintenancePriority.Low, Text = "Low" },
+        new() { Value = MaintenancePriority.Normal, Text = "Normal" },
+        new() { Value = MaintenancePriority.High, Text = "High" },
+        new() { Value = MaintenancePriority.Urgent, Text = "Urgent" }
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        UnitOptions = (await UnitService.GetAllAsync())
+            .OrderBy(u => u.Number)
+            .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .ToList();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var items = await MaintenanceService.GetAllAsync(openOnly: OpenOnly);
+            Rows = items.Select(m => new Row
+            {
+                Id = m.Id,
+                UnitId = m.UnitId,
+                CreatedDisplay = Clock.ToDisplayTime(m.CreatedUtc).ToString("d"),
+                UnitNumber = m.Unit?.Number ?? "",
+                AssetLabel = m.Asset is null ? "" : $"{m.Asset.Type} ({m.Asset.Serial})",
+                Priority = m.Priority.ToString(),
+                Status = m.Status.ToString(),
+                Description = m.Description,
+                Cost = m.Cost
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task ToggleOpenAsync()
+    {
+        OpenOnly = !OpenOnly;
+        await LoadAsync();
+    }
+
+    private async Task OnUnitChanged(ChangeEventArgs<Guid?, UnitOption> args)
+    {
+        FormAssetId = null;
+        AssetOptions = [];
+        if (args.Value is Guid uid)
+        {
+            var assets = await AssetService.GetByUnitIdAsync(uid);
+            AssetOptions = assets
+                .Select(a => new AssetOption { Id = a.Id, Text = $"{a.Type} — {a.Serial}" })
+                .ToList();
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (FormUnitId is null || string.IsNullOrWhiteSpace(FormDescription))
+        {
+            ErrorMessage = "Unit and description are required.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            await MaintenanceService.CreateAsync(
+                FormUnitId.Value,
+                FormDescription,
+                FormPriority,
+                FormAssetId);
+            SuccessMessage = "Work order created.";
+            ShowForm = false;
+            FormDescription = "";
+            FormAssetId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SetStatusAsync(Guid id, MaintenanceStatus status)
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var current = await MaintenanceService.GetByIdAsync(id)
+                ?? throw new InvalidOperationException("Not found.");
+            await MaintenanceService.UpdateAsync(
+                id,
+                current.Description,
+                status,
+                current.Priority,
+                current.AssetId,
+                current.Cost,
+                current.Notes);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void BeginComplete(Row row)
+    {
+        CompletingId = row.Id;
+        CompleteCost = row.Cost;
+    }
+
+    private async Task ConfirmCompleteAsync()
+    {
+        if (CompletingId is not Guid id)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var done = await MaintenanceService.CompleteAsync(id, CompleteCost);
+            SuccessMessage = done.OperatingCostId is null
+                ? "Work order completed."
+                : "Work order completed; Repair ops cost recorded.";
+            CompletingId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private sealed class Row
+    {
+        public Guid Id { get; set; }
+        public Guid UnitId { get; set; }
+        public string CreatedDisplay { get; set; } = "";
+        public string UnitNumber { get; set; } = "";
+        public string AssetLabel { get; set; } = "";
+        public string Priority { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string Description { get; set; } = "";
+        public decimal? Cost { get; set; }
+    }
+
+    private sealed class UnitOption
+    {
+        public Guid Id { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class AssetOption
+    {
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = "";
+    }
+
+    private sealed class PriorityOption
+    {
+        public MaintenancePriority Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+}

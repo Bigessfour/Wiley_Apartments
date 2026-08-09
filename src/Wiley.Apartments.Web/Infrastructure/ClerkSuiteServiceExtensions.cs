@@ -42,6 +42,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<ILedgerService, LedgerService>();
         builder.Services.AddScoped<IRentRollService, RentRollService>();
         builder.Services.AddScoped<IUnitOperatingCostService, UnitOperatingCostService>();
+        builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
         builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")

@@ -8,12 +8,10 @@ namespace Wiley.Apartments.Web.Services;
 public sealed class RentRollService : IRentRollService
 {
     private readonly ApartmentsDbContext _db;
-    private readonly ILedgerService _ledger;
 
-    public RentRollService(ApartmentsDbContext db, ILedgerService ledger)
+    public RentRollService(ApartmentsDbContext db)
     {
         _db = db;
-        _ledger = ledger;
     }
 
     public async Task<IReadOnlyList<RentRollRow>> GetRentRollAsync(CancellationToken cancellationToken = default)
@@ -32,15 +30,37 @@ public sealed class RentRollService : IRentRollService
             .GroupBy(l => l.UnitId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(l => l.StartUtc).First());
 
+        // One pass over ledger for all unit balances (avoids N GetBalanceAsync calls).
+        var balances = await LoadBalancesAsync(cancellationToken);
+
+        var orphanTenantIds = units
+            .Select(u =>
+            {
+                leaseByUnit.TryGetValue(u.Id, out var lease);
+                return lease?.TenantId ?? u.CurrentTenantId;
+            })
+            .Where(id => id is not null)
+            .Cast<Guid>()
+            .Distinct()
+            .Where(id => !activeLeases.Any(l => l.TenantId == id && l.Tenant is not null))
+            .ToList();
+
+        var orphanTenants = orphanTenantIds.Count == 0
+            ? new Dictionary<Guid, Tenant>()
+            : await _db.Tenants.AsNoTracking()
+                .Where(t => orphanTenantIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, cancellationToken);
+
         var rows = new List<RentRollRow>(units.Count);
         foreach (var unit in units)
         {
             leaseByUnit.TryGetValue(unit.Id, out var lease);
             var tenantId = lease?.TenantId ?? unit.CurrentTenantId;
             decimal balance = 0m;
-            if (tenantId is Guid tid)
+            if (tenantId is Guid tid
+                && balances.TryGetValue((tid, unit.Id), out var bal))
             {
-                balance = await _ledger.GetBalanceAsync(tid, unit.Id, cancellationToken);
+                balance = bal;
             }
 
             string? tenantName = null;
@@ -48,13 +68,9 @@ public sealed class RentRollService : IRentRollService
             {
                 tenantName = $"{lease.Tenant.LastName}, {lease.Tenant.FirstName}";
             }
-            else if (tenantId is Guid tid2)
+            else if (tenantId is Guid tid2 && orphanTenants.TryGetValue(tid2, out var t))
             {
-                var t = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(x => x.Id == tid2, cancellationToken);
-                if (t is not null)
-                {
-                    tenantName = $"{t.LastName}, {t.FirstName}";
-                }
+                tenantName = $"{t.LastName}, {t.FirstName}";
             }
 
             rows.Add(new RentRollRow(
@@ -86,13 +102,13 @@ public sealed class RentRollService : IRentRollService
         foreach (var g in groups)
         {
             decimal balance = 0;
-            DateTime? oldestCharge = null;
+            DateTime? oldestPastDueCharge = null;
             foreach (var e in g)
             {
                 balance += e.EntryType == LedgerEntryType.Charge ? e.Amount : -e.Amount;
                 if (e.EntryType == LedgerEntryType.Charge && !e.IsLateFee)
                 {
-                    oldestCharge ??= e.DateUtc;
+                    oldestPastDueCharge ??= e.DateUtc;
                 }
             }
 
@@ -111,9 +127,29 @@ public sealed class RentRollService : IRentRollService
                 g.Key.TenantId,
                 name,
                 balance,
-                oldestCharge));
+                oldestPastDueCharge));
         }
 
         return rows.OrderByDescending(r => r.Balance).ThenBy(r => r.UnitNumber).ToList();
+    }
+
+    private async Task<Dictionary<(Guid TenantId, Guid UnitId), decimal>> LoadBalancesAsync(
+        CancellationToken cancellationToken)
+    {
+        var entries = await _db.LedgerEntries.AsNoTracking()
+            .Where(e => !e.IsDeleted)
+            .Select(e => new { e.TenantId, e.UnitId, e.EntryType, e.Amount })
+            .ToListAsync(cancellationToken);
+
+        var map = new Dictionary<(Guid, Guid), decimal>();
+        foreach (var e in entries)
+        {
+            var key = (e.TenantId, e.UnitId);
+            map.TryGetValue(key, out var bal);
+            bal += e.EntryType == LedgerEntryType.Charge ? e.Amount : -e.Amount;
+            map[key] = bal;
+        }
+
+        return map;
     }
 }

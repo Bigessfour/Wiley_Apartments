@@ -175,14 +175,17 @@ public sealed class LedgerService : ILedgerService
         foreach (var group in entries.GroupBy(e => new { e.TenantId, e.UnitId }))
         {
             decimal balance = 0;
-            DateTime? oldestCharge = null;
+            var hasPastDueCharge = false;
             var hasLateFeeThisMonth = false;
             foreach (var e in group)
             {
                 balance += e.EntryType == LedgerEntryType.Charge ? e.Amount : -e.Amount;
-                if (e.EntryType == LedgerEntryType.Charge && !e.IsLateFee)
+                // Invoice-style: each charge's due window is DateUtc + GraceDays.
+                if (e.EntryType == LedgerEntryType.Charge
+                    && !e.IsLateFee
+                    && e.DateUtc.AddDays(settings.GraceDays) < asOf)
                 {
-                    oldestCharge ??= e.DateUtc;
+                    hasPastDueCharge = true;
                 }
 
                 if (e.IsLateFee
@@ -193,12 +196,7 @@ public sealed class LedgerService : ILedgerService
                 }
             }
 
-            if (balance <= 0 || hasLateFeeThisMonth || oldestCharge is null)
-            {
-                continue;
-            }
-
-            if (oldestCharge.Value.AddDays(settings.GraceDays) >= asOf)
+            if (balance <= 0 || hasLateFeeThisMonth || !hasPastDueCharge)
             {
                 continue;
             }

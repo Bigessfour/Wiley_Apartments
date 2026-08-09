@@ -14,6 +14,7 @@
 @inject IOccupancyService OccupancyService
 @inject ITenantService TenantService
 @inject IUnitOperatingCostService OpsCostService
+@inject IMaintenanceService MaintenanceService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 
@@ -344,6 +345,42 @@ else
             </TabItem>
             <TabItem>
                 <ChildContent>
+                    <TabHeader Text="Maintenance"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="d-flex justify-content-between align-items-end mb-2 flex-wrap gap-2">
+                        <p class="text-muted small mb-0">
+                            Work-order history for this unit.
+                            <a href="/maintenance">All maintenance</a>
+                        </p>
+                        <div style="min-width: 220px;">
+                            <label class="form-label small mb-1">Filter by asset</label>
+                            <SfDropDownList TValue="Guid?" TItem="AssetFilterOption"
+                                            DataSource="@AssetFilterOptions"
+                                            Placeholder="All (unit + assets)"
+                                            ShowClearButton="true"
+                                            @bind-Value="MaintenanceAssetFilter"
+                                            ValueChange="OnMaintenanceAssetFilterChanged">
+                                <DropDownListFieldSettings Text="Text" Value="Id" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
+                    <SfGrid TValue="MaintenanceRow" DataSource="@DisplayedMaintenanceRows" AllowPaging="true" AllowSorting="true" Height="360">
+                        <GridPageSettings PageSize="10" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(MaintenanceRow.CreatedDisplay)" HeaderText="Created" Width="110" />
+                            <GridColumn Field="@nameof(MaintenanceRow.AssetLabel)" HeaderText="Asset" Width="140" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Priority)" HeaderText="Priority" Width="100" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Status)" HeaderText="Status" Width="110" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Description)" HeaderText="Description" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Cost)" HeaderText="Cost" Format="C2" Width="100" TextAlign="TextAlign.Right" />
+                            <GridColumn Field="@nameof(MaintenanceRow.CompletedDisplay)" HeaderText="Completed" Width="110" />
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
                     <TabHeader Text="Ops costs"></TabHeader>
                 </ChildContent>
                 <ContentTemplate>
@@ -379,6 +416,10 @@ else
     private List<Flooring> UnitFloorings { get; set; } = [];
     private List<OpsCostRow> OpsCostRows { get; set; } = [];
     private decimal OpsCostTotal { get; set; }
+    private List<MaintenanceRow> MaintenanceRows { get; set; } = [];
+    private List<MaintenanceRow> DisplayedMaintenanceRows { get; set; } = [];
+    private List<AssetFilterOption> AssetFilterOptions { get; set; } = [];
+    private Guid? MaintenanceAssetFilter { get; set; }
     private Occupancy? CurrentOccupancy { get; set; }
     private List<Occupancy> OccupancyHistory { get; set; } = [];
     private List<TenantOption> TenantOptions { get; set; } = [];
@@ -438,6 +479,7 @@ else
         UnitAssets = (await AssetService.GetByUnitIdAsync(UnitId)).ToList();
         UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
         await ReloadOpsCostsAsync();
+        await ReloadMaintenanceAsync();
         await ReloadOccupancyAsync();
         TenantOptions = (await TenantService.SearchAsync())
             .Select(t => new TenantOption(t.Id, $"{t.LastName}, {t.FirstName}"))
@@ -455,6 +497,41 @@ else
             c.Notes ?? "")).ToList();
         OpsCostTotal = OpsCostRows.Sum(r => r.Amount);
     }
+
+    private async Task ReloadMaintenanceAsync()
+    {
+        var items = await MaintenanceService.GetForUnitAsync(UnitId);
+        MaintenanceRows = items.Select(ToMaintenanceRow).ToList();
+        AssetFilterOptions = UnitAssets
+            .Select(a => new AssetFilterOption { Id = a.Id, Text = $"{a.Type} ({a.Serial})" })
+            .ToList();
+        ApplyMaintenanceFilter();
+    }
+
+    private void ApplyMaintenanceFilter()
+    {
+        DisplayedMaintenanceRows = MaintenanceAssetFilter is Guid aid
+            ? MaintenanceRows.Where(r => r.AssetId == aid).ToList()
+            : MaintenanceRows;
+    }
+
+    private async Task OnMaintenanceAssetFilterChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<Guid?, AssetFilterOption> args)
+    {
+        MaintenanceAssetFilter = args.Value;
+        ApplyMaintenanceFilter();
+        await Task.CompletedTask;
+    }
+
+    private MaintenanceRow ToMaintenanceRow(MaintenanceRequest m) => new(
+        m.Id,
+        m.AssetId,
+        Clock.ToDisplayTime(m.CreatedUtc).ToString("d"),
+        m.Asset is null ? "(Unit)" : $"{m.Asset.Type} ({m.Asset.Serial})",
+        m.Priority.ToString(),
+        m.Status.ToString(),
+        m.Description,
+        m.Cost,
+        m.CompletedUtc is DateTime c ? Clock.ToDisplayTime(c).ToString("d") : "");
 
     private async Task ReloadOccupancyAsync()
     {
@@ -627,4 +704,21 @@ else
         decimal Amount,
         string Vendor,
         string Notes);
+
+    private sealed record MaintenanceRow(
+        Guid Id,
+        Guid? AssetId,
+        string CreatedDisplay,
+        string AssetLabel,
+        string Priority,
+        string Status,
+        string Description,
+        decimal? Cost,
+        string CompletedDisplay);
+
+    private sealed class AssetFilterOption
+    {
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = "";
+    }
 }

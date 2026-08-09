@@ -129,4 +129,18 @@ public class LedgerServiceTests
             (await service.ApplyLateFeesAsync(clock.UtcNow)).Should().Be(0);
         }
     }
+
+    [Fact]
+    public async Task ApplyLateFeesAsync_SkipsWhenChargeStillWithinGrace()
+    {
+        var (db, service, lateFees, clock) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            await lateFees.UpdateAsync(enabled: true, amount: 25m, graceDays: 10);
+            await service.PostChargeAsync(tenant.Id, unit.Id, 650m, clock.UtcNow.AddDays(-3));
+            (await service.ApplyLateFeesAsync(clock.UtcNow)).Should().Be(0);
+            (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(650m);
+        }
+    }
 }

@@ -314,7 +314,7 @@ else
         {
             DateTime? endUtc = AmendEnd is null
                 ? null
-                : DateTime.SpecifyKind(AmendEnd.Value.Date, DateTimeKind.Utc);
+                : Clock.ToUtc(AmendEnd.Value.Date);
             Lease = await LeaseService.AmendAsync(
                 LeaseId,
                 AmendRent,
@@ -351,7 +351,7 @@ else
         {
             var successor = await LeaseService.RenewAsync(
                 LeaseId,
-                DateTime.SpecifyKind(RenewEnd.Value.Date, DateTimeKind.Utc),
+                Clock.ToUtc(RenewEnd.Value.Date),
                 RenewRent,
                 RenewDeposit,
                 LifecycleNote);
@@ -382,7 +382,7 @@ else
         {
             Lease = await LeaseService.TerminateAsync(
                 LeaseId,
-                DateTime.SpecifyKind(TerminateEnd.Value.Date, DateTimeKind.Utc),
+                Clock.ToUtc(TerminateEnd.Value.Date),
                 LifecycleNote);
             ShowPanel = null;
             SuccessMessage = "Lease terminated.";
