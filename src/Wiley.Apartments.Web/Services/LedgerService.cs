@@ -216,6 +216,54 @@ public sealed class LedgerService : ILedgerService
         return assessed;
     }
 
+    public async Task<int> PostMonthlyRentChargesAsync(
+        DateTime? asOfUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        var asOf = EnsureUtc(asOfUtc ?? _clock.UtcNow);
+        var monthStart = new DateTime(asOf.Year, asOf.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthEnd = monthStart.AddMonths(1);
+
+        var activeLeases = await _db.Leases.AsNoTracking()
+            .Where(l => !l.IsDeleted && l.Status == LeaseStatus.Active)
+            .ToListAsync(cancellationToken);
+
+        var existingRentCharges = await _db.LedgerEntries.AsNoTracking()
+            .Where(e => !e.IsDeleted
+                && e.EntryType == LedgerEntryType.Charge
+                && !e.IsLateFee
+                && e.DateUtc >= monthStart
+                && e.DateUtc < monthEnd)
+            .Select(e => new { e.TenantId, e.UnitId })
+            .ToListAsync(cancellationToken);
+
+        var charged = new HashSet<(Guid TenantId, Guid UnitId)>(
+            existingRentCharges.Select(e => (e.TenantId, e.UnitId)));
+
+        var posted = 0;
+        foreach (var lease in activeLeases)
+        {
+            if (charged.Contains((lease.TenantId, lease.UnitId)))
+            {
+                continue;
+            }
+
+            await PostChargeAsync(
+                lease.TenantId,
+                lease.UnitId,
+                lease.Rent,
+                monthStart,
+                lease.Id,
+                notes: $"Rent {monthStart:MMMM yyyy}",
+                cancellationToken: cancellationToken);
+            charged.Add((lease.TenantId, lease.UnitId));
+            posted++;
+        }
+
+        _logger.LogInformation("Posted {Count} monthly rent charge(s) for {Month}.", posted, monthStart.ToString("yyyy-MM"));
+        return posted;
+    }
+
     private async Task ValidatePartiesAsync(
         Guid tenantId,
         Guid unitId,

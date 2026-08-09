@@ -11,6 +11,7 @@ public sealed class DashboardService : IDashboardService
     private readonly IRentRollService _rentRoll;
     private readonly ILeaseService _leases;
     private readonly IMaintenanceService _maintenance;
+    private readonly IScheduleService _schedule;
     private readonly IDateTimeService _clock;
 
     public DashboardService(
@@ -18,12 +19,14 @@ public sealed class DashboardService : IDashboardService
         IRentRollService rentRoll,
         ILeaseService leases,
         IMaintenanceService maintenance,
+        IScheduleService schedule,
         IDateTimeService clock)
     {
         _db = db;
         _rentRoll = rentRoll;
         _leases = leases;
         _maintenance = maintenance;
+        _schedule = schedule;
         _clock = clock;
     }
 
@@ -32,13 +35,19 @@ public sealed class DashboardService : IDashboardService
         var units = await _db.Units.AsNoTracking().ToListAsync(cancellationToken);
         var now = _clock.UtcNow;
 
-        var expiring = (await _leases.GetExpiringWithinAsync(60, cancellationToken))
-            .Select(l => new DashboardLeaseRow(
-                l.Id,
-                l.Unit?.Number ?? "",
-                l.Tenant is null ? "" : $"{l.Tenant.LastName}, {l.Tenant.FirstName}",
-                l.EndUtc,
-                Math.Max(0, (int)(l.EndUtc.Date - now.Date).TotalDays)))
+        var expiring60 = await _leases.GetExpiringWithinAsync(60, cancellationToken);
+        var expiring30 = expiring60
+            .Where(l => (l.EndUtc.Date - now.Date).TotalDays <= 30)
+            .ToList();
+        var expiring31To60 = expiring60
+            .Where(l => (l.EndUtc.Date - now.Date).TotalDays > 30)
+            .ToList();
+
+        var expiringWithin30 = expiring30
+            .Select(l => ToLeaseRow(l, now))
+            .ToList();
+        var expiringWithin60 = expiring31To60
+            .Select(l => ToLeaseRow(l, now))
             .ToList();
 
         var openWo = (await _maintenance.GetAllAsync(openOnly: true, cancellationToken))
@@ -74,16 +83,49 @@ public sealed class DashboardService : IDashboardService
                 a.WarrantyEnd.Value.DayNumber - today.DayNumber))
             .ToList();
 
+        var reminderWindowEnd = now.AddDays(14);
+        var scheduleItems = await _schedule.QueryAsync(includeCompleted: false, cancellationToken: cancellationToken);
+        var reminders = scheduleItems
+            .Select(item =>
+            {
+                var anchor = item.DueUtc ?? item.StartUtc;
+                var reminderUtc = item.ReminderOffset is TimeSpan offset
+                    ? anchor - offset
+                    : anchor;
+                return new { Item = item, ReminderUtc = reminderUtc, Anchor = anchor };
+            })
+            .Where(x => x.ReminderUtc <= reminderWindowEnd)
+            .OrderBy(x => x.ReminderUtc)
+            .Take(12)
+            .Select(x => new DashboardScheduleReminderRow(
+                x.Item.Id,
+                x.Item.Title,
+                x.Item.Unit?.Number ?? "—",
+                x.ReminderUtc,
+                x.Anchor,
+                x.Item.Category.ToString()))
+            .ToList();
+
         return new DashboardSnapshot(
             units.Count,
             units.Count(u => u.Status == UnitStatus.Occupied),
             units.Count(u => u.Status == UnitStatus.Vacant),
             units.Count(u => u.Status == UnitStatus.Maintenance),
             units.Count(u => u.Status == UnitStatus.MakeReady),
-            expiring,
+            expiringWithin30,
+            expiringWithin60,
             openWo,
             delinquencies,
             warranties,
+            reminders,
             now);
     }
+
+    private static DashboardLeaseRow ToLeaseRow(Lease l, DateTime now) =>
+        new(
+            l.Id,
+            l.Unit?.Number ?? "",
+            l.Tenant is null ? "" : $"{l.Tenant.LastName}, {l.Tenant.FirstName}",
+            l.EndUtc,
+            Math.Max(0, (int)(l.EndUtc.Date - now.Date).TotalDays));
 }

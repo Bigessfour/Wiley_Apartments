@@ -143,4 +143,32 @@ public class LedgerServiceTests
             (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(650m);
         }
     }
+
+    [Fact]
+    public async Task PostMonthlyRentChargesAsync_PostsForActiveLeasesOncePerMonth()
+    {
+        var (db, service, _, clock) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            var lease = new Lease
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                TenantId = tenant.Id,
+                StartUtc = clock.UtcNow.AddMonths(-2),
+                EndUtc = clock.UtcNow.AddMonths(10),
+                Rent = 725m,
+                Deposit = 500m,
+                Status = LeaseStatus.Active,
+                TemplateUsed = "brookside-year-lease.docx"
+            };
+            db.Leases.Add(lease);
+            await db.SaveChangesAsync();
+
+            (await service.PostMonthlyRentChargesAsync(clock.UtcNow)).Should().Be(1);
+            (await service.PostMonthlyRentChargesAsync(clock.UtcNow)).Should().Be(0);
+            (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(725m);
+        }
+    }
 }

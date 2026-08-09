@@ -8,6 +8,7 @@
 @using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
 @inject IUnitService UnitService
 @inject IAssetService AssetService
 @inject IFlooringService FlooringService
@@ -293,6 +294,21 @@ else
                             <GridColumn Field="@nameof(Asset.Notes)" HeaderText="Notes" Width="180" />
                         </GridColumns>
                     </SfGrid>
+                    <div class="mt-3">
+                        <label class="form-label">Asset documents (manuals, receipts, photos)</label>
+                        <SfDropDownList TValue="Guid?" TItem="AssetFilterOption" DataSource="@AssetFilterOptions"
+                                        @bind-Value="DocumentAssetId" Placeholder="Select asset" AllowFiltering="true">
+                            <DropDownListFieldSettings Text="Text" Value="Id" />
+                        </SfDropDownList>
+                        @if (DocumentAssetId is Guid docAssetId)
+                        {
+                            <EntityDocumentsPanel EntityType="DocumentEntityType.Asset"
+                                                  EntityId="docAssetId"
+                                                  Title="Asset attachments"
+                                                  RelativeDirectory="assets"
+                                                  DefaultCategory="DocumentCategory.Manual" />
+                        }
+                    </div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -420,6 +436,7 @@ else
     private List<MaintenanceRow> DisplayedMaintenanceRows { get; set; } = [];
     private List<AssetFilterOption> AssetFilterOptions { get; set; } = [];
     private Guid? MaintenanceAssetFilter { get; set; }
+    private Guid? DocumentAssetId { get; set; }
     private Occupancy? CurrentOccupancy { get; set; }
     private List<Occupancy> OccupancyHistory { get; set; } = [];
     private List<TenantOption> TenantOptions { get; set; } = [];

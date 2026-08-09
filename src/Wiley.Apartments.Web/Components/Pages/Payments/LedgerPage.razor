@@ -62,6 +62,8 @@
                   OnClick="@(() => ShowForm = "charge")" />
         <SfButton CssClass="e-outline e-small" Content="Post payment…" Disabled="@Busy"
                   OnClick="@(() => ShowForm = "payment")" />
+        <SfButton CssClass="e-outline e-small" Content="Generate rent charges" Disabled="@Busy"
+                  OnClick="GenerateRentChargesAsync" />
     </div>
 </div>
 
@@ -251,6 +253,29 @@
             ShowForm = null;
             FormAmount = null;
             FormNotes = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task GenerateRentChargesAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var count = await LedgerService.PostMonthlyRentChargesAsync();
+            SuccessMessage = count == 0
+                ? "No new rent charges needed for this month."
+                : $"Posted {count} rent charge(s) for active leases.";
             await LoadAsync();
         }
         catch (Exception ex)

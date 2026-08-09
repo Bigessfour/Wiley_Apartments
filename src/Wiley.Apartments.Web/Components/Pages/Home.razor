@@ -69,18 +69,18 @@ else
 
     <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 12, 12 })" AllowResizing="false" AllowDragging="false">
         <DashboardLayoutPanels>
-            <DashboardLayoutPanel Id="expiring" SizeX="3" SizeY="2" Row="0" Column="0">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Leases expiring (60 days)</div></HeaderTemplate>
+            <DashboardLayoutPanel Id="exp30" SizeX="3" SizeY="2" Row="0" Column="0">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Leases expiring (≤30 days)</div></HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
-                        @if (Snap.ExpiringLeases.Count == 0)
+                        @if (Snap.ExpiringLeasesWithin30.Count == 0)
                         {
                             <p class="text-muted small mb-0">None in window.</p>
                         }
                         else
                         {
                             <ul class="list-unstyled mb-0 small">
-                                @foreach (var l in Snap.ExpiringLeases)
+                                @foreach (var l in Snap.ExpiringLeasesWithin30)
                                 {
                                     <li class="mb-1">
                                         <a href="@($"/leases/{l.LeaseId}")">Unit @l.UnitNumber</a>
@@ -93,7 +93,55 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="0" Column="3">
+            <DashboardLayoutPanel Id="exp60" SizeX="3" SizeY="2" Row="0" Column="3">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Leases expiring (31–60 days)</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ExpiringLeasesWithin60.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None in window.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var l in Snap.ExpiringLeasesWithin60)
+                                {
+                                    <li class="mb-1">
+                                        <a href="@($"/leases/{l.LeaseId}")">Unit @l.UnitNumber</a>
+                                        — @l.TenantName · @Clock.ToDisplayTime(l.EndUtc).ToString("d")
+                                        (@l.DaysRemaining d)
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="schedule" SizeX="3" SizeY="2" Row="2" Column="3">
+                <HeaderTemplate><div class="fw-semibold px-2 py-1">Schedule reminders (14 days)</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ScheduleReminders.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No upcoming reminders.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var s in Snap.ScheduleReminders)
+                                {
+                                    <li class="mb-1">
+                                        <a href="schedule">Unit @s.UnitNumber</a>
+                                        — @s.Title · @Clock.ToDisplayTime(s.ReminderUtc).ToString("d")
+                                        (@s.Category)
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="4" Column="0">
                 <HeaderTemplate><div class="fw-semibold px-2 py-1">Open maintenance</div></HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
@@ -116,7 +164,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="2" Column="0">
+            <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="4" Column="3">
                 <HeaderTemplate><div class="fw-semibold px-2 py-1">Delinquencies</div></HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
@@ -139,7 +187,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="2" Column="3">
+            <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="6" Column="0">
                 <HeaderTemplate><div class="fw-semibold px-2 py-1">Warranties (90 days)</div></HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
@@ -162,7 +210,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="4" Column="0">
+            <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="6" Column="3">
                 <HeaderTemplate>
                     <div class="fw-semibold px-2 py-1 d-flex justify-content-between">
                         <span>P/L by unit (YTD)</span>
@@ -187,7 +235,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="plSeries" SizeX="3" SizeY="3" Row="4" Column="3">
+            <DashboardLayoutPanel Id="plSeries" SizeX="6" SizeY="3" Row="9" Column="0">
                 <HeaderTemplate><div class="fw-semibold px-2 py-1">Portfolio net (YTD by month)</div></HeaderTemplate>
                 <ContentTemplate>
                     <div style="height:100%; width:100%; padding:4px;">

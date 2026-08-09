@@ -11,6 +11,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Options.IOptions<Wiley.Apartments.Web.Configuration.ClerkSuiteOptions> ClerkOptions
+@using Wiley.Apartments.Web.Components.Shared
 
 <PageTitle>@(Tenant is null ? "Tenant" : $"{Tenant.LastName}, {Tenant.FirstName}")</PageTitle>
 
@@ -202,10 +203,11 @@ else
         (staff deep-link only — no card data in ClerkSuite).
     </p>
 
-    <h2 class="h5 mt-4">Documents</h2>
-    <p class="text-muted small mb-0">
-        Signed leases attach from each lease page (T3.3). Full vault browser / screening packs land in Phase 6.
-    </p>
+    <EntityDocumentsPanel EntityType="DocumentEntityType.Tenant"
+                          EntityId="TenantId"
+                          Title="Tenant documents (screening, correspondence)"
+                          RelativeDirectory="tenants"
+                          DefaultCategory="@DocumentCategory.Screening" />
 }
 
 @code {

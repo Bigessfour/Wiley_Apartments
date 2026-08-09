@@ -11,11 +11,21 @@ public sealed record DashboardSnapshot(
     int Vacant,
     int Maintenance,
     int MakeReady,
-    IReadOnlyList<DashboardLeaseRow> ExpiringLeases,
+    IReadOnlyList<DashboardLeaseRow> ExpiringLeasesWithin30,
+    IReadOnlyList<DashboardLeaseRow> ExpiringLeasesWithin60,
     IReadOnlyList<DashboardMaintenanceRow> OpenWorkOrders,
     IReadOnlyList<DelinquencyRow> Delinquencies,
     IReadOnlyList<DashboardWarrantyRow> ExpiringWarranties,
+    IReadOnlyList<DashboardScheduleReminderRow> ScheduleReminders,
     DateTime GeneratedUtc);
+
+public sealed record DashboardScheduleReminderRow(
+    Guid Id,
+    string Title,
+    string UnitNumber,
+    DateTime ReminderUtc,
+    DateTime DueOrStartUtc,
+    string Category);
 
 public sealed record DashboardLeaseRow(
     Guid LeaseId,

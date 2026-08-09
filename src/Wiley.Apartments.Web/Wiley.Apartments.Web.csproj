@@ -23,6 +23,7 @@
     <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.FileManager" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.FileManager.PhysicalFileProvider" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Layouts" Version="34.2.2" />
@@ -33,6 +34,7 @@
     <!-- WordProcessor / DocumentEditor deferred to T6.1 vault editing; leases use SfPdfViewer + DocIO/Pdf. -->
     <PackageReference Include="Syncfusion.DocIO.Net.Core" Version="34.2.2" />
     <PackageReference Include="Syncfusion.DocIORenderer.Net.Core" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.EJ2.AspNet.Core" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Pdf.Net.Core" Version="34.2.2" />
   </ItemGroup>
 

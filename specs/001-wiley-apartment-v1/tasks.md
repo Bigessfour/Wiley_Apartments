@@ -318,3 +318,36 @@ Mid-flight converge (2026-08-09) after fillable-PDF lease pivot + early Document
   - **Done (2026-08-09):** Removed WordProcessor package + DocumentEditor script/usings; DocIO/Pdf + SfPdfViewer retained; re-add at T6.1 if needed.
 
 **Re-converge (2026-08-09, post T008–T014):** Zero new CRITICAL/HIGH gaps beyond work already tracked in T3.4–T7.x. No Phase 9 Convergence appended.
+
+---
+
+## Phase 9: Convergence
+
+Post–Phase 6 re-converge (2026-08-09). Phase 7 handover (T7.1–T7.4) remains open and is not duplicated below.
+
+- [x] **T015** HIGH: Wire Syncfusion `SfFileManager` (NAS adapter over DocumentRoot) for vault browse per FR-019 / US5 Independent Test / plan: Document vault FileManager (`partial`)
+  - **Done (2026-08-09):** `DocumentVaultFileManagerController` + SfFileManager on `/documents`.
+
+- [x] **T016** HIGH: Attach screening/other documents from tenant detail (and list linked docs) per FR-008 / FR-2 AC (`partial`)
+  - **Done (2026-08-09):** `EntityDocumentsPanel` on tenant detail.
+
+- [x] **T017** HIGH: Attach manuals/receipts/photos from unit asset records via Document vault per FR-003 / US5/AC3 (`partial`)
+  - **Done (2026-08-09):** Asset document attach on unit Manage assets tab.
+
+- [x] **T018** HIGH: Surface lease expirations for both **60-day and 30-day** windows on dashboard per FR-022 / FR-3 AC (`partial`)
+  - **Done (2026-08-09):** Dashboard panels for ≤30 and 31–60 day buckets.
+
+- [x] **T019** HIGH: Reconcile FR-024 role-based access (Clerk/ReadOnly/Elevated) with Constitution VI / tech stack (**no roles in v1**) (`contradicts`)
+  - **Done (2026-08-09):** **FR-024 waived for v1** — Constitution VI + tech stack require authenticated clerks with full access; no RBAC until constitution amendment.
+
+- [x] **T020** MEDIUM: In-browser Office viewing/editing via Syncfusion DocumentEditor (or justified download-only for non-PDF) per FR-020 / US5/AC2 (`partial`)
+  - **Done (2026-08-09):** v1 download-only for non-PDF; PDF via SfPdfViewer; policy noted in vault UI.
+
+- [x] **T021** MEDIUM: Surface due/upcoming schedule reminders on clerk dashboard per plan:T3.5.2 / T6.2 (`partial`)
+  - **Done (2026-08-09):** Dashboard schedule reminders panel (14-day window).
+
+- [x] **T022** MEDIUM: Support batch/monthly rent charge generation (invoice-style charges) per FR-015 (`partial`)
+  - **Done (2026-08-09):** `PostMonthlyRentChargesAsync` + ledger UI button.
+
+- [x] **T023** LOW: Document optional Synology reverse-proxy HTTPS for LAN/Tailscale exposure per FR-026 / Constitution VI (`missing`)
+  - **Done (2026-08-09):** `deploy/synology/DEPLOY.md` reverse-proxy HTTPS section.

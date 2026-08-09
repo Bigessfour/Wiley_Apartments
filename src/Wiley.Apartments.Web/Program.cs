@@ -13,6 +13,7 @@ try
     app.ConfigureClerkSuitePipeline();
 
     app.MapStaticAssets();
+    app.MapControllers();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
 

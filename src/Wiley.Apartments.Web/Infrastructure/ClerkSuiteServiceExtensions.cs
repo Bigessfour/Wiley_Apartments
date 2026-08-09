@@ -76,6 +76,7 @@ public static class ClerkSuiteServiceExtensions
 
         builder.Services.AddAuthorization();
         builder.Services.AddCascadingAuthenticationState();
+        builder.Services.AddControllers();
         builder.Services.AddSyncfusionBlazor();
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
