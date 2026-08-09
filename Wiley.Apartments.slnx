@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Wiley.Apartments.Contracts/Wiley.Apartments.Contracts.csproj" />
+    <Project Path="src/Wiley.Apartments.Domain/Wiley.Apartments.Domain.csproj" />
+    <Project Path="src/Wiley.Apartments.Web/Wiley.Apartments.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Wiley.Apartments.E2ETests/Wiley.Apartments.E2ETests.csproj" />
+    <Project Path="tests/Wiley.Apartments.IntegrationTests/Wiley.Apartments.IntegrationTests.csproj" />
+    <Project Path="tests/Wiley.Apartments.Tests/Wiley.Apartments.Tests.csproj" />
+  </Folder>
+</Solution>

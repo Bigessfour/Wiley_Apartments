@@ -1,0 +1,65 @@
+@page "/Account/Login"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Inputs
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in — ClerkSuite</PageTitle>
+
+<div class="login-panel mx-auto mt-5" style="max-width: 420px;">
+    <h2>ClerkSuite</h2>
+    <p class="text-muted">Sign in to continue.</p>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">@ErrorMessage</div>
+    }
+
+    <EditForm Model="Input" OnValidSubmit="HandleLogin">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <SfTextBox @bind-Value="Input.Email" Placeholder="you@townofwiley.gov" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <SfTextBox @bind-Value="Input.Password" Type="InputType.Password" />
+        </div>
+        <SfButton CssClass="e-primary" IsPrimary="true" Type="ButtonType.Submit" Content="Sign in" />
+    </EditForm>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    private LoginInput Input { get; set; } = new();
+
+    private async Task HandleLogin()
+    {
+        ErrorMessage = null;
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, isPersistent: true, lockoutOnFailure: false);
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            return;
+        }
+
+        ErrorMessage = "Invalid email or password.";
+    }
+
+    private sealed class LoginInput
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

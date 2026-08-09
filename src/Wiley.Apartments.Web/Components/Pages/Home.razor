@@ -1,0 +1,21 @@
+﻿@page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+
+<PageTitle>ClerkSuite Dashboard</PageTitle>
+
+<h1>ClerkSuite</h1>
+<p class="lead">Town of Wiley apartment management — 16 units.</p>
+
+<SfButton CssClass="e-primary" Content="Syncfusion Ready" />
+
+<p class="text-muted mt-3">
+    Mountain Time: @DisplayTime
+</p>
+
+@code {
+    [Inject]
+    private Wiley.Apartments.Contracts.IDateTimeService DateTimeService { get; set; } = default!;
+
+    private string DisplayTime => DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
+}

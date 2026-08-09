@@ -1,0 +1,15 @@
+# Build
+**/bin/
+**/obj/
+.git/
+.cursor/mcp.json
+**/*.user
+**/*.db
+**/*.db-*
+
+# Secrets
+.env
+.env.*
+
+# APM
+apm_modules/

@@ -1,0 +1,33 @@
+# Build
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+.vs/
+
+# Dependencies
+node_modules/
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+appsettings.Development.json
+appsettings.Local.json
+**/Data/*.db
+**/Data/*.db-*
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cursor / APM — machine-local tooling copies (canonical skills live globally)
+.cursor/
+.agents/
+apm_modules/
+
+# Local document mount test dir
+local-docs/
