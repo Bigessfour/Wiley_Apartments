@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Syncfusion.EJ2.FileManager.Base;
 using Syncfusion.EJ2.FileManager.PhysicalFileProvider;
+using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Web.Configuration;
 using Wiley.Apartments.Web.Infrastructure;
 using Wiley.Apartments.Web.Services;
@@ -28,16 +29,12 @@ public sealed class DocumentVaultFileManagerController : Controller
     private readonly ILogger<DocumentVaultFileManagerController> _logger;
 
     public DocumentVaultFileManagerController(
-        IHostEnvironment environment,
-        IOptions<ClerkSuiteOptions> options,
+        IDocumentPathResolver paths,
         IDocumentVaultAuditService audit,
         IDocumentVaultMetadataSync metadata,
         ILogger<DocumentVaultFileManagerController> logger)
     {
-        var root = options.Value.DocumentRoot;
-        _documentRoot = Path.IsPathRooted(root)
-            ? root
-            : Path.GetFullPath(Path.Combine(environment.ContentRootPath, root));
+        _documentRoot = paths.GetDocumentRoot();
         Directory.CreateDirectory(_documentRoot);
         _provider.RootFolder(_documentRoot);
         _audit = audit;

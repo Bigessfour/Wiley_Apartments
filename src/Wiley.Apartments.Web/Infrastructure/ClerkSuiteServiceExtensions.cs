@@ -29,6 +29,8 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddSingleton<CircuitAuthCookieStore>();
         builder.Services.AddScoped<CircuitAuthCookieAccessor>();
         builder.Services.AddSingleton<IDateTimeService, DateTimeService>();
+        builder.Services.AddSingleton<IDocumentPathResolver, DocumentPathResolver>();
+        builder.Services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         builder.Services.AddScoped<AuditSaveChangesInterceptor>();
         builder.Services.AddScoped<IIdentitySeeder, IdentitySeeder>();
         builder.Services.AddScoped<IUnitSeeder, UnitSeeder>();

@@ -27,6 +27,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<LateFeeSettings> LateFeeSettings => Set<LateFeeSettings>();
     public DbSet<UnitOperatingCost> UnitOperatingCosts => Set<UnitOperatingCost>();
     public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -298,6 +299,16 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(e => e.AssetId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+
+        builder.Entity<AppSetting>(entity =>
+        {
+            entity.ToTable("AppSettings");
+            entity.HasKey(e => e.Key);
+            entity.Property(e => e.Key).HasMaxLength(128);
+            entity.Property(e => e.Value).HasMaxLength(2000).IsRequired();
+            entity.Property(e => e.UpdatedBy).HasMaxLength(256);
         });
     }
 }

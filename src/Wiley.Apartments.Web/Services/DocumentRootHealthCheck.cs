@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Wiley.Apartments.Contracts;
 using Microsoft.Extensions.Options;
 using Wiley.Apartments.Web.Configuration;
 
@@ -7,13 +8,11 @@ namespace Wiley.Apartments.Web.Services;
 /// <summary>Verifies NAS DocumentRoot exists and is writable (spec edge case 2).</summary>
 public sealed class DocumentRootHealthCheck : IHealthCheck
 {
-    private readonly ClerkSuiteOptions _options;
-    private readonly IHostEnvironment _environment;
+    private readonly IDocumentPathResolver _paths;
 
-    public DocumentRootHealthCheck(IOptions<ClerkSuiteOptions> options, IHostEnvironment environment)
+    public DocumentRootHealthCheck(IDocumentPathResolver paths)
     {
-        _options = options.Value;
-        _environment = environment;
+        _paths = paths;
     }
 
     public Task<HealthCheckResult> CheckHealthAsync(
@@ -22,7 +21,7 @@ public sealed class DocumentRootHealthCheck : IHealthCheck
     {
         try
         {
-            var root = ResolveRoot();
+            var root = _paths.GetDocumentRoot();
             Directory.CreateDirectory(root);
             if (!Directory.Exists(root))
             {
@@ -41,14 +40,6 @@ public sealed class DocumentRootHealthCheck : IHealthCheck
                 "Document root unavailable — do not report documents as saved. Contact IT / check NAS share.",
                 ex));
         }
-    }
-
-    private string ResolveRoot()
-    {
-        var root = _options.DocumentRoot;
-        return Path.IsPathRooted(root)
-            ? root
-            : Path.GetFullPath(Path.Combine(_environment.ContentRootPath, root));
     }
 }
 

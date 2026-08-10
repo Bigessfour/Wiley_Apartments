@@ -61,6 +61,14 @@ Settings → **Appearance** → Light / Dark. Preference is stored in this brows
 
 ---
 
+## Settings — document storage & demo data
+
+| Control | Use |
+| ------- | --- |
+| **Document root path** | Folder on mr-storage (container usually `/docs` → host `/volume1/apartments/docs`). Save after IT moves the share. |
+| **Load demo data** | Fills Jordan Reyes (24 months) + Community Center renters with PayStar-style payments for training/validation. |
+| **Validate demo** | Checks tenants, ledger, leases, docs on disk, CC rentals against the database. |
+
 ## If something looks wrong
 
 1. Refresh the page (Dashboard has a **Refresh** button).

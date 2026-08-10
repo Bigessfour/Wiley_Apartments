@@ -53,15 +53,16 @@ public class LeaseServiceTests
         var env = new TestHostEnvironment { ContentRootPath = Path.GetTempPath() };
         var opts = Options.Create(new ClerkSuiteOptions { DocumentRoot = documentRoot });
         var clock = new FixedClock();
+        var paths = new Wiley.Apartments.Tests.Support.FixedDocumentPathResolver(documentRoot);
         var documents = new DocumentService(
             db,
-            opts,
-            env,
+            paths,
             clock,
             NullLogger<DocumentService>.Instance);
         var service = new LeaseService(
             db,
             opts,
+            paths,
             env,
             clock,
             new LeaseDocumentGenerator(),

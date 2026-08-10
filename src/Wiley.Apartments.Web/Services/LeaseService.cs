@@ -17,6 +17,7 @@ public sealed class LeaseService : ILeaseService
 
     private readonly ApartmentsDbContext _db;
     private readonly ClerkSuiteOptions _options;
+    private readonly IDocumentPathResolver _paths;
     private readonly IHostEnvironment _environment;
     private readonly IDateTimeService _clock;
     private readonly LeaseDocumentGenerator _generator;
@@ -26,6 +27,7 @@ public sealed class LeaseService : ILeaseService
     public LeaseService(
         ApartmentsDbContext db,
         IOptions<ClerkSuiteOptions> options,
+        IDocumentPathResolver paths,
         IHostEnvironment environment,
         IDateTimeService clock,
         LeaseDocumentGenerator generator,
@@ -34,6 +36,7 @@ public sealed class LeaseService : ILeaseService
     {
         _db = db;
         _options = options.Value;
+        _paths = paths;
         _environment = environment;
         _clock = clock;
         _generator = generator;
@@ -590,16 +593,7 @@ public sealed class LeaseService : ILeaseService
         };
     }
 
-    private string ResolveDocumentRoot()
-    {
-        var root = _options.DocumentRoot;
-        if (Path.IsPathRooted(root))
-        {
-            return root;
-        }
-
-        return Path.GetFullPath(Path.Combine(_environment.ContentRootPath, root));
-    }
+    private string ResolveDocumentRoot() => _paths.GetDocumentRoot();
 
     private static DateTime EnsureUtc(DateTime value) =>
         value.Kind switch

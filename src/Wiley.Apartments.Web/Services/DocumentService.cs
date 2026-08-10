@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Domain;
-using Wiley.Apartments.Web.Configuration;
 using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
@@ -17,21 +15,18 @@ public sealed class DocumentService : IDocumentService
     private const long MaxUploadBytes = 25 * 1024 * 1024;
 
     private readonly ApartmentsDbContext _db;
-    private readonly ClerkSuiteOptions _options;
-    private readonly IHostEnvironment _environment;
+    private readonly IDocumentPathResolver _paths;
     private readonly IDateTimeService _clock;
     private readonly ILogger<DocumentService> _logger;
 
     public DocumentService(
         ApartmentsDbContext db,
-        IOptions<ClerkSuiteOptions> options,
-        IHostEnvironment environment,
+        IDocumentPathResolver paths,
         IDateTimeService clock,
         ILogger<DocumentService> logger)
     {
         _db = db;
-        _options = options.Value;
-        _environment = environment;
+        _paths = paths;
         _clock = clock;
         _logger = logger;
     }
@@ -206,16 +201,8 @@ public sealed class DocumentService : IDocumentService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    private string ResolveDocumentRoot()
-    {
-        var root = _options.DocumentRoot;
-        if (Path.IsPathRooted(root))
-        {
-            return root;
-        }
+    private string ResolveDocumentRoot() => _paths.GetDocumentRoot();
 
-        return Path.GetFullPath(Path.Combine(_environment.ContentRootPath, root));
-    }
 
     private static DocumentInfo Map(Document d) =>
         new(d.Id, d.EntityType, d.EntityId, d.FilePathOnNas, d.OriginalFileName, d.ContentType,

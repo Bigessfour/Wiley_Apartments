@@ -1,22 +1,32 @@
 @page "/settings"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @using Syncfusion.Blazor.Inputs
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Web.Configuration
 @inject IJSRuntime JsRuntime
 @inject ILateFeeSettingsService LateFeeSettings
 @inject ILedgerService LedgerService
+@inject IDocumentPathResolver DocumentPaths
+@inject IDemoDataSeeder DemoSeeder
 @inject IClerkToast Toast
+@inject AuthenticationStateProvider AuthState
 @inject Microsoft.Extensions.Options.IOptions<ClerkSuiteOptions> ClerkOptions
 
 <PageTitle>Settings</PageTitle>
 
-<PageHeader Title="Settings" Subtitle="Appearance, late fees, and payment portal deep-link." />
+<PageHeader Title="Settings" Subtitle="Appearance, document storage on mr-storage, late fees, payment portal, and demo data." />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(SuccessMessage))
+{
+    <div class="alert alert-success">@SuccessMessage</div>
 }
 
 <section class="settings-panel e-card p-4 mb-4" aria-labelledby="appearance-heading">
@@ -25,7 +35,6 @@
         Choose Fluent light or dark for Syncfusion controls and the ClerkSuite shell.
         Your preference is saved in this browser.
     </p>
-
     <div class="d-flex align-items-center gap-3 flex-wrap">
         <span class="@ThemeLabelClass(false)">Light</span>
         <SfSwitch @bind-Checked="IsDarkMode"
@@ -33,6 +42,43 @@
                   CssClass="clerksuite-theme-switch"
                   ValueChange="OnThemeChangedAsync" />
         <span class="@ThemeLabelClass(true)">Dark</span>
+    </div>
+</section>
+
+<section class="settings-panel e-card p-4 mb-4" aria-labelledby="docs-heading">
+    <h2 id="docs-heading" class="h5 mb-3">Document storage (mr-storage)</h2>
+    <p class="text-muted mb-3">
+        Vault files live on the NAS under this folder (leases, templates, uploads, appliances, community-center).
+        Default comes from deploy env <code>ClerkSuite__DocumentRoot</code> / compose mount
+        (usually <code>/docs</code> in the container → <code>/volume1/apartments/docs</code> on the NAS).
+        Change here only when IT moves the share; the app creates the folder if missing and checks write access.
+    </p>
+    <div class="row g-3" style="max-width: 720px;">
+        <div class="col-12">
+            <label class="form-label">Document root path</label>
+            <SfTextBox @bind-Value="DocumentRootPath"
+                       Placeholder="/docs or /volume1/apartments/docs"
+                       HtmlAttributes="@(new Dictionary<string, object> { ["spellcheck"] = "false" })" />
+            <div class="form-text">
+                Configured default: <code>@DocumentPaths.ConfiguredDefaultRoot</code>
+                · Effective now: <code>@EffectiveDocumentRoot</code>
+            </div>
+        </div>
+        <div class="col-12">
+            <p class="small text-muted mb-2">Standard subfolders (relative to root — do not rename casually):</p>
+            <ul class="small mb-0">
+                <li><code>templates/</code> — lease PDF templates</li>
+                <li><code>leases/</code> — generated & signed leases</li>
+                <li><code>uploads/</code> — general uploads</li>
+                <li><code>appliances/</code> — manuals / warranties</li>
+                <li><code>community-center/</code> — CC rental agreements & renter packets</li>
+                <li><code>tenants/</code> — screening & tenant docs</li>
+            </ul>
+        </div>
+        <div class="col-12 d-flex gap-2 flex-wrap">
+            <SfButton CssClass="e-primary e-small" Content="Save document path" Disabled="@Busy" OnClick="SaveDocumentRootAsync" />
+            <SfButton CssClass="e-outline e-small" Content="Reset to deploy default" Disabled="@Busy" OnClick="ResetDocumentRootAsync" />
+        </div>
     </div>
 </section>
 
@@ -62,11 +108,12 @@
     </div>
 </section>
 
-<section class="settings-panel e-card p-4" aria-labelledby="portal-heading">
-    <h2 id="portal-heading" class="h5 mb-3">Payment portal (G3)</h2>
+<section class="settings-panel e-card p-4 mb-4" aria-labelledby="portal-heading">
+    <h2 id="portal-heading" class="h5 mb-3">Payment portal (G3 / PayStar)</h2>
     <p class="text-muted mb-2">
         Staff deep-link only — no card data in ClerkSuite. Configure via
         <code>ClerkSuite__PaymentPortalUrl</code> / <code>PaymentPortalUrl</code> env.
+        Demo payments use method <strong>Online reference</strong> with PayStar confirmation notes.
     </p>
     @if (PortalConfigured)
     {
@@ -80,6 +127,62 @@
     }
 </section>
 
+<section class="settings-panel e-card p-4 mb-4" aria-labelledby="demo-heading">
+    <h2 id="demo-heading" class="h5 mb-3">Demo portfolio (pseudo residents)</h2>
+    <p class="text-muted mb-3">
+        Loads a full validation dataset: <strong>Jordan Reyes</strong> on Unit 1 with prior Unit 2 history,
+        household/vehicles/pets, assets/flooring, active lease, signed PDF stubs, 24 months of rent charges
+        and payments (cash/check/PayStar), maintenance, schedule, ops costs; plus <strong>five Community Center
+        event renters</strong> with agreements, deposits, PayStar-style payments, and schedule.
+        Marked with <code>[DEMO]</code> / <code>[DEMO-CC]</code> so they can be wiped safely.
+    </p>
+    <div class="d-flex gap-2 flex-wrap mb-3">
+        <SfButton CssClass="e-primary e-small" Content="Load demo data" Disabled="@Busy" OnClick="@(() => RunDemoAsync(false))" />
+        <SfButton CssClass="e-outline e-small" Content="Force reseed (wipe demo first)" Disabled="@Busy" OnClick="@(() => RunDemoAsync(true))" />
+        <SfButton CssClass="e-outline e-small" Content="Validate demo against backend" Disabled="@Busy" OnClick="ValidateDemoAsync" />
+    </div>
+    @if (LastSeed is not null)
+    {
+        <div class="border rounded p-3 mb-3 small">
+            <strong>Last seed:</strong> @LastSeed.Message<br />
+            Primary: @LastSeed.PrimaryTenantName
+            · CC renters: @LastSeed.CommunityCenterRenters
+            · Ledger lines: @LastSeed.LedgerEntries
+            · Docs: @LastSeed.Documents
+            · Maintenance: @LastSeed.Maintenance
+            · Schedule: @LastSeed.ScheduleItems
+        </div>
+    }
+    @if (Validation is not null)
+    {
+        <div class="border rounded p-3">
+            <p class="mb-2">
+                <strong>Validation:</strong>
+                @if (Validation.Pass)
+                {
+                    <span class="text-success">PASS</span>
+                }
+                else
+                {
+                    <span class="text-danger">FAIL</span>
+                }
+            </p>
+            <ul class="mb-0 small">
+                @foreach (var c in Validation.Checks)
+                {
+                    <li>
+                        @(c.Pass ? "✓" : "✗") <strong>@c.Area</strong> — @c.Detail
+                        @if (c.Count > 0)
+                        {
+                            <span class="text-muted">(@c.Count)</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</section>
+
 @code {
     private bool IsDarkMode { get; set; }
     private bool _themeLoaded;
@@ -88,6 +191,11 @@
     private int LateFeeGraceDays { get; set; }
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private string DocumentRootPath { get; set; } = "";
+    private string EffectiveDocumentRoot { get; set; } = "";
+    private DemoSeedResult? LastSeed { get; set; }
+    private DemoValidationReport? Validation { get; set; }
 
     private bool PortalConfigured =>
         PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out _);
@@ -106,6 +214,12 @@
         LateFeesEnabled = settings.Enabled;
         LateFeeAmount = settings.Amount;
         LateFeeGraceDays = settings.GraceDays;
+        EffectiveDocumentRoot = await DocumentPaths.GetDocumentRootAsync();
+        DocumentRootPath = EffectiveDocumentRoot;
+        if (await DemoSeeder.IsDemoLoadedAsync())
+        {
+            LastSeed = await DemoSeeder.SeedAsync(force: false);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -131,6 +245,36 @@
 
     private string ThemeLabelClass(bool forDark) =>
         forDark == IsDarkMode ? "fw-semibold" : "text-muted";
+
+    private async Task SaveDocumentRootAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var user = await CurrentUserAsync();
+            await DocumentPaths.SetDocumentRootAsync(DocumentRootPath, user);
+            EffectiveDocumentRoot = await DocumentPaths.GetDocumentRootAsync();
+            DocumentRootPath = EffectiveDocumentRoot;
+            SuccessMessage = $"Document storage path saved: {EffectiveDocumentRoot}";
+            await Toast.ShowSuccessAsync("Document path saved.");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ResetDocumentRootAsync()
+    {
+        DocumentRootPath = DocumentPaths.ConfiguredDefaultRoot;
+        await SaveDocumentRootAsync();
+    }
 
     private async Task SaveLateFeesAsync()
     {
@@ -174,5 +318,59 @@
         {
             Busy = false;
         }
+    }
+
+    private async Task RunDemoAsync(bool force)
+    {
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        Validation = null;
+        try
+        {
+            LastSeed = await DemoSeeder.SeedAsync(force);
+            SuccessMessage = LastSeed.Message;
+            await Toast.ShowSuccessAsync(LastSeed.AlreadyLoaded && !force
+                ? "Demo already present."
+                : "Demo portfolio loaded.");
+            Validation = await DemoSeeder.ValidateAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ValidateDemoAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            Validation = await DemoSeeder.ValidateAsync();
+            await Toast.ShowSuccessAsync(Validation.Pass
+                ? "All demo validation checks passed."
+                : "Validation found issues — see checklist.");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task<string> CurrentUserAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        return state.User.FindFirstValue(ClaimTypes.Email)
+            ?? state.User.Identity?.Name
+            ?? "clerk";
     }
 }

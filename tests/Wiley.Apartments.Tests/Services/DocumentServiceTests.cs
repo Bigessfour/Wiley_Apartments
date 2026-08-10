@@ -41,8 +41,7 @@ public class DocumentServiceTests
         var env = new TestHostEnvironment();
         var service = new DocumentService(
             db,
-            Options.Create(new ClerkSuiteOptions { DocumentRoot = root }),
-            env,
+            new Wiley.Apartments.Tests.Support.FixedDocumentPathResolver(root),
             new FixedClock(),
             NullLogger<DocumentService>.Instance);
         return (db, service, root);
