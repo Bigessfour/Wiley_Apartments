@@ -156,4 +156,29 @@ public class UnitServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*facility*");
     }
+
+    [Fact]
+    public async Task UpdateAsync_PersistsRentDepositAndHandicap()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db, maxUnits: 0);
+        var unit = await service.CreateAsync(new Unit
+        {
+            Number = "301",
+            SqFt = 900,
+            Beds = 3,
+            Baths = 1
+        });
+
+        unit.MonthlyRent = 900m;
+        unit.SecurityDeposit = 900m;
+        unit.IsHandicapAccessible = true;
+        unit.LeaseTerm = "Year";
+        var updated = await service.UpdateAsync(unit);
+
+        updated.MonthlyRent.Should().Be(900m);
+        updated.SecurityDeposit.Should().Be(900m);
+        updated.IsHandicapAccessible.Should().BeTrue();
+        updated.LeaseTerm.Should().Be("Year");
+    }
 }

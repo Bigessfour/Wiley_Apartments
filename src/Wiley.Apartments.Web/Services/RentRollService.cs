@@ -80,7 +80,7 @@ public sealed class RentRollService : IRentRollService
                 tenantId,
                 tenantName,
                 lease?.Id,
-                lease?.Rent,
+                lease?.Rent ?? (unit.MonthlyRent > 0 ? unit.MonthlyRent : null),
                 balance));
         }
 

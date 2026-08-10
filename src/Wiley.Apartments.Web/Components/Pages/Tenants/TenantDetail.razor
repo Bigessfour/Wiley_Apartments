@@ -28,7 +28,11 @@ else
 
     <PageHeader Title="@($"{Tenant.LastName}, {Tenant.FirstName}")"
                 Subtitle="@TenantSubtitle" />
-    @if (!string.IsNullOrWhiteSpace(Tenant.EmergencyContact))
+    @if (!string.IsNullOrWhiteSpace(Tenant.MailingAddress))
+    {
+        <p class="mb-1"><strong>Mailing:</strong> @Tenant.MailingAddress</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(Tenant.EmergencyContact) && Tenant.EmergencyContact != "—")
     {
         <p><strong>Emergency:</strong> @Tenant.EmergencyContact</p>
     }

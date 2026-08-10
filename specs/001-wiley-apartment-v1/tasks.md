@@ -398,3 +398,13 @@ Deep re-converge (2026-08-09) post–Phase 9, stressing edge cases, vault-contro
 - Existing pages accept `?unitId=` filter (Schedule, Payments, Maintenance); Documents remains NAS-wide vault
 - Explicitly deferred: FacilityReservation entity, separate SfSchedule, CC rental agreement PDF, dedicated P&L page
 
+---
+
+## Next version backlog (v1.1 — do not implement in 001)
+
+Recorded **2026-08-10** from clerk pilot feedback. Formalize under `specs/002-*` after T7 handover.
+
+- [ ] **NV-1** Payment receipt PDF — after clerk accepts/records a ledger payment, generate printable/emailable PDF receipt (town header, unit, tenant, amount, date, method/ref). Syncfusion PDF + optional vault copy. See [plan.md § Next version](./plan.md).
+- [ ] **NV-2** DocuSign / e-sign (post-v1 assumption)
+- [ ] **NV-3** Facility reservation + CC rental agreement PDF
+

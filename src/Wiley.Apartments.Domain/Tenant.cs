@@ -8,6 +8,8 @@ public class Tenant
     public string Phone { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string EmergencyContact { get; set; } = string.Empty;
+    /// <summary>Mailing address from rent ledger (PO Box / street).</summary>
+    public string MailingAddress { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public bool IsDeleted { get; set; }
     /// <summary>Optimistic concurrency token (SQLite-friendly Guid).</summary>

@@ -87,6 +87,29 @@
                     EditType="EditType.NumericEdit"
                     Width="90"
                     ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+        <GridColumn Field="@nameof(Unit.MonthlyRent)"
+                    HeaderText="Rent"
+                    TextAlign="TextAlign.Right"
+                    EditType="EditType.NumericEdit"
+                    Format="C2"
+                    Width="110"
+                    ValidationRules="@(new ValidationRules { Min = 0 })" />
+        <GridColumn Field="@nameof(Unit.SecurityDeposit)"
+                    HeaderText="Deposit"
+                    TextAlign="TextAlign.Right"
+                    EditType="EditType.NumericEdit"
+                    Format="C2"
+                    Width="110"
+                    ValidationRules="@(new ValidationRules { Min = 0 })" />
+        <GridColumn Field="@nameof(Unit.LeaseTerm)"
+                    HeaderText="Term"
+                    Width="120" />
+        <GridColumn Field="@nameof(Unit.IsHandicapAccessible)"
+                    HeaderText="HC"
+                    Width="70"
+                    DisplayAsCheckBox="true"
+                    EditType="EditType.BooleanEdit"
+                    TextAlign="TextAlign.Center" />
         <GridColumn Field="@nameof(Unit.Status)"
                     HeaderText="Status"
                     Width="140"

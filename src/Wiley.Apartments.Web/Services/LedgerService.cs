@@ -260,6 +260,39 @@ public sealed class LedgerService : ILedgerService
             posted++;
         }
 
+        // Occupied units with listed MonthlyRent but no active lease (paper leases / import).
+        var rosterUnits = await _db.Units.AsNoTracking()
+            .Where(u => !u.IsFacility
+                && u.CurrentTenantId != null
+                && u.MonthlyRent > 0
+                && u.Status == UnitStatus.Occupied)
+            .ToListAsync(cancellationToken);
+
+        foreach (var unit in rosterUnits)
+        {
+            var tenantId = unit.CurrentTenantId!.Value;
+            if (charged.Contains((tenantId, unit.Id)))
+            {
+                continue;
+            }
+
+            if (activeLeases.Any(l => l.UnitId == unit.Id && l.TenantId == tenantId))
+            {
+                continue;
+            }
+
+            await PostChargeAsync(
+                tenantId,
+                unit.Id,
+                unit.MonthlyRent,
+                monthStart,
+                leaseId: null,
+                notes: $"Rent {monthStart:MMMM yyyy} (unit roster)",
+                cancellationToken: cancellationToken);
+            charged.Add((tenantId, unit.Id));
+            posted++;
+        }
+
         _logger.LogInformation("Posted {Count} monthly rent charge(s) for {Month}.", posted, monthStart.ToString("yyyy-MM"));
         return posted;
     }

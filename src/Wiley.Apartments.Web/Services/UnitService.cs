@@ -127,6 +127,12 @@ public sealed class UnitService : IUnitService
         existing.Status = unit.Status;
         existing.Notes = unit.Notes;
         existing.CurrentTenantId = unit.CurrentTenantId;
+        existing.MonthlyRent = unit.MonthlyRent;
+        existing.SecurityDeposit = unit.SecurityDeposit;
+        existing.IsHandicapAccessible = unit.IsHandicapAccessible;
+        existing.LeaseTerm = string.IsNullOrWhiteSpace(unit.LeaseTerm)
+            ? string.Empty
+            : unit.LeaseTerm.Trim();
         existing.IsFacility = isFacility;
 
         _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = unit.RowVersion;
@@ -180,6 +186,19 @@ public sealed class UnitService : IUnitService
             throw new ArgumentException("Bath count cannot be negative.", nameof(unit));
         }
 
+        if (unit.MonthlyRent < 0)
+        {
+            throw new ArgumentException("Monthly rent cannot be negative.", nameof(unit));
+        }
+
+        if (unit.SecurityDeposit < 0)
+        {
+            throw new ArgumentException("Security deposit cannot be negative.", nameof(unit));
+        }
+
         unit.Number = unit.Number.Trim();
+        unit.LeaseTerm = string.IsNullOrWhiteSpace(unit.LeaseTerm)
+            ? string.Empty
+            : unit.LeaseTerm.Trim();
     }
 }

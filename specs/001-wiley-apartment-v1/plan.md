@@ -401,3 +401,22 @@ tests/Wiley.Apartments.Tests/
 ## Complexity Tracking
 
 > No constitution violations requiring justification.
+
+---
+
+## Next version (v1.1 / feature 002 — planned)
+
+Deferred from v1 pilot after clerk feedback. Do **not** implement under 001 tasks; open `specs/002-*` (or append a Phase 9 backlog once T7 sign-off closes) before coding.
+
+| ID | Item | Clerk need | Notes |
+| -- | ---- | ---------- | ----- |
+| **NV-1** | **Payment receipt PDF** | After Paige (or Deb) records/accepts a payment on the ledger, generate a **PDF receipt** the clerk can **print** or **email** to the tenant. | Syncfusion PDF (same stack as lease docs). Include town/Brookside header, unit #, tenant name, amount, date, method/ref, running balance optional, receipt #. Store optional copy under Document vault (`DocumentCategory` receipt/payment). No card data — cash/check/online-reference only. |
+| NV-2 | DocuSign / e-sign integration | Beyond export-ready PDF | Spec assumption already post-v1. |
+| NV-3 | Facility reservation entity / CC rental agreement PDF | Community Center bookings | Explicitly deferred from CC hub note in tasks.md. |
+
+**NV-1 acceptance sketch (for 002 specify):**
+
+1. From Payments/ledger (and tenant detail payment actions), clerk selects a **Payment** `LedgerEntry` → **Receipt**.
+2. App generates PDF; opens in SfPdfViewer (or download) with Print.
+3. Clerk can download and attach to email (mailto with attachment may be OS-limited — provide download + clear “email to tenant” instructions; optional later: SMTP if town IT provides).
+4. AuditLog records receipt generation.

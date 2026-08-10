@@ -171,4 +171,22 @@ public class LedgerServiceTests
             (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(725m);
         }
     }
+
+    [Fact]
+    public async Task PostMonthlyRentChargesAsync_PostsFromUnitMonthlyRent_WhenNoLease()
+    {
+        var (db, service, _, clock) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            unit.MonthlyRent = 900m;
+            unit.CurrentTenantId = tenant.Id;
+            unit.Status = UnitStatus.Occupied;
+            await db.SaveChangesAsync();
+
+            (await service.PostMonthlyRentChargesAsync(clock.UtcNow)).Should().Be(1);
+            (await service.PostMonthlyRentChargesAsync(clock.UtcNow)).Should().Be(0);
+            (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(900m);
+        }
+    }
 }

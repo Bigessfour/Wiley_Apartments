@@ -51,6 +51,9 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.Number).HasMaxLength(16).IsRequired();
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.MonthlyRent).HasPrecision(18, 2);
+            entity.Property(e => e.SecurityDeposit).HasPrecision(18, 2);
+            entity.Property(e => e.LeaseTerm).HasMaxLength(32);
             entity.Property(e => e.IsFacility).HasDefaultValue(false);
             entity.Property(e => e.RowVersion).IsConcurrencyToken();
             entity.HasIndex(e => e.Number).IsUnique();
@@ -99,6 +102,7 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.Phone).HasMaxLength(64);
             entity.Property(e => e.Email).HasMaxLength(256);
             entity.Property(e => e.EmergencyContact).HasMaxLength(512);
+            entity.Property(e => e.MailingAddress).HasMaxLength(512);
             entity.Property(e => e.Notes).HasMaxLength(2000);
             entity.Property(e => e.RowVersion).IsConcurrencyToken();
             entity.HasIndex(e => new { e.LastName, e.IsDeleted });

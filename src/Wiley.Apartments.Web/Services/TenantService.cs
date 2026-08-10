@@ -82,6 +82,7 @@ public sealed class TenantService : ITenantService
         existing.Phone = tenant.Phone.Trim();
         existing.Email = tenant.Email.Trim();
         existing.EmergencyContact = tenant.EmergencyContact.Trim();
+        existing.MailingAddress = tenant.MailingAddress.Trim();
         existing.Notes = tenant.Notes;
 
         _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = tenant.RowVersion;
@@ -290,5 +291,6 @@ public sealed class TenantService : ITenantService
         tenant.Phone = tenant.Phone?.Trim() ?? string.Empty;
         tenant.Email = tenant.Email?.Trim() ?? string.Empty;
         tenant.EmergencyContact = tenant.EmergencyContact?.Trim() ?? string.Empty;
+        tenant.MailingAddress = tenant.MailingAddress?.Trim() ?? string.Empty;
     }
 }

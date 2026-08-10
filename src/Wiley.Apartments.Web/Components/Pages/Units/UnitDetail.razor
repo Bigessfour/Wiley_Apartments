@@ -60,6 +60,26 @@ else
                             <label class="form-label">Square footage</label>
                             <SfNumericTextBox TValue="decimal" @bind-Value="Unit.SqFt" Min="0" Format="N0" ShowSpinButton="true" />
                         </div>
+                        <div class="col-6">
+                            <label class="form-label">Monthly rent</label>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Unit.MonthlyRent" Min="0" Format="C2" Decimals="2" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Security deposit</label>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Unit.SecurityDeposit" Min="0" Format="C2" Decimals="2" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Lease term (sheet)</label>
+                            <SfDropDownList TValue="string" TItem="LeaseTermOption"
+                                            DataSource="@LeaseTermOptions"
+                                            @bind-Value="Unit.LeaseTerm"
+                                            Placeholder="Year / Month-to-Month">
+                                <DropDownListFieldSettings Value="Value" Text="Text" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-6 d-flex align-items-end pb-2">
+                            <SfCheckBox @bind-Checked="Unit.IsHandicapAccessible" Label="Handicap accessible" />
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Status</label>
                             <SfDropDownList TValue="UnitStatus" TItem="UnitStatusOption"
@@ -70,7 +90,7 @@ else
                         </div>
                         <div class="col-12">
                             <label class="form-label">Layout notes</label>
-                            <SfTextBox @bind-Value="Unit.Notes" Multiline="true" Placeholder="Floor plan notes, storage, accessibility…" />
+                            <SfTextBox @bind-Value="Unit.Notes" Multiline="true" Placeholder="Floor plan notes, storage…" />
                         </div>
                         <div class="col-12">
                             <SfButton CssClass="e-primary e-small" Content="@(LayoutBusy ? "Saving…" : "Save layout")"
@@ -92,7 +112,8 @@ else
                         <UnitStatusChip Status="Unit.Status" />
                     </p>
                     <p class="mb-1">@Unit.Beds bed · @Unit.Baths bath</p>
-                    <p class="mb-0 text-muted">@Unit.SqFt.ToString("N0") sq ft</p>
+                    <p class="mb-1">@(Unit.MonthlyRent > 0 ? Unit.MonthlyRent.ToString("C") : "—") / mo</p>
+                    <p class="mb-0 text-muted">@Unit.SqFt.ToString("N0") sq ft@(Unit.IsHandicapAccessible ? " · HC" : "")</p>
                 </CardContent>
             </SfCard>
         </div>
@@ -496,6 +517,13 @@ else
         new(UnitStatus.MakeReady, "Make-Ready")
     ];
 
+    private readonly List<LeaseTermOption> LeaseTermOptions =
+    [
+        new("", "—"),
+        new("Year", "Year"),
+        new("Month-to-Month", "Month-to-Month")
+    ];
+
     private int ExpiringWarrantyCount => UnitAssets.Count(a =>
         a.WarrantyEnd is not null
         && a.WarrantyEnd >= DateOnly.FromDateTime(DateTime.UtcNow)
@@ -781,6 +809,8 @@ else
     private sealed record TenantOption(Guid Id, string DisplayName);
 
     private sealed record UnitStatusOption(UnitStatus Value, string Text);
+
+    private sealed record LeaseTermOption(string Value, string Text);
 
     private sealed record OpsCostRow(
         string DateDisplay,

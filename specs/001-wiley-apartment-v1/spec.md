@@ -383,6 +383,7 @@ authoritative spec workup and map to tasks Phases 1–7 and [quickstart.md](./qu
 - External payment portal URL provided by town IT; ClerkSuite links out only.
 - E-signature is export-ready in v1; DocuSign/similar integration is post-v1.
 - Initial data import from spreadsheets acceptable for bootstrap.
+- **Payment receipts (print/email PDF)** deferred to next version (v1.1) — see plan § Next version.
 
 ## Out of Scope (v1)
 
@@ -392,3 +393,4 @@ authoritative spec workup and map to tasks Phases 1–7 and [quickstart.md](./qu
 - Public marketing/listings site.
 - AI leasing or maintenance triage.
 - Native mobile apps (responsive web sufficient).
+- **Clerk-generated payment receipt PDF** (print or email to tenant after accepting payment) — planned for **v1.1** (not v1).

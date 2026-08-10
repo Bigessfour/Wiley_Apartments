@@ -8,10 +8,10 @@
 
 | Entity                 | C# type (planned)    | Key fields                                                                                                                      |
 | ---------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Unit**               | `Unit`               | Id, Number, SqFt, Beds, Baths, Status, Notes, CurrentTenantId, RowVersion                                                       |
+| **Unit**               | `Unit`               | Id, Number, SqFt, Beds, Baths, Status, Notes, CurrentTenantId, MonthlyRent, SecurityDeposit, IsHandicapAccessible, LeaseTerm, IsFacility, RowVersion |
 | **Asset / Appliance**  | `Asset`              | UnitId, Type, Make, Model, Serial, InstallDate, WarrantyStart, WarrantyEnd, Condition, PhotoPaths                               |
 | **Flooring**           | `Flooring`           | UnitId, Type, InstallDate, Condition, ReplacedDate, Notes                                                                       |
-| **Tenant**             | `Tenant`             | Id, Name fields, Contact, Emergency, Notes, IsDeleted, RowVersion                                                               |
+| **Tenant**             | `Tenant`             | Id, Name fields, Phone, Email, EmergencyContact, MailingAddress, Notes, IsDeleted, RowVersion                               |
 | **Occupancy**          | `Occupancy`          | TenantId, UnitId, StartDate, EndDate                                                                                            |
 | **Lease**              | `Lease`              | Id, UnitId, TenantId, Start, End, Rent, Deposit, Status, TemplateUsed, IsDeleted, RowVersion                                    |
 | **Charge**             | `LedgerEntry`        | LeaseId?, TenantId, UnitId, Amount, Type=Charge, Date, Notes                                                                    |
@@ -229,6 +229,7 @@ erDiagram
 
 - **PaymentPortalUrl** — deep link only (v1)
 - **E-sign** — export PDF; integration post-v1
+- **Payment receipt PDF** — v1.1 (NV-1): generate from `LedgerEntry` Payment for print/email; optional Document vault copy
 
 ---
 

@@ -107,4 +107,8 @@ bool IsElevated { get; }
 
 - `PaymentPortalUrl` — external town card portal (FR-016)
 - `DocumentRoot` — container mount for `/volume1/apartments/docs`
-- `MaxUnits` — default 16
+- `MaxUnits` — `0` = unlimited residential (default); positive = hard cap
+
+## Next version (v1.1) — not in v1 contracts
+
+- **Payment receipt PDF** from a Payment `LedgerEntry` (print / download / email workflow) — see plan.md § Next version (NV-1).

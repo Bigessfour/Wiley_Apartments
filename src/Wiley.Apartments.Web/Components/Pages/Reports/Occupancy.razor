@@ -6,6 +6,7 @@
 @using Wiley.Apartments.Domain
 @inject IUnitService UnitService
 @inject ILeaseService LeaseService
+@inject ITenantService TenantService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
@@ -30,7 +31,7 @@
         <GridColumn Field="@nameof(OccRow.UnitNumber)" HeaderText="Unit" Width="90" />
         <GridColumn Field="@nameof(OccRow.Status)" HeaderText="Status" Width="110" />
         <GridColumn Field="@nameof(OccRow.TenantName)" HeaderText="Tenant" />
-        <GridColumn Field="@nameof(OccRow.LeaseEndDisplay)" HeaderText="Lease end" Width="120" />
+        <GridColumn Field="@nameof(OccRow.LeaseEndDisplay)" HeaderText="Lease / term" Width="140" />
         <GridColumn Field="@nameof(OccRow.MonthlyRentDisplay)" HeaderText="Rent" Width="100" TextAlign="TextAlign.Right" />
     </GridColumns>
 </SfGrid>
@@ -57,6 +58,22 @@
                 .GroupBy(l => l.UnitId)
                 .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StartUtc).First());
 
+            var tenantIds = units
+                .Select(u => activeByUnit.TryGetValue(u.Id, out var lease) ? lease.TenantId : u.CurrentTenantId)
+                .Where(id => id is not null)
+                .Cast<Guid>()
+                .Distinct()
+                .ToList();
+            var tenants = new Dictionary<Guid, Tenant>();
+            foreach (var id in tenantIds)
+            {
+                var t = await TenantService.GetByIdAsync(id);
+                if (t is not null)
+                {
+                    tenants[id] = t;
+                }
+            }
+
             TotalUnits = units.Count;
             OccupiedCount = units.Count(u => u.Status == UnitStatus.Occupied);
             VacantCount = units.Count(u => u.Status == UnitStatus.Vacant);
@@ -64,15 +81,27 @@
             Rows = units.OrderBy(u => u.Number).Select(u =>
             {
                 activeByUnit.TryGetValue(u.Id, out var lease);
+                Guid? tenantId = lease?.TenantId ?? u.CurrentTenantId;
+                string tenantName = "—";
+                if (lease?.Tenant is not null)
+                {
+                    tenantName = $"{lease.Tenant.LastName}, {lease.Tenant.FirstName}";
+                }
+                else if (tenantId is Guid tid && tenants.TryGetValue(tid, out var t))
+                {
+                    tenantName = $"{t.LastName}, {t.FirstName}";
+                }
+
+                var rent = lease?.Rent ?? (u.MonthlyRent > 0 ? u.MonthlyRent : (decimal?)null);
                 return new OccRow
                 {
                     UnitNumber = u.Number,
                     Status = u.Status.ToString(),
-                    TenantName = lease?.Tenant is null
-                        ? "—"
-                        : $"{lease.Tenant.LastName}, {lease.Tenant.FirstName}",
-                    LeaseEndDisplay = lease is null ? "—" : Clock.ToDisplayTime(lease.EndUtc).ToString("d"),
-                    MonthlyRentDisplay = lease is null ? "—" : lease.Rent.ToString("C")
+                    TenantName = tenantName,
+                    LeaseEndDisplay = lease is null
+                        ? (string.IsNullOrWhiteSpace(u.LeaseTerm) ? "—" : u.LeaseTerm)
+                        : Clock.ToDisplayTime(lease.EndUtc).ToString("d"),
+                    MonthlyRentDisplay = rent is null ? "—" : rent.Value.ToString("C")
                 };
             }).ToList();
         }
