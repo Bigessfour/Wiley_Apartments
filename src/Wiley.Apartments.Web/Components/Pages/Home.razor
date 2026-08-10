@@ -81,10 +81,10 @@ else
                             <LinearGaugeAxis Minimum="0" Maximum="@(Math.Max(100, Snap.CollectionRatePercent))">
                                 <LinearGaugeAxisLabelStyle Format="{value}%" />
                                 <LinearGaugePointers>
-                                    <LinearGaugePointer Value="@Snap.CollectionRatePercent"
+                                    <LinearGaugePointer PointerValue="@Snap.CollectionRatePercent"
                                                         Type="Syncfusion.Blazor.LinearGauge.Point.Bar"
                                                         Color="#0f6cbd"
-                                                        Height="12" />
+                                                        Width="12" />
                                 </LinearGaugePointers>
                             </LinearGaugeAxis>
                         </LinearGaugeAxes>
@@ -206,20 +206,23 @@ else
                         }
                         else
                         {
-                            <SfHeatMap TValue="List<DashboardHeatCell>"
-                                       DataSource="@HeatCells"
+                            @* JSON cell binding per Syncfusion HeatMap docs:
+                               https://blazor.syncfusion.com/documentation/heatmap-chart/working-with-data *@
+                            <SfHeatMap DataSource="@HeatCells"
                                        Height="100%"
                                        Width="100%"
-                                       Theme="@ChartTheme"
-                                       ShowTooltip="true">
+                                       Theme="@ChartTheme">
                                 <HeatMapTitleSettings Text="Rent payments ($)" />
-                                <HeatMapXAxis Labels="@HeatMonthLabels" LabelRotation="45" />
-                                <HeatMapYAxis Labels="@HeatUnitLabels" />
                                 <HeatMapDataSourceSettings IsJsonData="true"
                                                            AdaptorType="AdaptorType.Cell"
-                                                           XDataMapping="Month"
-                                                           YDataMapping="Unit"
+                                                           XDataMapping="Unit"
+                                                           YDataMapping="Month"
                                                            ValueMapping="Value" />
+                                <HeatMapXAxis Labels="@HeatUnitLabels" LabelRotation="45" />
+                                <HeatMapYAxis Labels="@HeatMonthLabels" />
+                                <HeatMapCellSettings ShowLabel="false" Format="C0" />
+                                <HeatMapTooltipSettings Enable="true" />
+                                <HeatMapLegendSettings Visible="true" Position="Syncfusion.Blazor.HeatMap.LegendPosition.Bottom" />
                                 <HeatMapPaletteSettings Type="PaletteType.Gradient">
                                     <HeatMapPalettes>
                                         <HeatMapPalette Value="0" Color="#f3f6f9" />
@@ -436,10 +439,20 @@ else
                         }
                         else
                         {
-                            <SfChart3D Width="100%" Height="100%" Theme="@ChartTheme" TiltAngle="-20" Depth="80" RotationAngle="15" EnableRotation="true">
-                                <Chart3DPrimaryXAxis ValueType="Syncfusion.Blazor.Chart3D.ValueType.Category" LabelRotation="-45" />
+                            @* 3D column chart per Syncfusion Chart3D docs:
+                               RotationAngle/Depth/EnableRotation — not Tilt/Rotation *@
+                            <SfChart3D Width="100%"
+                                       Height="100%"
+                                       Theme="@ChartTheme"
+                                       EnableRotation="true"
+                                       RotationAngle="22"
+                                       Depth="100"
+                                       TiltAngle="10">
+                                <Chart3DPrimaryXAxis ValueType="Syncfusion.Blazor.Chart3D.ValueType.Category"
+                                                     LabelRotation="-45" />
                                 <Chart3DPrimaryYAxis />
                                 <Chart3DTooltipSettings Enable="true" />
+                                <Chart3DLegendSettings Visible="false" />
                                 <Chart3DSeriesCollection>
                                     <Chart3DSeries DataSource="@UnitChart"
                                                    XName="Label"
