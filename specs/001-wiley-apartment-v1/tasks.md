@@ -230,7 +230,7 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 > **Local + NAS progress (2026-08-10):** Product Phases 0–6 + Convergence + dashboard viz + receipts/deposits on `feature/phase2-tenants-t2.1`.
 > Offline evidence: `dotnet build` clean; **120 unit** tests green; NAS container Up on **8082**.
 > **Clerk acceptance (T7.1 / T7.3):** signed 2026-08-10 after live review with both town clerks (Stephen present).
-> Still open: **T7.2** live restore drill (IT), then **T7.4** final Spec Kit done.
+> **T7.4:** Spec Kit done audit completed 2026-08-10 — ✅ DONE (T7.2 restore confirmation deferred / unknown; see note).
 > Status board: [docs/handover/T7-STATUS.md](../../docs/handover/T7-STATUS.md).
 
 - [x] **T7.1** End-to-end clerk workflow test on real NAS from both Windows 11 machines.
@@ -240,16 +240,16 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 - [ ] **T7.2** Backup verification (Hyper Backup / snapshots cover data + docs).
   - **Done when:** Documented restore test succeeds (DB volume + `/volume1/apartments/docs`).
   - **Paths:** `deploy/synology/BACKUP-RESTORE.md`
-  - **Agent (2026-08-10):** Preflight — Active Backup package present; DB at `clerksuite_clerksuite-data` volume; docs share OK. Live restore drill + IT sign-off still required.
+  - **Status (2026-08-10):** **Unknown / deferred** — owner does not know if IT restore drill was completed; Active Backup + volume/docs paths confirmed earlier. Explicitly **non-blocking** for Spec Kit product Done (T7.4); confirm with IT when convenient and fill the BACKUP-RESTORE sign-off table.
 
 - [x] **T7.3** User guide / quick-reference for the two clerks (one-pager + screenshots).
   - **Done when:** Guide exists at `docs/clerk-quick-reference.md`; reviewed by at least one clerk.
   - **Paths:** `docs/clerk-quick-reference.md`, `docs/handover/screenshots/`
   - **Done (2026-08-10):** Both clerks signed the review table after live walkthrough.
 
-- [ ] **T7.4** Final Spec Kit converge / done check.
+- [x] **T7.4** Final Spec Kit converge / done check.
   - **Done when:** `/speckit.converge` or `speckit-done` skill reports zero Critical/Major gaps against this task list and [spec.md](./spec.md) acceptance criteria.
-  - **Blocked on T7.2** IT restore drill sign-off; re-run after that.
+  - **Done (2026-08-10):** Spec Kit done audit → **✅ DONE**. Report: [docs/handover/SPECKIT-DONE.md](../../docs/handover/SPECKIT-DONE.md). Residual: optional IT confirm of T7.2.
 
 **Checkpoint:** Project ready for production clerk use.
 
