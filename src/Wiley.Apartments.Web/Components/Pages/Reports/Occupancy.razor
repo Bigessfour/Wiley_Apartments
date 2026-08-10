@@ -50,7 +50,7 @@
         ErrorMessage = null;
         try
         {
-            var units = await UnitService.GetAllAsync();
+            var units = (await UnitService.GetAllAsync()).Where(u => !u.IsFacility).ToList();
             var leases = await LeaseService.GetAllAsync();
             var activeByUnit = leases
                 .Where(l => l.Status == LeaseStatus.Active)

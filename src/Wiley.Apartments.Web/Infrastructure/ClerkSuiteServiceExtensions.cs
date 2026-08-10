@@ -119,8 +119,12 @@ public static class ClerkSuiteServiceExtensions
         var unitSeeder = scope.ServiceProvider.GetRequiredService<IUnitSeeder>();
         await unitSeeder.SeedAsync();
 
-        var unitCount = await db.Units.CountAsync();
-        Log.Information("Database migrated. {UnitCount} units in portfolio.", unitCount);
+        var residentialCount = await db.Units.CountAsync(u => !u.IsFacility);
+        var facilityCount = await db.Units.CountAsync(u => u.IsFacility);
+        Log.Information(
+            "Database migrated. {ResidentialCount} residential + {FacilityCount} facility unit(s).",
+            residentialCount,
+            facilityCount);
     }
 
     public static WebApplication ConfigureClerkSuitePipeline(this WebApplication app)

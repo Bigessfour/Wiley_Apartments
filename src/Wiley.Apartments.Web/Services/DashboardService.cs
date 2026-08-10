@@ -32,7 +32,9 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<DashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
-        var units = await _db.Units.AsNoTracking().ToListAsync(cancellationToken);
+        var units = await _db.Units.AsNoTracking()
+            .Where(u => !u.IsFacility)
+            .ToListAsync(cancellationToken);
         var now = _clock.UtcNow;
 
         var expiring60 = await _leases.GetExpiringWithinAsync(60, cancellationToken);
