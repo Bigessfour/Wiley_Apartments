@@ -181,6 +181,12 @@
     private PaymentMethod FormMethod { get; set; } = PaymentMethod.Cash;
     private string? FormNotes { get; set; }
     private bool _queryApplied;
+    private string? FilterUnitLabel { get; set; }
+
+    private string HeaderSubtitle =>
+        FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel)
+            ? $"Ledger filtered to {FilterUnitLabel}. Record charges and payments; balance updates immediately."
+            : "Record charges and payments (cash, check, online reference). Payments reduce the running balance immediately.";
 
     private static readonly List<MethodOption> MethodOptions =
     [

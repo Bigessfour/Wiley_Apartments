@@ -225,11 +225,11 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 
 ## Phase 7 — Hardening & Handover
 
-> **Local progress (2026-08-09):** Dual Windows clerk terminals unavailable until tomorrow.
-> Completed offline: local Release build + full test suite (103 unit / 13 integration / 7 E2E),
-> Syncfusion Fluent2 theme/API polish + Chrome DevTools control poke across all clerk routes,
-> `docs/clerk-quick-reference.md` draft, `deploy/synology/BACKUP-RESTORE.md` runbook.
-> Still blocked for Done-when: T7.1 NAS dual-clerk sign-off, T7.2 live restore drill, T7.3 clerk review of guide, T7.4 final converge.
+> **Local progress (2026-08-10):** Product Phases 0–6 + Convergence 8–10 + Community Center hub complete on `feature/phase2-tenants-t2.1`.
+> Offline evidence: `dotnet build` clean; **106 unit / 13 integration / 7 E2E** tests green; facility seeder (16 + CC); hub `/community-center`.
+> Converge report: [docs/handover/SPECKIT-CONVERGE.md](../../docs/handover/SPECKIT-CONVERGE.md) — **product converged**, no Phase 11 tasks.
+> Done report: [docs/handover/SPECKIT-DONE.md](../../docs/handover/SPECKIT-DONE.md) — **NOT DONE** until T7.1–T7.3 human/NAS sign-off.
+> Still blocked for Done-when: T7.1 NAS dual-clerk sign-off, T7.2 live restore drill, T7.3 clerk signature on guide, T7.4 re-run after those.
 
 - [ ] **T7.1** End-to-end clerk workflow test on real NAS from both Windows 11 machines.
   - **Done when:** Both clerks complete: create-unit → add-tenant → generate-lease → record-payment → upload-document without errors.
