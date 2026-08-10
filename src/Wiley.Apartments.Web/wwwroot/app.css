@@ -448,6 +448,45 @@ h1:focus {
   font-size: 0.92rem;
 }
 
+.ledger-entry-form {
+  background: color-mix(in srgb, var(--cs-surface, #fff) 92%, var(--cs-primary, #0f6e6e) 8%);
+  border-color: color-mix(in srgb, var(--cs-primary, #0f6e6e) 35%, transparent) !important;
+}
+
+/* Lease/vault PDF viewer: Syncfusion 34.x still opens secondary designer bars unless hidden. */
+.clerk-pdf-viewer .e-pv-annotation-toolbar,
+.clerk-pdf-viewer .e-pv-formdesigner-toolbar,
+.clerk-pdf-viewer .e-pv-redaction-toolbar,
+.clerk-pdf-viewer .e-pv-comment-panel,
+.clerk-pdf-viewer .e-pv-sidebar-toolbar {
+  display: none !important;
+}
+
+/* Schedule category colors (EventRendered CssClass — avoid Attributes NRE) */
+.e-schedule .e-appointment.cs-sched-cleaning,
+.cs-sched-cleaning.e-appointment {
+  background: #0d6efd !important;
+  border-color: #0d6efd !important;
+}
+
+.e-schedule .e-appointment.cs-sched-vacancy,
+.cs-sched-vacancy.e-appointment {
+  background: #fd7e14 !important;
+  border-color: #fd7e14 !important;
+}
+
+.e-schedule .e-appointment.cs-sched-inspection,
+.cs-sched-inspection.e-appointment {
+  background: #198754 !important;
+  border-color: #198754 !important;
+}
+
+.e-schedule .e-appointment.cs-sched-other,
+.cs-sched-other.e-appointment {
+  background: #6c757d !important;
+  border-color: #6c757d !important;
+}
+
 /* —— KPI / cards —— */
 
 .kpi-grid {

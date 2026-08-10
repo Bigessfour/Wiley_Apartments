@@ -25,15 +25,30 @@ public static class SyncfusionLicenseBootstrap
         }
 
         SyncfusionLicenseProvider.RegisterLicense(licenseKey);
-        SyncfusionLicenseProvider.ValidateLicense([Platform.Blazor], out var errorMessage);
+
+        // Blazor UI key alone is not enough — lease PDF generation uses DocIO/PDF.
+        Platform[] required =
+        [
+            Platform.Blazor,
+            Platform.PDF,
+            Platform.Word,
+            Platform.WordToPDF,
+            Platform.PDFViewer
+        ];
+        SyncfusionLicenseProvider.ValidateLicense(required, out var errorMessage);
 
         if (!string.IsNullOrEmpty(errorMessage))
         {
-            logger.LogWarning("Syncfusion license validation reported: {Message}", errorMessage);
+            logger.LogWarning(
+                "Syncfusion license validation reported: {Message}. " +
+                "Lease PDFs may include a trial watermark until SYNCFUSION_LICENSE_KEY covers PDF/Word/PDFViewer.",
+                errorMessage);
         }
         else
         {
-            logger.LogInformation("Syncfusion Blazor license registered (length {Length}).", licenseKey.Length);
+            logger.LogInformation(
+                "Syncfusion license registered for Blazor + PDF/Word (key length {Length}).",
+                licenseKey.Length);
         }
     }
 }

@@ -1,0 +1,114 @@
+@namespace Wiley.Apartments.Web.Components.Shared
+@using Syncfusion.Blazor.SfPdfViewer
+
+@* View/print/download-focused PDF viewer for ClerkSuite (lease preview + vault). *@
+<div class="clerk-pdf-viewer" style="height: @Height; width: 100%;">
+    @if (string.IsNullOrEmpty(_documentPath))
+    {
+        <p class="text-muted p-3 mb-0">No PDF loaded.</p>
+    }
+    else
+    {
+        <SfPdfViewer2 @key="_revision"
+                      DocumentPath="@_documentPath"
+                      Height="100%"
+                      Width="100%"
+                      EnableToolbar="true"
+                      EnableAnnotation="false"
+                      EnableAnnotationToolbar="false"
+                      EnableFormDesigner="false"
+                      EnableFormFields="false"
+                      IsDesignerMode="false"
+                      EnableCommentPanel="false"
+                      EnablePageOrganizer="false"
+                      EnableNavigationPanel="false"
+                      EnableThumbnailPanel="false"
+                      EnableBookmarkPanel="false"
+                      EnableHandwrittenSignature="false"
+                      EnableFreeText="false"
+                      EnableStickyNotesAnnotation="false"
+                      EnableTextMarkupAnnotation="false"
+                      EnableShapeAnnotation="false"
+                      EnableStampAnnotations="false"
+                      EnableInkAnnotation="false"
+                      EnableMeasureAnnotation="false"
+                      EnableDownload="true"
+                      EnablePrint="true"
+                      EnableTextSearch="true"
+                      EnableMagnification="true"
+                      EnableNavigation="true">
+            <PdfViewerToolbarSettings ShowTooltip="true" ToolbarItems="@ToolbarItems" />
+            <PdfViewerEvents DocumentLoadFailed="OnLoadFailed" DocumentLoaded="OnLoaded" />
+        </SfPdfViewer2>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(LoadError))
+{
+    <div class="alert alert-warning mt-2 mb-0">@LoadError</div>
+}
+
+@code {
+    private static readonly List<Syncfusion.Blazor.SfPdfViewer.ToolbarItem> ToolbarItems =
+    [
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.PageNavigationTool,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.MagnificationTool,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.SearchOption,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.PrintOption,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.DownloadOption
+    ];
+
+    private string? _documentPath;
+    private byte[]? _boundBytes;
+    private int _revision;
+    private string? LoadError { get; set; }
+
+    [Parameter]
+    public string Height { get; set; } = "680px";
+
+    /// <summary>PDF file bytes. Viewer builds a data-URI DocumentPath when this changes.</summary>
+    [Parameter]
+    public byte[]? PdfBytes { get; set; }
+
+    [Parameter]
+    public EventCallback OnDocumentLoaded { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(PdfBytes, _boundBytes))
+        {
+            return;
+        }
+
+        _boundBytes = PdfBytes;
+        LoadError = null;
+
+        if (PdfBytes is { Length: > 0 })
+        {
+            _documentPath = "data:application/pdf;base64," + Convert.ToBase64String(PdfBytes);
+            _revision++;
+        }
+        else
+        {
+            _documentPath = null;
+            _revision++;
+        }
+    }
+
+    private async Task OnLoadFailed(LoadFailedEventArgs args)
+    {
+        LoadError = args.IsPasswordRequired
+            ? "This PDF is password-protected and cannot be opened here."
+            : "PDF failed to load in the viewer. Try Regenerate PDF or download the file.";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnLoaded(LoadEventArgs args)
+    {
+        LoadError = null;
+        if (OnDocumentLoaded.HasDelegate)
+        {
+            await OnDocumentLoaded.InvokeAsync();
+        }
+    }
+}

@@ -18,7 +18,7 @@ public sealed class NullElectronicSignatureHook : IElectronicSignatureHook
             Status: "NotConfigured",
             Message:
             "E-signature provider is not configured. Download/print the PDF for wet-ink signature, " +
-            "or upload a signed PDF on the lease page. Hook: IElectronicSignatureHook.",
+            "or upload a signed PDF on the lease page.",
             ExternalReference: null));
     }
 }

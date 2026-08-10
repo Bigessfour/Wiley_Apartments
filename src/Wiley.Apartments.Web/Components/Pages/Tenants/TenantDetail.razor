@@ -191,19 +191,25 @@ else
     }
 
     <h2 class="h5 mt-4">Payments / ledger</h2>
-    <p class="text-muted small mb-1">
-        <a href="/payments">Open tenant ledger</a>
-        ·
+    <p class="text-muted small mb-2">
+        Record cash/check/online-reference payments on the tenant ledger. Payments reduce the running balance.
+    </p>
+    <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
+        <SfButton CssClass="e-primary e-small" Content="Record payment"
+                  OnClick="@(() => Navigation.NavigateTo($"/payments?tenantId={TenantId}&action=payment"))" />
+        <SfButton CssClass="e-outline e-small" Content="Post charge"
+                  OnClick="@(() => Navigation.NavigateTo($"/payments?tenantId={TenantId}&action=charge"))" />
+        <SfButton CssClass="e-outline e-small" Content="View ledger"
+                  OnClick="@(() => Navigation.NavigateTo($"/payments?tenantId={TenantId}"))" />
         @if (PaymentPortalConfigured)
         {
-            <a href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Town PayStar payment portal</a>
-            <span class="text-muted">(staff deep-link only — no card data in ClerkSuite).</span>
+            <a class="e-btn e-outline e-small" href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">PayStar portal</a>
         }
-        else
-        {
-            <span class="text-danger">@PaymentPortalError</span>
-        }
-    </p>
+    </div>
+    @if (!PaymentPortalConfigured)
+    {
+        <p class="small text-danger mb-0">@PaymentPortalError</p>
+    }
 
     <EntityDocumentsPanel EntityType="DocumentEntityType.Tenant"
                           EntityId="TenantId"

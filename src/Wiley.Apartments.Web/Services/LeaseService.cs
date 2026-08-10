@@ -219,8 +219,31 @@ public sealed class LeaseService : ILeaseService
         }
 
         var merge = BuildMergeData(lease);
-        await using var templateStream = File.OpenRead(templatePath);
-        var (docx, pdf) = _generator.Generate(templateStream, Path.GetFileName(templatePath), merge);
+
+        // Prefer DOCX merge (underscore replace → PDF). Fillable PDF templates currently keep
+        // @@markers@@ in page content, so AcroForm fill alone produces unreadable leases.
+        var docxSibling = Path.ChangeExtension(templatePath, ".docx");
+        byte[]? docx;
+        byte[] pdf;
+        if (templatePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+            && File.Exists(docxSibling))
+        {
+            await using var docxStream = File.OpenRead(docxSibling);
+            (docx, pdf) = _generator.GenerateFromDocx(docxStream, merge);
+            lease.TemplateUsed = Path.GetFileName(docxSibling);
+        }
+        else
+        {
+            await using var templateStream = File.OpenRead(templatePath);
+            (docx, pdf) = _generator.Generate(templateStream, Path.GetFileName(templatePath), merge);
+        }
+
+        if (pdf.AsSpan().IndexOf("Created with a trial version of Syncfusion"u8) >= 0)
+        {
+            throw new InvalidOperationException(
+                "Generated lease PDF contains a Syncfusion trial watermark. " +
+                "Register a SYNCFUSION_LICENSE_KEY that includes PDF/Word (not Blazor-only) via user-secrets.");
+        }
 
         var leasesDir = Path.Combine(ResolveDocumentRoot(), "leases");
         Directory.CreateDirectory(leasesDir);
@@ -496,7 +519,27 @@ public sealed class LeaseService : ILeaseService
         {
             var docxPath = Path.Combine(templatesDir, $"{baseName}.docx");
             var pdfPath = Path.Combine(templatesDir, $"{baseName}.pdf");
-            if (!File.Exists(docxPath) || File.Exists(pdfPath))
+            if (!File.Exists(docxPath))
+            {
+                continue;
+            }
+
+            var needsRebuild = !File.Exists(pdfPath);
+            if (!needsRebuild)
+            {
+                try
+                {
+                    var existing = File.ReadAllBytes(pdfPath);
+                    needsRebuild = existing.AsSpan().IndexOf("@@"u8) >= 0
+                        || existing.AsSpan().IndexOf("Created with a trial version of Syncfusion"u8) >= 0;
+                }
+                catch
+                {
+                    needsRebuild = true;
+                }
+            }
+
+            if (!needsRebuild)
             {
                 continue;
             }
@@ -506,7 +549,7 @@ public sealed class LeaseService : ILeaseService
                 using var docx = File.OpenRead(docxPath);
                 var fillable = _generator.CreateFillablePdfFromDocx(docx);
                 File.WriteAllBytes(pdfPath, fillable);
-                _logger.LogInformation("Created fillable PDF template {Pdf} from {Docx}.", pdfPath, docxPath);
+                _logger.LogInformation("Created/refreshed fillable PDF template {Pdf} from {Docx}.", pdfPath, docxPath);
             }
             catch (Exception ex)
             {

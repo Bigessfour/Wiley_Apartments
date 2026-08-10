@@ -8,10 +8,10 @@
 @using Syncfusion.Blazor.FileManager
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
-@using Syncfusion.Blazor.SfPdfViewer
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Infrastructure
+@using Wiley.Apartments.Web.Components.Shared
 @inject IDocumentService DocumentService
 @inject IUnitService UnitService
 @inject ITenantService TenantService
@@ -19,6 +19,7 @@
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Navigation
 @inject AntiforgeryStateProvider AntiforgeryState
+@inject CircuitAuthCookieAccessor CircuitCookies
 @inject IClerkToast Toast
 
 <PageTitle>Document vault</PageTitle>
@@ -144,9 +145,7 @@
 {
     <h2 class="h6 mt-4">Viewer</h2>
     <p class="small text-muted">@_viewLabel</p>
-    <div style="height: 640px; width: 100%;">
-        <SfPdfViewer2 @ref="PdfViewer" Height="100%" Width="100%" />
-    </div>
+    <ClerkPdfViewer PdfBytes="@_pdfBytes" Height="640px" />
 }
 else if (!string.IsNullOrEmpty(ViewerHint))
 {
@@ -169,8 +168,6 @@ else if (!string.IsNullOrEmpty(ViewerHint))
     private string? ViewerHint { get; set; }
     private string? _viewLabel;
     private byte[]? _pdfBytes;
-    private bool _pendingLoad;
-    private SfPdfViewer2? PdfViewer;
     private (string Name, string ContentType, byte[] Bytes)? _pending;
 
     private static readonly List<EntityTypeOption> EntityTypeOptions =
@@ -204,26 +201,29 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         await LoadAsync();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_pendingLoad && PdfViewer is not null && _pdfBytes is not null)
-        {
-            _pendingLoad = false;
-            await PdfViewer.LoadAsync(_pdfBytes);
-        }
-    }
-
     private void OnFileManagerSend(BeforeSendEventArgs args)
     {
-        var token = AntiforgeryState.GetAntiforgeryToken()?.Value;
-        if (string.IsNullOrEmpty(token) || args.HttpClientInstance is null)
+        if (args.HttpClientInstance is null)
         {
             return;
         }
 
-        args.HttpClientInstance.DefaultRequestHeaders.Remove(DocumentVaultAntiforgeryFilter.HeaderName);
-        args.HttpClientInstance.DefaultRequestHeaders.Add(
-            DocumentVaultAntiforgeryFilter.HeaderName, token);
+        // SfFileManager uses server-side HttpClient (no browser cookies). Forward the
+        // circuit-captured Cookie header so [Authorize] vault endpoints authenticate.
+        var cookie = CircuitCookies.CookieHeader;
+        if (!string.IsNullOrWhiteSpace(cookie))
+        {
+            args.HttpClientInstance.DefaultRequestHeaders.Remove("Cookie");
+            args.HttpClientInstance.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", cookie);
+        }
+
+        var token = AntiforgeryState.GetAntiforgeryToken()?.Value;
+        if (!string.IsNullOrEmpty(token))
+        {
+            args.HttpClientInstance.DefaultRequestHeaders.Remove(DocumentVaultAntiforgeryFilter.HeaderName);
+            args.HttpClientInstance.DefaultRequestHeaders.Add(
+                DocumentVaultAntiforgeryFilter.HeaderName, token);
+        }
     }
 
     private async Task LoadAsync()
@@ -346,7 +346,6 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         }
 
         _pdfBytes = bytes;
-        _pendingLoad = true;
     }
 
     private sealed class DocRow

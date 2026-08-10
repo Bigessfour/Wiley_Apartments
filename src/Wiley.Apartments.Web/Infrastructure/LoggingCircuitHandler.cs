@@ -26,7 +26,7 @@ public sealed class LoggingCircuitHandler : CircuitHandler
 
     public override Task OnConnectionDownAsync(Circuit circuit, CancellationToken cancellationToken)
     {
-        _logger.LogWarning("Blazor circuit connection down {CircuitId}", circuit.Id);
+        _logger.LogDebug("Blazor circuit connection down {CircuitId}", circuit.Id);
         return Task.CompletedTask;
     }
 

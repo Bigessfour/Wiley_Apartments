@@ -5,10 +5,10 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.Extensions.Options
 @using Syncfusion.Blazor.Inputs
-@using Syncfusion.Blazor.SfPdfViewer
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Configuration
+@using Wiley.Apartments.Web.Components.Shared
 @inject ILeaseService LeaseService
 @inject IDocumentService DocumentService
 @inject IElectronicSignatureHook ESignHook
@@ -38,9 +38,11 @@ else
         {
             <span class="text-danger small align-self-center">@PaymentPortalError</span>
         }
-        @if (string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+        <SfButton CssClass="e-primary" Content="@(string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) ? "Generate PDF" : "Regenerate PDF")"
+                  Disabled="@Busy" OnClick="GenerateAsync" />
+        @if (_pdfBytes is { Length: > 0 })
         {
-            <SfButton CssClass="e-primary" Content="Generate PDF" Disabled="@Busy" OnClick="GenerateAsync" />
+            <a class="e-btn e-outline" href="@PdfDownloadHref" download="@PdfDownloadFileName">Download PDF</a>
         }
     </PageHeader>
     <p class="small mb-3">
@@ -162,8 +164,9 @@ else
 
     <h2 class="h5 mt-2">Signed lease</h2>
     <p class="text-muted small mb-2">
-        E-sign: @(ESignHook.IsConfigured ? "provider configured" : "not configured (v1) — print/wet-ink or upload signed PDF").
-        Hook: <code>IElectronicSignatureHook</code>.
+        @(ESignHook.IsConfigured
+            ? "E-sign provider is configured."
+            : "E-sign is not configured in v1 — print/wet-ink signature, then upload the signed PDF below.")
     </p>
     @if (!string.IsNullOrWhiteSpace(Lease.CustomClauses))
     {
@@ -214,10 +217,12 @@ else
             {
                 <span> · DOCX archive: @Lease.GeneratedDocxRelativePath</span>
             }
+            @if (_pdfBytes is { Length: > 0 })
+            {
+                <span> · @_pdfBytes.Length.ToString("N0") bytes</span>
+            }
         </p>
-        <div style="height: 680px; width: 100%;">
-            <SfPdfViewer2 @ref="PdfViewer" Height="100%" Width="100%" />
-        </div>
+        <ClerkPdfViewer PdfBytes="@_pdfBytes" Height="680px" />
     }
 }
 
@@ -226,11 +231,9 @@ else
 
     private Lease? Lease { get; set; }
     private Wiley.Apartments.Contracts.DocumentInfo? SignedInfo { get; set; }
-    private SfPdfViewer2? PdfViewer { get; set; }
     private string? ErrorMessage { get; set; }
     private bool Busy { get; set; }
     private byte[]? _pdfBytes;
-    private bool _pendingLoad;
     private (string Name, string ContentType, byte[] Bytes)? _pendingSigned;
     private string? ShowPanel { get; set; }
     private decimal? AmendRent { get; set; }
@@ -243,6 +246,14 @@ else
     private DateTime? TerminateEnd { get; set; }
     private string? LifecycleNote { get; set; }
     private Guid? _loadedLeaseId;
+
+    private string PdfDownloadFileName =>
+        Path.GetFileName(Lease?.GeneratedPdfRelativePath ?? "lease.pdf");
+
+    private string PdfDownloadHref =>
+        _pdfBytes is { Length: > 0 }
+            ? "data:application/pdf;base64," + Convert.ToBase64String(_pdfBytes)
+            : "#";
 
     private string LeaseHeaderSubtitle
     {
@@ -282,15 +293,6 @@ else
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_pendingLoad && PdfViewer is not null && _pdfBytes is not null)
-        {
-            _pendingLoad = false;
-            await PdfViewer.LoadAsync(_pdfBytes);
-        }
-    }
-
     private async Task LoadAsync()
     {
         Lease = await LeaseService.GetByIdAsync(LeaseId);
@@ -318,7 +320,6 @@ else
         LifecycleNote = null;
 
         await PreferDisplayPdfAsync();
-        _pendingLoad = _pdfBytes is not null;
     }
 
     private async Task AmendAsync()
@@ -442,6 +443,15 @@ else
         }
 
         _pdfBytes = await File.ReadAllBytesAsync(path);
+        if (_pdfBytes.Length < 5
+            || _pdfBytes[0] != (byte)'%'
+            || _pdfBytes[1] != (byte)'P'
+            || _pdfBytes[2] != (byte)'D'
+            || _pdfBytes[3] != (byte)'F')
+        {
+            ErrorMessage = $"Generated file is not a valid PDF: {Lease.GeneratedPdfRelativePath}";
+            _pdfBytes = null;
+        }
     }
 
     private async Task GenerateAsync()
@@ -452,7 +462,14 @@ else
         {
             Lease = await LeaseService.GenerateDocumentsAsync(LeaseId);
             await PreferDisplayPdfAsync();
-            _pendingLoad = true;
+            if (_pdfBytes is { Length: > 0 })
+            {
+                await Toast.ShowSuccessAsync("Lease PDF generated.");
+            }
+            else if (string.IsNullOrEmpty(ErrorMessage))
+            {
+                ErrorMessage = "Generate completed but PDF bytes could not be read from DocumentRoot.";
+            }
         }
         catch (Exception ex)
         {
@@ -505,7 +522,6 @@ else
             _pendingSigned = null;
             await Toast.ShowSuccessAsync("Signed lease attached. Status is now Active.");
             await LoadAsync();
-            _pendingLoad = true;
         }
         catch (Exception ex)
         {
@@ -525,7 +541,6 @@ else
         }
 
         _pdfBytes = await DocumentService.ReadBytesAsync(sid);
-        _pendingLoad = _pdfBytes is not null;
     }
 
     private async Task RequestESignAsync()

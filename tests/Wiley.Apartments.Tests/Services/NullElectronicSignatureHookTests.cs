@@ -16,6 +16,7 @@ public class NullElectronicSignatureHookTests
             "clerk@test");
 
         result.Status.Should().Be("NotConfigured");
-        result.Message.Should().Contain("IElectronicSignatureHook");
+        result.Message.Should().Contain("wet-ink");
+        result.Message.Should().Contain("upload");
     }
 }

@@ -24,7 +24,10 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.Configure<SeedUserOptions>(
             builder.Configuration.GetSection(SeedUserOptions.SectionName));
 
+        builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton<CircuitAuthCookieStore>();
+        builder.Services.AddScoped<CircuitAuthCookieAccessor>();
         builder.Services.AddSingleton<IDateTimeService, DateTimeService>();
         builder.Services.AddScoped<AuditSaveChangesInterceptor>();
         builder.Services.AddScoped<IIdentitySeeder, IdentitySeeder>();
@@ -87,6 +90,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddControllers();
         builder.Services.AddSyncfusionBlazor();
         builder.Services.AddScoped<CircuitHandler, LoggingCircuitHandler>();
+        builder.Services.AddScoped<CircuitHandler, CircuitAuthCookieHandler>();
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents(options =>
             {

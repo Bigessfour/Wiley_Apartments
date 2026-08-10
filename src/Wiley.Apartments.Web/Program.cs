@@ -5,6 +5,9 @@ using Wiley.Apartments.Web.Infrastructure;
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+    // Enable static web assets for `dotnet run` outside Development (avoids FileNotFound
+    // for Syncfusion/_content and scoped CSS when ASPNETCORE_ENVIRONMENT=Production).
+    builder.WebHost.UseStaticWebAssets();
     builder.AddClerkSuiteSerilog();
     builder.AddClerkSuiteServices();
 

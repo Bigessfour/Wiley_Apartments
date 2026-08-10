@@ -5,6 +5,7 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
@@ -18,6 +19,7 @@
 @inject IMaintenanceService MaintenanceService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject IClerkToast Toast
 
 <PageTitle>Unit @Unit?.Number</PageTitle>
 
@@ -41,9 +43,50 @@ else
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-4">
             <SfCard CssClass="unit-summary-card h-100">
-                <CardHeader Title="Status & layout" />
+                <CardHeader Title="Unit layout (FR-002)" />
+                <CardContent>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Beds</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Unit.Beds" Min="0" Max="10" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Baths</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Unit.Baths" Min="0" Max="10" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Square footage</label>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Unit.SqFt" Min="0" Format="N0" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Status</label>
+                            <SfDropDownList TValue="UnitStatus" TItem="UnitStatusOption"
+                                            DataSource="@StatusOptions"
+                                            @bind-Value="Unit.Status">
+                                <DropDownListFieldSettings Value="Value" Text="Text" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Layout notes</label>
+                            <SfTextBox @bind-Value="Unit.Notes" Multiline="true" Placeholder="Floor plan notes, storage, accessibility…" />
+                        </div>
+                        <div class="col-12">
+                            <SfButton CssClass="e-primary e-small" Content="@(LayoutBusy ? "Saving…" : "Save layout")"
+                                      Disabled="@LayoutBusy" OnClick="SaveLayoutAsync" />
+                            @if (!string.IsNullOrEmpty(LayoutError))
+                            {
+                                <div class="alert alert-warning mt-2 mb-0 py-1">@LayoutError</div>
+                            }
+                        </div>
+                    </div>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Status" />
                 <CardContent>
                     <p class="mb-2">
                         <UnitStatusChip Status="Unit.Status" />
@@ -53,7 +96,7 @@ else
                 </CardContent>
             </SfCard>
         </div>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
             <SfCard CssClass="unit-summary-card h-100">
                 <CardHeader Title="Assets & appliances" />
                 <CardContent>
@@ -71,7 +114,7 @@ else
                 </CardContent>
             </SfCard>
         </div>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
             <SfCard CssClass="unit-summary-card h-100">
                 <CardHeader Title="Flooring & carpet" />
                 <CardContent>
@@ -80,7 +123,7 @@ else
                 </CardContent>
             </SfCard>
         </div>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-2">
             <SfCard CssClass="unit-summary-card h-100">
                 <CardHeader Title="Current tenant" />
                 <CardContent>
@@ -442,6 +485,16 @@ else
     private string? LoadError { get; set; }
     private string? GridError { get; set; }
     private string? OccupancyError { get; set; }
+    private string? LayoutError { get; set; }
+    private bool LayoutBusy { get; set; }
+
+    private readonly List<UnitStatusOption> StatusOptions =
+    [
+        new(UnitStatus.Vacant, "Vacant"),
+        new(UnitStatus.Occupied, "Occupied"),
+        new(UnitStatus.Maintenance, "Maintenance"),
+        new(UnitStatus.MakeReady, "Make-Ready")
+    ];
 
     private int ExpiringWarrantyCount => UnitAssets.Count(a =>
         a.WarrantyEnd is not null
@@ -474,9 +527,40 @@ else
         "Add", "Edit", "Delete", "Update", "Cancel", "Search"
     ];
 
+    private Guid? _loadedUnitId;
+
     protected override async Task OnParametersSetAsync()
     {
-        await LoadAsync();
+        if (_loadedUnitId != UnitId)
+        {
+            await LoadAsync();
+            _loadedUnitId = UnitId;
+        }
+    }
+
+    private async Task SaveLayoutAsync()
+    {
+        if (Unit is null)
+        {
+            return;
+        }
+
+        LayoutBusy = true;
+        LayoutError = null;
+        try
+        {
+            Unit = await UnitService.UpdateAsync(Unit);
+            await Toast.ShowSuccessAsync($"Unit {Unit.Number} layout saved.");
+        }
+        catch (Exception ex)
+        {
+            LayoutError = ex.Message;
+            await LoadAsync();
+        }
+        finally
+        {
+            LayoutBusy = false;
+        }
     }
 
     private async Task LoadAsync()
@@ -695,6 +779,8 @@ else
     }
 
     private sealed record TenantOption(Guid Id, string DisplayName);
+
+    private sealed record UnitStatusOption(UnitStatus Value, string Text);
 
     private sealed record OpsCostRow(
         string DateDisplay,

@@ -304,21 +304,21 @@
 
     private void OnEventRendered(Syncfusion.Blazor.Schedule.EventRenderedArgs<ScheduleAppointment> args)
     {
-        if (args.Data is null)
+        if (args?.Data is null)
         {
             return;
         }
 
-        var color = ParseCategory(args.Data.Category) switch
+        var css = ParseCategory(args.Data.Category) switch
         {
-            ScheduledItemCategory.Cleaning => "#0d6efd",
-            ScheduledItemCategory.Vacancy => "#fd7e14",
-            ScheduledItemCategory.Inspection => "#198754",
-            _ => "#6c757d"
+            ScheduledItemCategory.Cleaning => "cs-sched-cleaning",
+            ScheduledItemCategory.Vacancy => "cs-sched-vacancy",
+            ScheduledItemCategory.Inspection => "cs-sched-inspection",
+            _ => "cs-sched-other"
         };
 
-        args.Attributes ??= new Dictionary<string, object>();
-        args.Attributes["style"] = $"background:{color}; border-color:{color};";
+        // CssClasses (list) — Attributes can be null and previously NRE'd on indexer set.
+        args.CssClasses = [css];
     }
 
     private ScheduleAppointment ToAppointment(ScheduledItem item, int localId)

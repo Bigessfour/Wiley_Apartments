@@ -20,7 +20,9 @@ public sealed class LateFeeSettingsService : ILateFeeSettingsService
 
     public async Task<LateFeeSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        var existing = await _db.LateFeeSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var existing = await _db.LateFeeSettings.AsNoTracking()
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
         if (existing is not null)
         {
             return existing;
@@ -54,7 +56,7 @@ public sealed class LateFeeSettingsService : ILateFeeSettingsService
             throw new ArgumentException("Grace days cannot be negative.", nameof(graceDays));
         }
 
-        var row = await _db.LateFeeSettings.FirstOrDefaultAsync(cancellationToken);
+        var row = await _db.LateFeeSettings.OrderBy(s => s.Id).FirstOrDefaultAsync(cancellationToken);
         if (row is null)
         {
             row = new LateFeeSettings { Id = Guid.Parse("11111111-1111-1111-1111-111111111111") };

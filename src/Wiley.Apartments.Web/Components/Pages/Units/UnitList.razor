@@ -11,7 +11,8 @@
 
 <PageTitle>Units</PageTitle>
 
-<PageHeader Title="Units" Subtitle="@($"Town of Wiley — {UnitCount} of {UnitService.MaxUnits} units")" />
+<PageHeader Title="Units"
+            Subtitle="@($"Town of Wiley — {UnitCount} of {UnitService.MaxUnits} units. Edit Sq Ft / Beds / Baths inline, or Open a unit for full layout notes.")" />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -41,9 +42,12 @@
                       Mode="EditMode.Normal"
                       ShowDeleteConfirmDialog="true" />
     <GridColumns>
+        <GridColumn Field="@nameof(Unit.Id)"
+                    IsPrimaryKey="true"
+                    Visible="false"
+                    AllowEditing="false" />
         <GridColumn Field="@nameof(Unit.Number)"
                     HeaderText="Unit #"
-                    IsPrimaryKey="true"
                     Width="100"
                     ValidationRules="@(new ValidationRules { Required = true })" />
         <GridColumn Field="@nameof(Unit.SqFt)"
@@ -88,7 +92,7 @@
             </Template>
         </GridColumn>
         <GridColumn Field="@nameof(Unit.Notes)"
-                    HeaderText="Notes"
+                    HeaderText="Layout notes"
                     Width="180" />
         <GridColumn HeaderText=""
                     Width="90"
