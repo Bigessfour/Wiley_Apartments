@@ -208,6 +208,8 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
   - **Done when:** SfDashboardLayout default landing page; live accurate data for 16 units; loads **< 3 s** on LAN; widgets clickable to detail.
   - **Paths:** `Pages/Dashboard/Home.razor`, `Services/DashboardService.cs`
   - **Done (2026-08-09):** `/` Home.razor SfDashboardLayout + cards; `IDashboardService` snapshot; links to units/leases/maintenance/reports.
+  - **Done (2026-08-10):** Phase 1 data-viz — occupancy CircularGauge, collection KPI + sparkline, unit-status doughnut, 12-month rent-collected chart.
+  - **Done (2026-08-10):** Phase 2–3 data-viz — LinearGauge collection rate, unit×month HeatMap, chart zoom/pan (range UX), Charts3D P/L by unit, PNG export, layout persistence, `/reports/rent-pivot`.
 
 - [x] **T6.3** Basic exportable reports (rent roll, occupancy, warranty list).
   - **Done when:** Rent roll printable/downloadable; occupancy and warranty status reports available.
@@ -404,7 +406,22 @@ Deep re-converge (2026-08-09) post–Phase 9, stressing edge cases, vault-contro
 
 Recorded **2026-08-10** from clerk pilot feedback. Formalize under `specs/002-*` after T7 handover.
 
-- [ ] **NV-1** Payment receipt PDF — after clerk accepts/records a ledger payment, generate printable/emailable PDF receipt (town header, unit, tenant, amount, date, method/ref). Syncfusion PDF + optional vault copy. See [plan.md § Next version](./plan.md).
+- [x] **NV-1** Payment receipt PDF — after clerk accepts/records a ledger payment, generate printable/emailable PDF receipt (town header, unit, tenant, amount, date, method/ref). Syncfusion PDF + optional vault copy. **Done 2026-08-10.**
+- [x] **NV-4** Tenant security deposit panel — required/paid/held on Tenant page; record deposit to ledger. **Done 2026-08-10.**
 - [ ] **NV-2** DocuSign / e-sign (post-v1 assumption)
 - [ ] **NV-3** Facility reservation + CC rental agreement PDF
+- [x] **NV-5** Dashboard viz Phase 2 — LinearGauge collection target, HeatMap (unit×month), chart zoom/pan range UX on collection/P/L. **Done 2026-08-10.**
+- [x] **NV-6** Dashboard viz Phase 3 — Pivot Table `/reports/rent-pivot`, Charts3D P/L by unit, chart PNG export, persisted dashboard layouts. **Done 2026-08-10.**
+
+---
+
+## Phase 11: Convergence
+
+> Appended by `/speckit-converge` on **2026-08-10** after NV-1/NV-4 + AcroForm receipt + SfPdfViewer Print/Save landed.
+> Open Phase 7 handover tasks (**T7.1–T7.4**) remain tracked above — not re-listed.
+> NV-2 / NV-3 stay deferred (post-v1 / `002-*`).
+
+- [x] **T034** HIGH: Record an AuditLog entry when a payment receipt is generated (receipt number, payment id, vault doc id if any) — vault Document create alone does not cover regenerate-without-vault; `PaymentReceiptService` has no audit call per plan:NV-1 acceptance #4 / Constitution III / FR-025 (`partial`) — **Done 2026-08-10** (`PaymentReceipt` / `Generate` audit).
+- [x] **T035** MEDIUM: Enforce Edge Case 3 — prevent or warn when creating residential unit beyond 16 (`ClerkSuite:MaxUnits` defaults to `0` = unlimited today) per spec Edge Case 3 / FR-001 (`partial`) — **Done 2026-08-10** (default `MaxUnits=16`; `0` remains admin override).
+- [x] **T036** MEDIUM: Update `docs/clerk-quick-reference.md` with Payment **Receipt** (preview/print/save) and Tenant **Security deposit** steps so clerks see NV-1/NV-4 in the handover guide per Constitution I / T7.3 (`partial`) — **Done 2026-08-10**.
 

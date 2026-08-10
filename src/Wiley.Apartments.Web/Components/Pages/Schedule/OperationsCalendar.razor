@@ -1,6 +1,7 @@
 @page "/schedule"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Schedule
@@ -328,21 +329,36 @@
 
     private void OnEventRendered(Syncfusion.Blazor.Schedule.EventRenderedArgs<ScheduleAppointment> args)
     {
-        if (args?.Data is null)
+        // Syncfusion may invoke EventRendered for placeholder/drag ghosts with null Data.
+        // Never throw — LoggingErrorBoundary would otherwise spam on every vertical refresh.
+        try
         {
-            return;
+            if (args?.Data is null)
+            {
+                return;
+            }
+
+            var css = ParseCategory(args.Data.Category) switch
+            {
+                ScheduledItemCategory.Cleaning => "cs-sched-cleaning",
+                ScheduledItemCategory.Vacancy => "cs-sched-vacancy",
+                ScheduledItemCategory.Inspection => "cs-sched-inspection",
+                _ => "cs-sched-other"
+            };
+
+            if (args.CssClasses is null)
+            {
+                args.CssClasses = [css];
+            }
+            else if (!args.CssClasses.Contains(css))
+            {
+                args.CssClasses.Add(css);
+            }
         }
-
-        var css = ParseCategory(args.Data.Category) switch
+        catch
         {
-            ScheduledItemCategory.Cleaning => "cs-sched-cleaning",
-            ScheduledItemCategory.Vacancy => "cs-sched-vacancy",
-            ScheduledItemCategory.Inspection => "cs-sched-inspection",
-            _ => "cs-sched-other"
-        };
-
-        // CssClasses (list) — Attributes can be null and previously NRE'd on indexer set.
-        args.CssClasses = [css];
+            // Styling only — ignore Syncfusion edge cases during render.
+        }
     }
 
     private ScheduleAppointment ToAppointment(ScheduledItem item, int localId)

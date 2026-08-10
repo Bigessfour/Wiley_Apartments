@@ -1,16 +1,18 @@
 @namespace Wiley.Apartments.Web.Components.Shared
 @using Syncfusion.Blazor.SfPdfViewer
 
-@* View/print/download-focused PDF viewer for ClerkSuite (lease preview + vault). *@
-<div class="clerk-pdf-viewer" style="height: @Height; width: 100%;">
+@* View/print/download-focused PDF viewer for ClerkSuite (lease preview, receipts, vault). *@
+<div class="clerk-pdf-viewer" style="height: @Height; width: 100%; border: 1px solid #d9d9d9; background: #f5f5f5;">
     @if (string.IsNullOrEmpty(_documentPath))
     {
         <p class="text-muted p-3 mb-0">No PDF loaded.</p>
     }
     else
     {
-        <SfPdfViewer2 @key="_revision"
+        <SfPdfViewer2 @ref="_viewer"
+                      @key="_revision"
                       DocumentPath="@_documentPath"
+                      DownloadFileName="@EffectiveDownloadFileName"
                       Height="100%"
                       Width="100%"
                       EnableToolbar="true"
@@ -58,10 +60,12 @@
         Syncfusion.Blazor.SfPdfViewer.ToolbarItem.DownloadOption
     ];
 
+    private SfPdfViewer2? _viewer;
     private string? _documentPath;
     private byte[]? _boundBytes;
     private int _revision;
     private string? LoadError { get; set; }
+    private bool _documentReady;
 
     [Parameter]
     public string Height { get; set; } = "680px";
@@ -70,8 +74,37 @@
     [Parameter]
     public byte[]? PdfBytes { get; set; }
 
+    /// <summary>Required for toolbar Download when DocumentPath is a base64 data URI.</summary>
+    [Parameter]
+    public string? DownloadFileName { get; set; }
+
     [Parameter]
     public EventCallback OnDocumentLoaded { get; set; }
+
+    private string EffectiveDownloadFileName =>
+        string.IsNullOrWhiteSpace(DownloadFileName) ? "document.pdf" : DownloadFileName.Trim();
+
+    public bool IsDocumentReady => _documentReady && _viewer is not null;
+
+    public async Task PrintAsync()
+    {
+        if (_viewer is null || !_documentReady)
+        {
+            return;
+        }
+
+        await _viewer.PrintAsync();
+    }
+
+    public async Task DownloadAsync()
+    {
+        if (_viewer is null || !_documentReady)
+        {
+            return;
+        }
+
+        await _viewer.DownloadAsync();
+    }
 
     protected override void OnParametersSet()
     {
@@ -82,6 +115,7 @@
 
         _boundBytes = PdfBytes;
         LoadError = null;
+        _documentReady = false;
 
         if (PdfBytes is { Length: > 0 })
         {
@@ -97,6 +131,7 @@
 
     private async Task OnLoadFailed(LoadFailedEventArgs args)
     {
+        _documentReady = false;
         LoadError = args.IsPasswordRequired
             ? "This PDF is password-protected and cannot be opened here."
             : "PDF failed to load in the viewer. Try Regenerate PDF or download the file.";
@@ -106,9 +141,12 @@
     private async Task OnLoaded(LoadEventArgs args)
     {
         LoadError = null;
+        _documentReady = true;
         if (OnDocumentLoaded.HasDelegate)
         {
             await OnDocumentLoaded.InvokeAsync();
         }
+
+        await InvokeAsync(StateHasChanged);
     }
 }

@@ -14,7 +14,8 @@
 
 | Item | Spec home | Status |
 | ---- | --------- | ------ |
-| **NV-1 Payment receipt PDF** (print / email after clerk accepts payment) | [plan.md § Next version](./001-wiley-apartment-v1/plan.md) · [tasks.md](./001-wiley-apartment-v1/tasks.md) | Backlog for **v1.1 / 002** |
+| **NV-1 Payment receipt PDF** (print / email after clerk accepts payment) | [plan.md § Next version](./001-wiley-apartment-v1/plan.md) · [tasks.md](./001-wiley-apartment-v1/tasks.md) | **Done 2026-08-10** |
+| **NV-4 Tenant deposit panel** | same | **Done 2026-08-10** |
 | DocuSign / e-sign · CC reservations | same | Backlog |
 
 ## Task phases (authoritative)

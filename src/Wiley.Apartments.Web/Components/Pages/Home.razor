@@ -1,9 +1,15 @@
 @page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Chart3D
+@using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.HeatMap
 @using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.LinearGauge
+@using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
 @inject IDashboardService DashboardService
 @inject IPortfolioProfitLossService ProfitLoss
@@ -14,8 +20,10 @@
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
 <PageHeader Title="ClerkSuite dashboard"
-            Subtitle="@($"Occupancy, expirations, work orders, delinquencies, warranties · Mountain Time {DisplayTime}")">
+            Subtitle="@($"Occupancy, collection, expirations, work orders · Mountain Time {DisplayTime}")">
     <SfButton CssClass="e-outline" Content="Refresh" OnClick="LoadAsync" />
+    <SfButton CssClass="e-outline" Content="Export charts" OnClick="ExportChartsAsync" Disabled="@(Snap is null)" />
+    <SfButton CssClass="e-outline" Content="Reset layout" OnClick="ResetLayoutAsync" />
 </PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
@@ -28,36 +36,203 @@ else if (Snap is null)
 }
 else
 {
-    <div class="kpi-grid">
-        <SfCard CssClass="kpi-card kpi-card--accent">
+    <div class="kpi-grid kpi-grid--viz">
+        <SfCard CssClass="kpi-card kpi-card--accent kpi-card--gauge">
             <CardContent>
-                <div class="kpi-label">Occupied</div>
-                <div class="kpi-value"><a href="units">@Snap.Occupied / @Snap.TotalUnits</a></div>
+                <div class="kpi-label">Occupancy</div>
+                <div class="kpi-gauge-wrap">
+                    <SfCircularGauge Height="120px" Width="100%" Theme="@ChartTheme">
+                        <CircularGaugeAxes>
+                            <CircularGaugeAxis StartAngle="210" EndAngle="150" Minimum="0" Maximum="100">
+                                <CircularGaugeAxisMajorTicks Height="0" />
+                                <CircularGaugeAxisMinorTicks Height="0" />
+                                <CircularGaugeAxisLabelStyle Format=" " />
+                                <CircularGaugeRanges>
+                                    <CircularGaugeRange Start="0" End="100" Color="#c5d8f0" StartWidth="12" EndWidth="12" Radius="90%" />
+                                </CircularGaugeRanges>
+                                <CircularGaugePointers>
+                                    <CircularGaugePointer Value="@Snap.OccupancyPercent"
+                                                          Type="PointerType.RangeBar"
+                                                          PointerWidth="12"
+                                                          Color="#0f6cbd"
+                                                          Radius="90%"
+                                                          RoundedCornerRadius="6" />
+                                </CircularGaugePointers>
+                                <CircularGaugeAnnotations>
+                                    <CircularGaugeAnnotation Content="@($"{Snap.OccupancyPercent:0.#}%")" Angle="180" Radius="0%" ZIndex="1">
+                                        <CircularGaugeAnnotationTextStyle Size="18px" FontWeight="600" />
+                                    </CircularGaugeAnnotation>
+                                </CircularGaugeAnnotations>
+                            </CircularGaugeAxis>
+                        </CircularGaugeAxes>
+                    </SfCircularGauge>
+                </div>
+                <div class="kpi-sub"><a href="units">@Snap.Occupied / @Snap.TotalUnits occupied</a></div>
             </CardContent>
         </SfCard>
         <SfCard CssClass="kpi-card">
             <CardContent>
-                <div class="kpi-label">Vacant</div>
-                <div class="kpi-value">@Snap.Vacant</div>
+                <div class="kpi-label">Collected this month</div>
+                <div class="kpi-value">@Snap.CollectedThisMonth.ToString("C0")</div>
+                <div class="kpi-sub">Expected @Snap.ExpectedRentThisMonth.ToString("C0") · @CollectionRateLabel</div>
+                <div class="kpi-linear-gauge">
+                    <SfLinearGauge Height="56px" Width="100%" Theme="@ChartTheme">
+                        <LinearGaugeAxes>
+                            <LinearGaugeAxis Minimum="0" Maximum="@(Math.Max(100, Snap.CollectionRatePercent))">
+                                <LinearGaugeAxisLabelStyle Format="{value}%" />
+                                <LinearGaugePointers>
+                                    <LinearGaugePointer Value="@Snap.CollectionRatePercent"
+                                                        Type="Syncfusion.Blazor.LinearGauge.Point.Bar"
+                                                        Color="#0f6cbd"
+                                                        Height="12" />
+                                </LinearGaugePointers>
+                            </LinearGaugeAxis>
+                        </LinearGaugeAxes>
+                    </SfLinearGauge>
+                </div>
+                @if (CollectionSparkData.Count > 0)
+                {
+                    <div class="kpi-spark">
+                        <SfSparkline TValue="SparkPoint"
+                                     DataSource="@CollectionSparkData"
+                                     XName="Label"
+                                     YName="Amount"
+                                     Type="SparklineType.Area"
+                                     Height="28px"
+                                     Width="100%"
+                                     Fill="#0f6cbd"
+                                     LineWidth="1.5"
+                                     Theme="@ChartTheme">
+                        </SfSparkline>
+                    </div>
+                }
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card kpi-card--danger">
+            <CardContent>
+                <div class="kpi-label">Outstanding</div>
+                <div class="kpi-value"><a href="reports/delinquency">@Snap.OutstandingBalanceTotal.ToString("C0")</a></div>
+                <div class="kpi-sub">@Snap.Delinquencies.Count delinquent account(s)</div>
             </CardContent>
         </SfCard>
         <SfCard CssClass="kpi-card kpi-card--warn">
             <CardContent>
                 <div class="kpi-label">Open work orders</div>
                 <div class="kpi-value"><a href="maintenance">@Snap.OpenWorkOrders.Count</a></div>
-            </CardContent>
-        </SfCard>
-        <SfCard CssClass="kpi-card kpi-card--danger">
-            <CardContent>
-                <div class="kpi-label">Delinquent accounts</div>
-                <div class="kpi-value"><a href="reports/delinquency">@Snap.Delinquencies.Count</a></div>
+                <div class="kpi-sub">Maintenance queue</div>
             </CardContent>
         </SfCard>
     </div>
 
-    <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 14, 14 })" AllowResizing="false" AllowDragging="false">
+    <SfDashboardLayout @ref="_layout"
+                       ID="clerksuite-home-dashboard"
+                       Columns="6"
+                       CellSpacing="@(new double[] { 14, 14 })"
+                       AllowResizing="true"
+                       AllowDragging="true"
+                       EnablePersistence="true"
+                       MediaQuery="max-width: 768px">
         <DashboardLayoutPanels>
-            <DashboardLayoutPanel Id="exp30" SizeX="3" SizeY="2" Row="0" Column="0">
+            <DashboardLayoutPanel Id="statusDonut" SizeX="3" SizeY="3" Row="0" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-title">Units by status</div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        <SfAccumulationChart Width="100%" Height="100%" Theme="@ChartTheme" EnableSmartLabels="true">
+                            <AccumulationChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Bottom" />
+                            <AccumulationChartTooltipSettings Enable="true" Format="${point.x}: <b>${point.y}</b>" />
+                            <AccumulationChartSeriesCollection>
+                                <AccumulationChartSeries DataSource="@StatusSlices"
+                                                         XName="Status"
+                                                         YName="Count"
+                                                         Name="Units"
+                                                         InnerRadius="55%"
+                                                         Radius="80%"
+                                                         Type="AccumulationType.Pie">
+                                    <AccumulationDataLabelSettings Visible="true" Name="Status" />
+                                </AccumulationChartSeries>
+                            </AccumulationChartSeriesCollection>
+                        </SfAccumulationChart>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="collectionTrend" SizeX="3" SizeY="3" Row="0" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
+                        <span>Rent collected (12 months)</span>
+                        <span class="small text-muted">zoom / pan</span>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        @if (CollectionChart.Count == 0 || CollectionChart.All(c => c.Amount == 0))
+                        {
+                            <p class="text-muted small p-2 mb-0">No non-deposit payments in the last 12 months.</p>
+                        }
+                        else
+                        {
+                            <SfChart @ref="_collectionChart" Width="100%" Height="100%" Theme="@ChartTheme">
+                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
+                                <ChartPrimaryYAxis LabelFormat="C0" />
+                                <ChartTooltipSettings Enable="true" />
+                                <ChartZoomSettings EnableSelectionZooming="true"
+                                                   EnableMouseWheelZooming="true"
+                                                   EnablePinchZooming="true"
+                                                   Mode="Syncfusion.Blazor.Charts.ZoomMode.X"
+                                                   EnableScrollbar="true" />
+                                <ChartSeriesCollection>
+                                    <ChartSeries DataSource="@CollectionChart"
+                                                 XName="Label"
+                                                 YName="Amount"
+                                                 Type="ChartSeriesType.Column"
+                                                 Name="Collected"
+                                                 Fill="#0f6cbd" />
+                                </ChartSeriesCollection>
+                            </SfChart>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="payHeat" SizeX="6" SizeY="3" Row="3" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-title">Payments by unit × month (heatmap)</div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px; overflow:auto;">
+                        @if (HeatCells.Count == 0)
+                        {
+                            <p class="text-muted small p-2 mb-0">No payment heatmap data yet.</p>
+                        }
+                        else
+                        {
+                            <SfHeatMap TValue="List<DashboardHeatCell>"
+                                       DataSource="@HeatCells"
+                                       Height="100%"
+                                       Width="100%"
+                                       Theme="@ChartTheme"
+                                       ShowTooltip="true">
+                                <HeatMapTitleSettings Text="Rent payments ($)" />
+                                <HeatMapXAxis Labels="@HeatMonthLabels" LabelRotation="45" />
+                                <HeatMapYAxis Labels="@HeatUnitLabels" />
+                                <HeatMapDataSourceSettings IsJsonData="true"
+                                                           AdaptorType="AdaptorType.Cell"
+                                                           XDataMapping="Month"
+                                                           YDataMapping="Unit"
+                                                           ValueMapping="Value" />
+                                <HeatMapPaletteSettings Type="PaletteType.Gradient">
+                                    <HeatMapPalettes>
+                                        <HeatMapPalette Value="0" Color="#f3f6f9" />
+                                        <HeatMapPalette Color="#9dc3eb" />
+                                        <HeatMapPalette Color="#0f6cbd" />
+                                    </HeatMapPalettes>
+                                </HeatMapPaletteSettings>
+                            </SfHeatMap>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="exp30" SizeX="3" SizeY="2" Row="6" Column="0">
                 <HeaderTemplate>
                     <div class="panel-header-bar">
                         <div class="panel-header-title">Leases expiring (≤30 days)</div>
@@ -89,7 +264,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="exp60" SizeX="3" SizeY="2" Row="0" Column="3">
+            <DashboardLayoutPanel Id="exp60" SizeX="3" SizeY="2" Row="6" Column="3">
                 <HeaderTemplate>
                     <div class="panel-header-bar">
                         <div class="panel-header-title">Leases expiring (31–60 days)</div>
@@ -121,7 +296,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="schedule" SizeX="3" SizeY="2" Row="2" Column="3">
+            <DashboardLayoutPanel Id="schedule" SizeX="3" SizeY="2" Row="8" Column="3">
                 <HeaderTemplate>
                     <div class="panel-header-bar">
                         <div class="panel-header-title">Schedule reminders (14 days)</div>
@@ -153,7 +328,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="4" Column="0">
+            <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="8" Column="0">
                 <HeaderTemplate>
                     <div class="panel-header-bar">
                         <div class="panel-header-title">Open maintenance</div>
@@ -184,7 +359,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="4" Column="3">
+            <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="10" Column="3">
                 <HeaderTemplate>
                     <div class="panel-header-bar">
                         <div class="panel-header-title">Delinquencies</div>
@@ -215,7 +390,7 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="6" Column="0">
+            <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="10" Column="0">
                 <HeaderTemplate>
                     <div class="panel-header-bar">
                         <div class="panel-header-title">Warranties (90 days)</div>
@@ -246,10 +421,10 @@ else
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="6" Column="3">
+            <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="12" Column="0">
                 <HeaderTemplate>
                     <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
-                        <span>P/L by unit (YTD)</span>
+                        <span>P/L by unit (YTD, 3D)</span>
                         <a class="small" href="reports/profit-loss">Full report</a>
                     </div>
                 </HeaderTemplate>
@@ -261,18 +436,29 @@ else
                         }
                         else
                         {
-                            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
-                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
-                                <ChartSeriesCollection>
-                                    <ChartSeries DataSource="@UnitChart" XName="Label" YName="Net" Type="ChartSeriesType.Column" Name="Net" />
-                                </ChartSeriesCollection>
-                            </SfChart>
+                            <SfChart3D Width="100%" Height="100%" Theme="@ChartTheme" Tilt="-20" Depth="80" Rotation="15">
+                                <Chart3DPrimaryXAxis ValueType="Syncfusion.Blazor.Chart3D.ValueType.Category" LabelRotation="-45" />
+                                <Chart3DPrimaryYAxis />
+                                <Chart3DTooltipSettings Enable="true" />
+                                <Chart3DSeriesCollection>
+                                    <Chart3DSeries DataSource="@UnitChart"
+                                                   XName="Label"
+                                                   YName="Net"
+                                                   Type="Chart3DSeriesType.Column"
+                                                   Name="Net" />
+                                </Chart3DSeriesCollection>
+                            </SfChart3D>
                         }
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="plSeries" SizeX="6" SizeY="3" Row="9" Column="0">
-                <HeaderTemplate><div class="panel-header-title">Portfolio net (YTD by month)</div></HeaderTemplate>
+            <DashboardLayoutPanel Id="plSeries" SizeX="3" SizeY="3" Row="12" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
+                        <span>Portfolio net (YTD)</span>
+                        <span class="small text-muted">zoom / pan</span>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div style="height:100%; width:100%; padding:4px;">
                         @if (SeriesChart.Count == 0)
@@ -281,8 +467,12 @@ else
                         }
                         else
                         {
-                            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
+                            <SfChart @ref="_seriesChart" Width="100%" Height="100%" Theme="@ChartTheme">
                                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
+                                <ChartZoomSettings EnableSelectionZooming="true"
+                                                   EnableMouseWheelZooming="true"
+                                                   Mode="Syncfusion.Blazor.Charts.ZoomMode.X"
+                                                   EnableScrollbar="true" />
                                 <ChartSeriesCollection>
                                     <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
                                     <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Expense" Type="ChartSeriesType.Line" Name="Expense" />
@@ -299,12 +489,34 @@ else
 }
 
 @code {
+    private SfDashboardLayout? _layout;
+    private SfChart? _collectionChart;
+    private SfChart? _seriesChart;
     private DashboardSnapshot? Snap { get; set; }
     private string? ErrorMessage { get; set; }
     private List<ChartPoint> UnitChart { get; set; } = [];
     private List<ChartPoint> SeriesChart { get; set; } = [];
+    private List<DashboardStatusSlice> StatusSlices { get; set; } = [];
+    private List<DashboardMonthAmount> CollectionChart { get; set; } = [];
+    private List<SparkPoint> CollectionSparkData { get; set; } = [];
+    private List<DashboardHeatCell> HeatCells { get; set; } = [];
+    private string[] HeatMonthLabels { get; set; } = [];
+    private string[] HeatUnitLabels { get; set; } = [];
     private Theme ChartTheme { get; set; } = Theme.Fluent2;
     private string DisplayTime => Clock.ToDisplayTime(Clock.UtcNow).ToString("f");
+
+    private string CollectionRateLabel
+    {
+        get
+        {
+            if (Snap is null || Snap.ExpectedRentThisMonth <= 0)
+            {
+                return "no expected rent set";
+            }
+
+            return $"{Snap.CollectionRatePercent:0.#}% of expected";
+        }
+    }
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -330,6 +542,15 @@ else
         try
         {
             Snap = await DashboardService.GetSnapshotAsync();
+            StatusSlices = Snap.UnitStatusSlices.ToList();
+            CollectionChart = Snap.CollectionByMonth.ToList();
+            CollectionSparkData = Snap.CollectionByMonth
+                .Select(m => new SparkPoint { Label = m.Label, Amount = (double)m.Amount })
+                .ToList();
+            HeatCells = Snap.PaymentHeatmap.ToList();
+            HeatMonthLabels = Snap.PaymentHeatmap.Select(c => c.Month).Distinct().ToArray();
+            HeatUnitLabels = Snap.PaymentHeatmap.Select(c => c.Unit).Distinct().OrderBy(u => u).ToArray();
+
             var pl = await ProfitLoss.GetAsync(ProfitLossPeriod.YearToDate);
             UnitChart = pl.ByUnit
                 .Where(u => u.UnitId is not null)
@@ -351,11 +572,41 @@ else
         }
     }
 
+    private async Task ExportChartsAsync()
+    {
+        if (_collectionChart is not null)
+        {
+            await _collectionChart.ExportAsync(Syncfusion.Blazor.Charts.ExportType.PNG, "clerksuite-rent-collected");
+        }
+
+        if (_seriesChart is not null)
+        {
+            await _seriesChart.ExportAsync(Syncfusion.Blazor.Charts.ExportType.PNG, "clerksuite-portfolio-net");
+        }
+    }
+
+    private async Task ResetLayoutAsync()
+    {
+        if (_layout is null)
+        {
+            return;
+        }
+
+        await _layout.ResetPersistDataAsync();
+        await _layout.RefreshAsync();
+    }
+
     private sealed class ChartPoint
     {
         public string Label { get; set; } = "";
         public double Net { get; set; }
         public double Income { get; set; }
         public double Expense { get; set; }
+    }
+
+    private sealed class SparkPoint
+    {
+        public string Label { get; set; } = "";
+        public double Amount { get; set; }
     }
 }

@@ -11,8 +11,19 @@ Blank Brookside / Wiley Housing Authority lease forms live on the documents shar
 | Month-to-month (source DOCX)  | 1 calendar month  | `/volume1/apartments/docs/templates/brookside-month-to-month-lease.docx` |
 | Year lease (fillable PDF)     | preferred runtime | `/volume1/apartments/docs/templates/brookside-year-lease.pdf`            |
 | Month-to-month (fillable PDF) | preferred runtime | `/volume1/apartments/docs/templates/brookside-month-to-month-lease.pdf`  |
+| Payment receipt (fillable)    | NV-1 tenant copy  | `/volume1/apartments/docs/templates/Wiley_Payment_Receipt_Template.pdf`  |
 
-Container path: `/docs/templates/brookside-*`
+Container path: `/docs/templates/brookside-*` and `/docs/templates/Wiley_Payment_Receipt_Template.pdf`
+
+### Payment receipt (NV-1)
+
+Shipped blank AcroForm: `deploy/templates/Wiley_Payment_Receipt_Template.pdf` (also under
+`src/Wiley.Apartments.Web/Templates/` and copied into the image). On first generate,
+ClerkSuite seeds it into DocumentRoot/templates if missing. Filled example for clerks:
+`deploy/templates/Wiley_Payment_Receipt_EXAMPLE_FILLED.pdf`.
+
+AcroForm fields: `ReceiptNumber`, `ReceiptDate`, `TenantName`, `UnitNumber`, `PaymentType`,
+`Amount`, `PaymentMethod`, `ReferenceNumber`, `Description`, `Notes`, `ReceivedBy`, `Signature`.
 
 Source: Brookside WHA notices folder (blank templates only; filled tenant PDFs stay out of this folder).
 

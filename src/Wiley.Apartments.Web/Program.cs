@@ -8,6 +8,15 @@ try
     // Enable static web assets for `dotnet run` outside Development (avoids FileNotFound
     // for Syncfusion/_content and scoped CSS when ASPNETCORE_ENVIRONMENT=Production).
     builder.WebHost.UseStaticWebAssets();
+    if (builder.Environment.IsProduction()
+        && Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "Properties")))
+    {
+        // Source-tree run with Production: Syncfusion/_content used to 500 without UseStaticWebAssets.
+        Log.Warning(
+            "ASPNETCORE_ENVIRONMENT=Production while running from the project source tree. "
+            + "Local Mac work must use Development (launchSettings or ./scripts/run-local.sh). "
+            + "Production is for published/Docker (NAS) only.");
+    }
     builder.AddClerkSuiteSerilog();
     builder.AddClerkSuiteServices();
 

@@ -189,4 +189,46 @@ public class LedgerServiceTests
             (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(900m);
         }
     }
+
+    [Fact]
+    public async Task PostDepositPaymentAsync_ChargesRequiredDepositAndRecordsPayment()
+    {
+        var (db, service, _, clock) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            unit.SecurityDeposit = 900m;
+            unit.CurrentTenantId = tenant.Id;
+            unit.Status = UnitStatus.Occupied;
+            db.Occupancies.Add(new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                TenantId = tenant.Id,
+                StartUtc = clock.UtcNow.AddMonths(-1)
+            });
+            await db.SaveChangesAsync();
+
+            var payment = await service.PostDepositPaymentAsync(
+                tenant.Id,
+                unit.Id,
+                900m,
+                clock.UtcNow,
+                PaymentMethod.Check,
+                "Check #55");
+
+            payment.IsDeposit.Should().BeTrue();
+            payment.EntryType.Should().Be(LedgerEntryType.Payment);
+
+            var summary = await service.GetDepositSummaryAsync(tenant.Id, unit.Id);
+            summary.RequiredAmount.Should().Be(900m);
+            summary.PaidAmount.Should().Be(900m);
+            summary.HeldAmount.Should().Be(900m);
+            summary.StatusLabel.Should().Be("Held");
+            summary.StillDue.Should().Be(0m);
+
+            // Deposit charge + payment net to zero on running rent balance
+            (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(0m);
+        }
+    }
 }

@@ -554,6 +554,38 @@ h1:focus {
   border-top: 3px solid var(--cs-danger) !important;
 }
 
+.kpi-grid--viz .kpi-card .kpi-value {
+  font-size: 1.55rem;
+}
+
+.kpi-sub {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--cs-muted);
+}
+
+.kpi-sub a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.kpi-sub a:hover {
+  color: var(--cs-accent);
+}
+
+.kpi-spark {
+  margin-top: 0.5rem;
+  height: 36px;
+}
+
+.kpi-linear-gauge {
+  margin-top: 0.4rem;
+}
+
+.kpi-gauge-wrap {
+  margin: 0.15rem 0 0.25rem;
+}
+
 .unit-summary-card .unit-summary-value {
   font-size: 1.75rem;
   font-weight: 600;

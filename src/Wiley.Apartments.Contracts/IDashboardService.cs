@@ -3,6 +3,8 @@ namespace Wiley.Apartments.Contracts;
 public interface IDashboardService
 {
     Task<DashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RentPivotRow>> GetRentPivotRowsAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record DashboardSnapshot(
@@ -17,7 +19,31 @@ public sealed record DashboardSnapshot(
     IReadOnlyList<DelinquencyRow> Delinquencies,
     IReadOnlyList<DashboardWarrantyRow> ExpiringWarranties,
     IReadOnlyList<DashboardScheduleReminderRow> ScheduleReminders,
-    DateTime GeneratedUtc);
+    DateTime GeneratedUtc,
+    double OccupancyPercent,
+    decimal ExpectedRentThisMonth,
+    decimal CollectedThisMonth,
+    decimal OutstandingBalanceTotal,
+    IReadOnlyList<DashboardStatusSlice> UnitStatusSlices,
+    IReadOnlyList<DashboardMonthAmount> CollectionByMonth,
+    double CollectionRatePercent,
+    IReadOnlyList<DashboardHeatCell> PaymentHeatmap);
+
+public sealed record DashboardStatusSlice(string Status, int Count);
+
+public sealed record DashboardMonthAmount(string Label, decimal Amount);
+
+/// <summary>Unit × month cell for payment-collection heatmap (amount paid, deposits excluded).</summary>
+public sealed record DashboardHeatCell(string Unit, string Month, double Value);
+
+public sealed record RentPivotRow(
+    string Unit,
+    string Year,
+    string Month,
+    decimal Amount,
+    string EntryKind,
+    decimal PaymentAmount,
+    decimal ChargeAmount);
 
 public sealed record DashboardScheduleReminderRow(
     Guid Id,

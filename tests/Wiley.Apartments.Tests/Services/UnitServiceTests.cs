@@ -55,6 +55,22 @@ public class UnitServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_Throws_WhenDefaultSixteenCapReached()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db, maxUnits: 16);
+        for (var i = 1; i <= 16; i++)
+        {
+            await service.CreateAsync(new Unit { Number = i.ToString(), SqFt = 500, Beds = 1, Baths = 1 });
+        }
+
+        var act = () => service.CreateAsync(new Unit { Number = "17", SqFt = 500, Beds = 1, Baths = 1 });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*more than 16 residential units*");
+    }
+
+    [Fact]
     public async Task CreateAsync_Throws_WhenNumberDuplicate()
     {
         await using var db = CreateContext();

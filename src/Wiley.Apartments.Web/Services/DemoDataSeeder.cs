@@ -266,10 +266,10 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
         // Deposit + 24 months rent charges/payments
         var ledgerCount = 0;
         _db.LedgerEntries.Add(MakeCharge(jordan.Id, unit1.Id, lease.Id, deposit, residencyStart,
-            $"{DemoTag} Security deposit"));
+            $"{DemoTag} Security deposit", isDeposit: true));
         ledgerCount++;
         _db.LedgerEntries.Add(MakePayment(jordan.Id, unit1.Id, lease.Id, deposit, residencyStart.AddDays(1),
-            PaymentMethod.Check, $"{DemoTag} Deposit check #1042"));
+            PaymentMethod.Check, $"{DemoTag} Deposit check #1042", isDeposit: true));
         ledgerCount++;
 
         for (var m = 0; m < 24; m++)
@@ -891,7 +891,8 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
     }
 
     private static LedgerEntry MakeCharge(
-        Guid tenantId, Guid unitId, Guid leaseId, decimal amount, DateTime dateUtc, string notes, bool isLateFee = false) =>
+        Guid tenantId, Guid unitId, Guid leaseId, decimal amount, DateTime dateUtc, string notes,
+        bool isLateFee = false, bool isDeposit = false) =>
         new()
         {
             Id = Guid.NewGuid(),
@@ -902,11 +903,13 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
             Amount = amount,
             DateUtc = DateTime.SpecifyKind(dateUtc, DateTimeKind.Utc),
             Notes = notes,
-            IsLateFee = isLateFee
+            IsLateFee = isLateFee,
+            IsDeposit = isDeposit
         };
 
     private static LedgerEntry MakePayment(
-        Guid tenantId, Guid unitId, Guid leaseId, decimal amount, DateTime dateUtc, PaymentMethod method, string notes) =>
+        Guid tenantId, Guid unitId, Guid leaseId, decimal amount, DateTime dateUtc, PaymentMethod method, string notes,
+        bool isDeposit = false) =>
         new()
         {
             Id = Guid.NewGuid(),
@@ -917,7 +920,8 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
             Amount = amount,
             DateUtc = DateTime.SpecifyKind(dateUtc, DateTimeKind.Utc),
             Method = method,
-            Notes = notes
+            Notes = notes,
+            IsDeposit = isDeposit
         };
 
     private async Task<int> WriteStubDocumentAsync(

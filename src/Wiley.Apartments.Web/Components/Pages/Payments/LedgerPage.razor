@@ -14,6 +14,8 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IClerkToast Toast
+@using Syncfusion.Blazor.Buttons
+@inject ILogger<LedgerPage> Logger
 
 <PageTitle>Ledger</PageTitle>
 
@@ -109,11 +111,20 @@
                         <DropDownListFieldSettings Text="Text" Value="Value" />
                     </SfDropDownList>
                 </div>
+                <div class="col-md-4 d-flex align-items-end pb-2">
+                    <SfCheckBox @bind-Checked="FormIsDeposit" Label="Security deposit payment" />
+                </div>
             }
             <div class="col-12">
                 <label class="form-label">Notes / reference</label>
                 <SfTextBox @bind-Value="FormNotes" Placeholder="Check #, PayStar confirmation, memo…" />
             </div>
+            @if (ShowForm == "payment")
+            {
+                <div class="col-12">
+                    <SfCheckBox @bind-Checked="FormOpenReceipt" Label="Open receipt after save (print / download)" />
+                </div>
+            }
             <div class="col-12 d-flex gap-2 mt-2">
                 <SfButton CssClass="e-primary e-small"
                           Content="@(ShowForm == "payment" ? "Save payment" : "Save charge")"
@@ -150,6 +161,19 @@
         <GridColumn Field="@nameof(LedgerRow.RunningBalance)" HeaderText="Balance" Format="C2" Width="110" TextAlign="TextAlign.Right" />
         <GridColumn Field="@nameof(LedgerRow.Method)" HeaderText="Method" Width="120" />
         <GridColumn Field="@nameof(LedgerRow.Notes)" HeaderText="Notes" />
+        <GridColumn HeaderText="" Width="100" TextAlign="TextAlign.Center" AllowFiltering="false">
+            <Template>
+                @{
+                    var row = (LedgerRow)context;
+                }
+                @if (row.IsPayment)
+                {
+                    <SfButton CssClass="e-small e-outline"
+                              Content="Receipt"
+                              OnClick="@(() => OpenReceipt(row.EntryId, row.TenantId))" />
+                }
+            </Template>
+        </GridColumn>
     </GridColumns>
 </SfGrid>
 
@@ -180,6 +204,8 @@
     private DateTime? FormDate { get; set; } = DateTime.Today;
     private PaymentMethod FormMethod { get; set; } = PaymentMethod.Cash;
     private string? FormNotes { get; set; }
+    private bool FormIsDeposit { get; set; }
+    private bool FormOpenReceipt { get; set; } = true;
     private bool _queryApplied;
     private string? FilterUnitLabel { get; set; }
 
@@ -314,12 +340,17 @@
             var lines = await LedgerService.GetLedgerAsync(FilterTenantId, FilterUnitId);
             Rows = lines.Select(l => new LedgerRow
             {
+                EntryId = l.Entry.Id,
+                TenantId = l.Entry.TenantId,
                 DateDisplay = Clock.ToDisplayTime(l.Entry.DateUtc).ToString("d"),
                 TenantName = l.Entry.Tenant is null
                     ? ""
                     : $"{l.Entry.Tenant.LastName}, {l.Entry.Tenant.FirstName}",
                 UnitNumber = l.Entry.Unit?.Number ?? "",
-                EntryType = l.Entry.EntryType.ToString(),
+                EntryType = l.Entry.IsDeposit
+                    ? $"{l.Entry.EntryType} (deposit)"
+                    : l.Entry.EntryType.ToString(),
+                IsPayment = l.Entry.EntryType == LedgerEntryType.Payment,
                 Amount = l.Entry.Amount,
                 RunningBalance = l.RunningBalance,
                 Method = l.Entry.Method?.ToString() ?? "",
@@ -356,6 +387,7 @@
         try
         {
             var dateUtc = Clock.ToUtc(FormDate.Value.Date);
+            Guid? paymentId = null;
             if (ShowForm == "charge")
             {
                 await LedgerService.PostChargeAsync(
@@ -363,27 +395,57 @@
                     FormUnitId.Value,
                     FormAmount.Value,
                     dateUtc,
-                    notes: FormNotes);
+                    notes: FormNotes,
+                    isDeposit: FormIsDeposit);
                 await Toast.ShowSuccessAsync("Charge posted.");
             }
             else
             {
-                await LedgerService.PostPaymentAsync(
-                    FormTenantId.Value,
-                    FormUnitId.Value,
-                    FormAmount.Value,
-                    dateUtc,
-                    FormMethod,
-                    notes: FormNotes);
-                await Toast.ShowSuccessAsync($"Payment recorded ({FormMethod}). Balance updated.");
+                var payment = FormIsDeposit
+                    ? await LedgerService.PostDepositPaymentAsync(
+                        FormTenantId.Value,
+                        FormUnitId.Value,
+                        FormAmount.Value,
+                        dateUtc,
+                        FormMethod,
+                        notes: FormNotes)
+                    : await LedgerService.PostPaymentAsync(
+                        FormTenantId.Value,
+                        FormUnitId.Value,
+                        FormAmount.Value,
+                        dateUtc,
+                        FormMethod,
+                        notes: FormNotes);
+                paymentId = payment.Id;
+                await Toast.ShowSuccessAsync(
+                    FormIsDeposit
+                        ? $"Deposit payment recorded ({FormMethod})."
+                        : $"Payment recorded ({FormMethod}). Balance updated.");
+                Logger.LogInformation(
+                    "Clerk saved payment {PaymentId} deposit={IsDeposit} openReceipt={OpenReceipt}.",
+                    paymentId,
+                    FormIsDeposit,
+                    FormOpenReceipt);
             }
 
+            var tenantId = FormTenantId;
+            var unitId = FormUnitId;
+            var openReceipt = FormOpenReceipt && paymentId is not null;
             FilterTenantId = FormTenantId;
             FilterUnitId = FormUnitId;
             ShowForm = null;
             FormAmount = null;
             FormNotes = null;
+            FormIsDeposit = false;
             await LoadAsync();
+
+            if (openReceipt && paymentId is Guid pid)
+            {
+                var href = tenantId is Guid tid
+                    ? $"/payments/receipt/{pid}?tenantId={tid}"
+                    : $"/payments/receipt/{pid}";
+                Navigation.NavigateTo(href);
+            }
         }
         catch (Exception ex)
         {
@@ -394,6 +456,9 @@
             Busy = false;
         }
     }
+
+    private void OpenReceipt(Guid entryId, Guid tenantId) =>
+        Navigation.NavigateTo($"/payments/receipt/{entryId}?tenantId={tenantId}");
 
     private async Task GenerateRentChargesAsync()
     {
@@ -419,10 +484,13 @@
 
     private sealed class LedgerRow
     {
+        public Guid EntryId { get; set; }
+        public Guid TenantId { get; set; }
         public string DateDisplay { get; set; } = "";
         public string TenantName { get; set; } = "";
         public string UnitNumber { get; set; } = "";
         public string EntryType { get; set; } = "";
+        public bool IsPayment { get; set; }
         public decimal Amount { get; set; }
         public decimal RunningBalance { get; set; }
         public string Method { get; set; } = "";

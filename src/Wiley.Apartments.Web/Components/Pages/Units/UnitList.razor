@@ -204,7 +204,7 @@
         {
             args.Cancel = true;
             ErrorMessage = UnitService.MaxUnits > 0
-                ? $"Portfolio is capped at {UnitService.MaxUnits} residential units."
+                ? $"Portfolio is capped at {UnitService.MaxUnits} residential units (Community Center does not count). Ask IT to raise ClerkSuite:MaxUnits only if the town adds units."
                 : "Cannot add unit right now.";
             return;
         }

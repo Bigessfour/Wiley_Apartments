@@ -12,7 +12,7 @@ public class ClerkSuiteOptionsTests
 
         options.DatabaseProvider.Should().Be("Sqlite");
         options.LateFeesEnabled.Should().BeFalse();
-        options.MaxUnits.Should().Be(0);
+        options.MaxUnits.Should().Be(16);
         options.PaymentPortalUrl.Should().Contain("townofwiley.gov");
     }
 

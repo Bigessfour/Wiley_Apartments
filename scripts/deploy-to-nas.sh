@@ -136,6 +136,13 @@ nas_ssh "sudo mkdir -p '${NAS_DIR}' \
 nas_ssh "sudo mv /tmp/clerksuite-docker-compose.yml '${NAS_DIR}/docker-compose.yml'"
 nas_ssh "sudo chown root:root '${NAS_DIR}/docker-compose.yml'"
 
+RECEIPT_TEMPLATE="${ROOT}/deploy/templates/Wiley_Payment_Receipt_Template.pdf"
+if [[ -f ${RECEIPT_TEMPLATE} ]]; then
+	echo "==> Ensuring payment receipt template on NAS DocumentRoot"
+	nas_upload "${RECEIPT_TEMPLATE}" "/tmp/Wiley_Payment_Receipt_Template.pdf"
+	nas_ssh "sudo mv /tmp/Wiley_Payment_Receipt_Template.pdf /volume1/apartments/docs/templates/Wiley_Payment_Receipt_Template.pdf && sudo chmod 644 /volume1/apartments/docs/templates/Wiley_Payment_Receipt_Template.pdf"
+fi
+
 if [[ ${SKIP_ENV} == false ]]; then
 	echo "==> Ensuring remote .env from Keychain (values not printed)"
 	license="$(read_license_from_keychain)"

@@ -17,5 +17,7 @@ public class LedgerEntry
     public PaymentMethod? Method { get; set; }
     public string? Notes { get; set; }
     public bool IsLateFee { get; set; }
+    /// <summary>True when this line is a security-deposit charge or payment (not rent).</summary>
+    public bool IsDeposit { get; set; }
     public bool IsDeleted { get; set; }
 }

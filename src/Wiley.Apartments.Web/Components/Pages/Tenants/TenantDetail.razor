@@ -2,7 +2,11 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Configuration
@@ -10,9 +14,12 @@
 @inject ITenantService TenantService
 @inject IOccupancyService OccupancyService
 @inject ILeaseService LeaseService
+@inject ILedgerService LedgerService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Options.IOptions<ClerkSuiteOptions> ClerkOptions
+@inject ILogger<TenantDetail> Logger
+@inject IClerkToast Toast
 
 <PageTitle>@(Tenant is null ? "Tenant" : $"{Tenant.LastName}, {Tenant.FirstName}")</PageTitle>
 
@@ -22,20 +29,12 @@
 }
 else
 {
-    <div class="mb-3">
-        <SfButton CssClass="e-outline e-small" Content="← Tenants" OnClick="@(() => Navigation.NavigateTo("/tenants"))" />
-    </div>
-
     <PageHeader Title="@($"{Tenant.LastName}, {Tenant.FirstName}")"
-                Subtitle="@TenantSubtitle" />
-    @if (!string.IsNullOrWhiteSpace(Tenant.MailingAddress))
-    {
-        <p class="mb-1"><strong>Mailing:</strong> @Tenant.MailingAddress</p>
-    }
-    @if (!string.IsNullOrWhiteSpace(Tenant.EmergencyContact) && Tenant.EmergencyContact != "—")
-    {
-        <p><strong>Emergency:</strong> @Tenant.EmergencyContact</p>
-    }
+                Subtitle="Tenant profile — contact, occupancy, and deposit status">
+        <SfButton CssClass="e-outline e-small" Content="← Tenants"
+                  OnClick="@(() => Navigation.NavigateTo("/tenants"))" />
+    </PageHeader>
+
     @if (Tenant.IsDeleted)
     {
         <div class="alert alert-warning">This tenant is soft-deleted.</div>
@@ -46,7 +45,157 @@ else
         <div class="alert alert-warning">@ErrorMessage</div>
     }
 
-    <h2 class="h5 mt-4">Household</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-4">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Contact" />
+                <CardContent>
+                    <p class="mb-1"><strong>Phone:</strong> @(string.IsNullOrWhiteSpace(Tenant.Phone) ? "—" : Tenant.Phone)</p>
+                    <p class="mb-1"><strong>Email:</strong> @(string.IsNullOrWhiteSpace(Tenant.Email) ? "—" : Tenant.Email)</p>
+                    <p class="mb-1"><strong>Mailing:</strong> @(string.IsNullOrWhiteSpace(Tenant.MailingAddress) ? "—" : Tenant.MailingAddress)</p>
+                    <p class="mb-0"><strong>Emergency:</strong>
+                        @(string.IsNullOrWhiteSpace(Tenant.EmergencyContact) || Tenant.EmergencyContact == "—"
+                            ? "—"
+                            : Tenant.EmergencyContact)</p>
+                    @if (!string.IsNullOrWhiteSpace(Tenant.Notes))
+                    {
+                        <p class="mt-2 mb-0 small text-muted">@Tenant.Notes</p>
+                    }
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-4">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Security deposit" />
+                <CardContent>
+                    @if (Deposit is null)
+                    {
+                        <p class="text-muted mb-0">Loading deposit…</p>
+                    }
+                    else
+                    {
+                        <p class="mb-2">
+                            <DepositStatusChip Status="@Deposit.StatusLabel" />
+                            @if (!string.IsNullOrEmpty(Deposit.UnitNumber))
+                            {
+                                <span class="text-muted ms-2">Unit @Deposit.UnitNumber</span>
+                            }
+                        </p>
+                        <p class="unit-summary-value mb-1">
+                            @if (Deposit.StillDue > 0)
+                            {
+                                <span>@Deposit.StillDue.ToString("C") due</span>
+                            }
+                            else if (Deposit.HeldAmount > 0 || Deposit.PaidAmount > 0)
+                            {
+                                <span>@Deposit.HeldAmount.ToString("C") held</span>
+                            }
+                            else if (Deposit.RequiredAmount > 0)
+                            {
+                                <span>@Deposit.RequiredAmount.ToString("C") required</span>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </p>
+                        <p class="mb-1 small">
+                            Required @Deposit.RequiredAmount.ToString("C") ·
+                            Paid @Deposit.PaidAmount.ToString("C") ·
+                            Held @Deposit.HeldAmount.ToString("C")
+                        </p>
+                        @if (Deposit.LastDepositPaymentUtc is DateTime lastPay)
+                        {
+                            <p class="mb-2 small text-muted">
+                                Last payment @Clock.ToDisplayTime(lastPay).ToString("d")
+                                @if (!string.IsNullOrWhiteSpace(Deposit.LastDepositNotes))
+                                {
+                                    <span> — @Deposit.LastDepositNotes</span>
+                                }
+                            </p>
+                        }
+                        <div class="d-flex flex-wrap gap-2">
+                            <SfButton CssClass="e-primary e-small" Content="Record deposit"
+                                      Disabled="@(Tenant.IsDeleted || Deposit.UnitId is null)"
+                                      OnClick="OpenDepositForm" />
+                            <SfButton CssClass="e-outline e-small" Content="View ledger"
+                                      OnClick="@(() => Navigation.NavigateTo($"/payments?tenantId={TenantId}"))" />
+                        </div>
+                    }
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-4">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Occupancy" />
+                <CardContent>
+                    @if (CurrentOccupancy?.Unit is not null)
+                    {
+                        <p class="mb-1">
+                            Unit
+                            <a href="@($"/units/{CurrentOccupancy.UnitId}")">@CurrentOccupancy.Unit.Number</a>
+                        </p>
+                        <p class="mb-0 text-muted small">
+                            Since @Clock.ToDisplayTime(CurrentOccupancy.StartUtc).ToString("g") MT
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="mb-0 text-muted">No active occupancy</p>
+                    }
+                    @if (ActiveLease is not null)
+                    {
+                        <p class="mt-2 mb-0 small">
+                            Lease <LeaseStatusChip Status="ActiveLease.Status" />
+                            · @ActiveLease.Rent.ToString("C") / mo
+                            <a class="ms-1" href="@($"/leases/{ActiveLease.Id}")">Open</a>
+                        </p>
+                    }
+                </CardContent>
+            </SfCard>
+        </div>
+    </div>
+
+    @if (ShowDepositForm)
+    {
+        <SfCard CssClass="mb-4">
+            <CardHeader Title="Record security deposit payment" />
+            <CardContent>
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label">Amount</label>
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="DepositAmount" Format="C2" Min="0.01m" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Date</label>
+                        <SfDatePicker TValue="DateTime?" @bind-Value="DepositDate" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Method</label>
+                        <SfDropDownList TValue="PaymentMethod" TItem="MethodOption"
+                                        DataSource="@MethodOptions"
+                                        @bind-Value="DepositMethod">
+                            <DropDownListFieldSettings Text="Text" Value="Value" />
+                        </SfDropDownList>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes / check #</label>
+                        <SfTextBox @bind-Value="DepositNotes" Placeholder="Check # or memo" />
+                    </div>
+                    <div class="col-12">
+                        <SfCheckBox @bind-Checked="DepositOpenReceipt" Label="Open receipt after save" />
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <SfButton CssClass="e-primary e-small" Content="Save deposit" Disabled="@DepositBusy"
+                                  OnClick="SaveDepositAsync" />
+                        <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="CloseDepositForm" />
+                    </div>
+                </div>
+            </CardContent>
+        </SfCard>
+    }
+
+    <h2 class="h5 mt-2">Household</h2>
     <SfGrid TValue="HouseholdMember"
             DataSource="@Tenant.HouseholdMembers"
             Toolbar="@(new List<string> { "Add", "Edit", "Delete", "Update", "Cancel" })"
@@ -229,32 +378,26 @@ else
     private Tenant? Tenant { get; set; }
     private List<Occupancy> OccupancyHistory { get; set; } = [];
     private List<Lease> Leases { get; set; } = [];
+    private DepositSummary? Deposit { get; set; }
+    private Occupancy? CurrentOccupancy { get; set; }
+    private Lease? ActiveLease { get; set; }
     private string StatusMessage { get; set; } = "Loading…";
     private string? ErrorMessage { get; set; }
+    private bool ShowDepositForm { get; set; }
+    private bool DepositBusy { get; set; }
+    private decimal? DepositAmount { get; set; }
+    private DateTime? DepositDate { get; set; } = DateTime.Today;
+    private PaymentMethod DepositMethod { get; set; } = PaymentMethod.Check;
+    private string? DepositNotes { get; set; }
+    private bool DepositOpenReceipt { get; set; } = true;
 
-    private string TenantSubtitle
-    {
-        get
-        {
-            if (Tenant is null)
-            {
-                return string.Empty;
-            }
-
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(Tenant.Phone))
-            {
-                parts.Add(Tenant.Phone);
-            }
-
-            if (!string.IsNullOrWhiteSpace(Tenant.Email))
-            {
-                parts.Add(Tenant.Email);
-            }
-
-            return string.Join(" · ", parts);
-        }
-    }
+    private static readonly List<MethodOption> MethodOptions =
+    [
+        new() { Value = PaymentMethod.Cash, Text = "Cash" },
+        new() { Value = PaymentMethod.Check, Text = "Check" },
+        new() { Value = PaymentMethod.OnlineReference, Text = "Online reference" },
+        new() { Value = PaymentMethod.Other, Text = "Other" }
+    ];
 
     private bool PaymentPortalConfigured =>
         PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out _);
@@ -278,11 +421,91 @@ else
         {
             OccupancyHistory = [];
             Leases = [];
+            CurrentOccupancy = null;
+            ActiveLease = null;
+            Deposit = null;
             return;
         }
 
         OccupancyHistory = (await OccupancyService.GetHistoryForTenantAsync(TenantId)).ToList();
+        CurrentOccupancy = OccupancyHistory.FirstOrDefault(o => o.EndUtc is null);
         Leases = (await LeaseService.GetByTenantAsync(TenantId)).ToList();
+        ActiveLease = Leases
+            .Where(l => l.Status is LeaseStatus.Active or LeaseStatus.Amended)
+            .OrderByDescending(l => l.StartUtc)
+            .FirstOrDefault();
+        Deposit = await LedgerService.GetDepositSummaryAsync(TenantId);
+        if (Deposit.StillDue > 0 && DepositAmount is null)
+        {
+            DepositAmount = Deposit.StillDue;
+        }
+    }
+
+    private void OpenDepositForm()
+    {
+        ShowDepositForm = true;
+        ErrorMessage = null;
+        DepositDate ??= DateTime.Today;
+        if (Deposit is { StillDue: > 0 })
+        {
+            DepositAmount = Deposit.StillDue;
+        }
+    }
+
+    private void CloseDepositForm()
+    {
+        ShowDepositForm = false;
+        DepositNotes = null;
+    }
+
+    private async Task SaveDepositAsync()
+    {
+        if (Deposit?.UnitId is null)
+        {
+            ErrorMessage = "Tenant has no current unit — assign occupancy before recording a deposit.";
+            return;
+        }
+
+        if (DepositAmount is null or <= 0 || DepositDate is null)
+        {
+            ErrorMessage = "Deposit amount and date are required.";
+            return;
+        }
+
+        DepositBusy = true;
+        ErrorMessage = null;
+        try
+        {
+            var payment = await LedgerService.PostDepositPaymentAsync(
+                TenantId,
+                Deposit.UnitId.Value,
+                DepositAmount.Value,
+                Clock.ToUtc(DepositDate.Value.Date),
+                DepositMethod,
+                DepositNotes);
+            Logger.LogInformation(
+                "Tenant page recorded deposit payment {PaymentId} for tenant {TenantId} unit {UnitId}.",
+                payment.Id,
+                TenantId,
+                Deposit.UnitId);
+            await Toast.ShowSuccessAsync("Security deposit recorded.");
+            ShowDepositForm = false;
+            DepositNotes = null;
+            await ReloadAsync();
+            if (DepositOpenReceipt)
+            {
+                Navigation.NavigateTo($"/payments/receipt/{payment.Id}?tenantId={TenantId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Deposit save failed for tenant {TenantId}.", TenantId);
+        }
+        finally
+        {
+            DepositBusy = false;
+        }
     }
 
     private async Task OnHouseholdCompleteAsync(ActionEventArgs<HouseholdMember> args)
@@ -394,5 +617,11 @@ else
             ErrorMessage = ex.Message;
             await ReloadAsync();
         }
+    }
+
+    private sealed class MethodOption
+    {
+        public PaymentMethod Value { get; set; }
+        public string Text { get; set; } = "";
     }
 }

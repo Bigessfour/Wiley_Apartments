@@ -145,7 +145,7 @@
 {
     <h2 class="h6 mt-4">Viewer</h2>
     <p class="small text-muted">@_viewLabel</p>
-    <ClerkPdfViewer PdfBytes="@_pdfBytes" Height="640px" />
+    <ClerkPdfViewer PdfBytes="@_pdfBytes" DownloadFileName="@_viewLabel" Height="640px" />
 }
 else if (!string.IsNullOrEmpty(ViewerHint))
 {

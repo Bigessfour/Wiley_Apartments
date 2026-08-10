@@ -20,17 +20,23 @@
     <PackageReference Include="Syncfusion.Blazor.Buttons" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Calendars" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Cards" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.Chart3D" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Charts" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.CircularGauge" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.DropDowns" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.FileManager" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.FileManager.PhysicalFileProvider" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Grid" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.HeatMap" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Layouts" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.LinearGauge" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Navigations" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Notifications" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.PivotTable" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Schedule" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.Sparkline" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.2" />
     <!-- WordProcessor / DocumentEditor deferred to T6.1 vault editing; leases use SfPdfViewer + DocIO/Pdf. -->
     <PackageReference Include="Syncfusion.DocIO.Net.Core" Version="34.2.2" />
@@ -51,6 +57,13 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Wiley.Apartments.Tests" />
     <InternalsVisibleTo Include="Wiley.Apartments.IntegrationTests" />
+  </ItemGroup>
+
+  <!-- Blank AcroForm receipt; also seeded to DocumentRoot/templates at runtime. -->
+  <ItemGroup>
+    <None Update="Templates\Wiley_Payment_Receipt_Template.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

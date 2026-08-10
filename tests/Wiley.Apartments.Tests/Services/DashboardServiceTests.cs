@@ -91,8 +91,93 @@ public class DashboardServiceTests
             snap.TotalUnits.Should().Be(2);
             snap.Occupied.Should().Be(1);
             snap.Vacant.Should().Be(1);
+            snap.OccupancyPercent.Should().Be(50);
+            snap.UnitStatusSlices.Should().Contain(s => s.Status == "Occupied" && s.Count == 1);
+            snap.CollectionByMonth.Should().HaveCount(12);
+            snap.PaymentHeatmap.Should().NotBeNull();
+            snap.CollectionRatePercent.Should().BeGreaterThanOrEqualTo(0);
             snap.ExpiringWarranties.Should().ContainSingle(w => w.AssetLabel.Contains("Fridge"));
             snap.OpenWorkOrders.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_ComputesCollectionKpis_ExcludingDeposits()
+    {
+        var (db, service) = Create();
+        await using (db)
+        {
+            var unit = new Unit
+            {
+                Id = Guid.NewGuid(),
+                Number = "301",
+                SqFt = 700,
+                Beds = 2,
+                Baths = 1,
+                Status = UnitStatus.Occupied,
+                MonthlyRent = 900m
+            };
+            var tenant = new Tenant
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Ada",
+                LastName = "Clerk",
+                IsDeleted = false
+            };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Charge,
+                    Amount = 1200m,
+                    DateUtc = new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc)
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Payment,
+                    Amount = 900m,
+                    DateUtc = new DateTime(2026, 8, 5, 12, 0, 0, DateTimeKind.Utc),
+                    IsDeposit = false
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Payment,
+                    Amount = 500m,
+                    DateUtc = new DateTime(2026, 7, 15, 12, 0, 0, DateTimeKind.Utc),
+                    IsDeposit = true
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Charge,
+                    Amount = 500m,
+                    DateUtc = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc),
+                    IsDeposit = true,
+                    Notes = "Security deposit charge"
+                });
+            await db.SaveChangesAsync();
+
+            var snap = await service.GetSnapshotAsync();
+            snap.ExpectedRentThisMonth.Should().Be(900m);
+            snap.CollectedThisMonth.Should().Be(900m);
+            // Aug charge 1200 − rent 900 − Jul deposit charge/payment net 0 → +300
+            snap.OutstandingBalanceTotal.Should().Be(300m);
+            snap.CollectionByMonth.Should().Contain(m => m.Label.Contains("Aug") && m.Amount == 900m);
+            snap.CollectionByMonth.Should().Contain(m => m.Label.Contains("Jul") && m.Amount == 0m);
+            snap.CollectionRatePercent.Should().Be(100);
+            snap.PaymentHeatmap.Should().Contain(c => c.Unit == "301" && c.Month.Contains("Aug") && c.Value == 900);
         }
     }
 }
