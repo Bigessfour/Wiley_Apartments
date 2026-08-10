@@ -376,6 +376,7 @@ public sealed class LedgerService : ILedgerService
                 // Invoice-style: each charge's due window is DateUtc + GraceDays.
                 if (e.EntryType == LedgerEntryType.Charge
                     && !e.IsLateFee
+                    && !e.IsDeposit
                     && e.DateUtc.AddDays(settings.GraceDays) < asOf)
                 {
                     hasPastDueCharge = true;
@@ -425,6 +426,7 @@ public sealed class LedgerService : ILedgerService
             .Where(e => !e.IsDeleted
                 && e.EntryType == LedgerEntryType.Charge
                 && !e.IsLateFee
+                && !e.IsDeposit
                 && e.DateUtc >= monthStart
                 && e.DateUtc < monthEnd)
             .Select(e => new { e.TenantId, e.UnitId })

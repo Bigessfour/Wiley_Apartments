@@ -27,6 +27,7 @@ public sealed class PortfolioProfitLossService : IPortfolioProfitLossService
         var payments = await _db.LedgerEntries.AsNoTracking()
             .Where(e => !e.IsDeleted
                 && e.EntryType == LedgerEntryType.Payment
+                && !e.IsDeposit
                 && e.DateUtc >= start
                 && e.DateUtc <= end)
             .ToListAsync(cancellationToken);

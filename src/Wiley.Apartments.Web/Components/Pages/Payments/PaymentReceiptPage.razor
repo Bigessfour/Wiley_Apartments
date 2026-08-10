@@ -112,16 +112,12 @@ else if (_pdfBytes is { Length: > 0 })
         _viewerReady = false;
         try
         {
-            var save = !_vaultSaved;
-            var result = await ReceiptService.GenerateAsync(EntryId, saveToVault: save);
+            var result = await ReceiptService.GenerateAsync(EntryId, saveToVault: true);
             _pdfBytes = result.PdfBytes;
             _fileName = result.FileName;
             _receiptNumber = result.ReceiptNumber;
-            if (result.DocumentId is Guid)
-            {
-                _documentId = result.DocumentId;
-                _vaultSaved = true;
-            }
+            _documentId = result.DocumentId;
+            _vaultSaved = result.DocumentId is Guid;
 
             _loadedId = EntryId;
             Logger.LogInformation("Opened receipt page for payment {EntryId} ({ReceiptNumber}).", EntryId, _receiptNumber);

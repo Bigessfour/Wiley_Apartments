@@ -227,8 +227,62 @@ public class LedgerServiceTests
             summary.StatusLabel.Should().Be("Held");
             summary.StillDue.Should().Be(0m);
 
-            // Deposit charge + payment net to zero on running rent balance
             (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(0m);
+        }
+    }
+
+    [Fact]
+    public async Task PostMonthlyRentChargesAsync_StillPostsRent_WhenDepositChargeExistsSameMonth()
+    {
+        var (db, service, _, clock) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            unit.SecurityDeposit = 900m;
+            unit.MonthlyRent = 725m;
+            unit.CurrentTenantId = tenant.Id;
+            unit.Status = UnitStatus.Occupied;
+            var lease = new Lease
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                TenantId = tenant.Id,
+                StartUtc = clock.UtcNow.AddMonths(-2),
+                EndUtc = clock.UtcNow.AddMonths(10),
+                Rent = 725m,
+                Deposit = 900m,
+                Status = LeaseStatus.Active,
+                TemplateUsed = "brookside-year-lease.docx"
+            };
+            db.Leases.Add(lease);
+            await db.SaveChangesAsync();
+
+            await service.PostDepositPaymentAsync(
+                tenant.Id, unit.Id, 900m, clock.UtcNow, PaymentMethod.Check, "Check #1");
+
+            (await service.PostMonthlyRentChargesAsync(clock.UtcNow)).Should().Be(1);
+            (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(725m);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyLateFeesAsync_IgnoresPastDueDepositCharges()
+    {
+        var (db, service, lateFees, clock) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            await lateFees.UpdateAsync(enabled: true, amount: 25m, graceDays: 5);
+            await service.PostChargeAsync(
+                tenant.Id,
+                unit.Id,
+                900m,
+                clock.UtcNow.AddDays(-20),
+                notes: "Security deposit",
+                isDeposit: true);
+
+            (await service.ApplyLateFeesAsync(clock.UtcNow)).Should().Be(0);
+            (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(900m);
         }
     }
 }

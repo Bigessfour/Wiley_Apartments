@@ -88,18 +88,39 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         Guid? documentId = null;
         if (saveToVault)
         {
-            await using var stream = new MemoryStream(pdf);
-            var doc = await _documents.UploadAsync(
-                DocumentEntityType.Tenant,
-                entry.TenantId,
-                DocumentCategory.Receipt,
-                fileName,
-                "application/pdf",
-                stream,
-                uploadedBy,
-                $"tenants/{entry.TenantId:N}/receipts",
-                cancellationToken);
-            documentId = doc.Id;
+            var existing = await _db.Documents.AsNoTracking()
+                .Where(d => !d.IsDeleted
+                            && d.EntityType == DocumentEntityType.Tenant
+                            && d.EntityId == entry.TenantId
+                            && d.Category == DocumentCategory.Receipt
+                            && d.OriginalFileName == fileName)
+                .OrderByDescending(d => d.UploadedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existing is not null)
+            {
+                documentId = existing.Id;
+                _logger.LogInformation(
+                    "Reusing existing vault receipt {DocumentId} for payment {PaymentId} ({FileName}).",
+                    documentId,
+                    paymentEntryId,
+                    fileName);
+            }
+            else
+            {
+                await using var stream = new MemoryStream(pdf);
+                var doc = await _documents.UploadAsync(
+                    DocumentEntityType.Tenant,
+                    entry.TenantId,
+                    DocumentCategory.Receipt,
+                    fileName,
+                    "application/pdf",
+                    stream,
+                    uploadedBy,
+                    $"tenants/{entry.TenantId:N}/receipts",
+                    cancellationToken);
+                documentId = doc.Id;
+            }
         }
 
         await WriteReceiptAuditAsync(

@@ -112,4 +112,43 @@ public class PortfolioProfitLossServiceTests
             report.Series.Count.Should().BeGreaterThanOrEqualTo(10);
         }
     }
+
+    [Fact]
+    public async Task GetAsync_ExcludesDepositPaymentsFromIncome()
+    {
+        var (db, service, _) = Create();
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "1", SqFt = 500, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "A", LastName = "B" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Payment,
+                    Amount = 800m,
+                    DateUtc = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+                    IsDeposit = false
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Payment,
+                    Amount = 900m,
+                    DateUtc = new DateTime(2026, 3, 2, 0, 0, 0, DateTimeKind.Utc),
+                    IsDeposit = true
+                });
+            await db.SaveChangesAsync();
+
+            var report = await service.GetAsync(ProfitLossPeriod.YearToDate);
+            report.TotalIncome.Should().Be(800m);
+            report.ByUnit.Single(u => u.UnitId == unit.Id).Income.Should().Be(800m);
+        }
+    }
 }
