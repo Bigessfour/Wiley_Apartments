@@ -8,6 +8,18 @@ Sign in with your seeded town account. Prefer **Sign out** when leaving a shared
 
 ---
 
+## Screenshots (orientation)
+
+| Screen | File |
+| ------ | ---- |
+| Dashboard | [handover/screenshots/01-dashboard.png](handover/screenshots/01-dashboard.png) |
+| Payments / ledger | [handover/screenshots/02-payments.png](handover/screenshots/02-payments.png) |
+| Tenants | [handover/screenshots/03-tenants.png](handover/screenshots/03-tenants.png) |
+
+Captured from Development Mac smoke (2026-08-10). Live NAS uses the same layout at `http://mr-storage:8082`.
+
+---
+
 ## Daily path (happy path)
 
 | Step | Where         | What to do                                                                                                                                                                                                                |

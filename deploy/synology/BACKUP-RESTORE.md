@@ -4,18 +4,27 @@ Covers the two data planes clerks depend on:
 
 | Plane            | Location                                                                 | Typical DSM coverage                                                                                          |
 | ---------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| SQLite DB volume | Docker volume `clerksuite-data` → `/data/clerksuite.db` inside container | Hyper Backup / Snapshot Replication of `/volume1/docker` (or the volume path DSM shows for Container Manager) |
-| Document vault   | Host `/volume1/apartments/docs`                                          | Hyper Backup / Shared Folder Sync / snapshots on the `apartments` share                                       |
+| SQLite DB volume | Docker volume `clerksuite_clerksuite-data` → host `/volume1/@docker/volumes/clerksuite_clerksuite-data/_data/clerksuite.db` | **Active Backup** (installed on DS225+) and/or Hyper Backup / Snapshot Replication covering Docker volumes |
+| Document vault   | Host `/volume1/apartments/docs`                                          | Active Backup / Hyper Backup / Shared Folder Sync / snapshots on the `apartments` share                       |
 
 **Do not** back up the DB file over SMB as the live write path. Keep SQLite on the Docker volume; back up that volume (or its host bind path).
+
+### Agent preflight (2026-08-10)
+
+| Check | Result |
+| ----- | ------ |
+| Document share present | `/volume1/apartments/docs` with `leases`, `templates`, `uploads`, `appliances`, `tenants` |
+| DB file on Docker volume | `/volume1/@docker/volumes/clerksuite_clerksuite-data/_data/clerksuite.db` |
+| DSM backup package | `ActiveBackup` package present on Mr_Storage (Hyper Backup package name not listed) |
+| Live restore drill | **Not run** — requires maintenance window + IT operator sign-off below |
 
 ---
 
 ## Pre-flight (once)
 
-1. Confirm Hyper Backup (or Snapshot Replication) includes:
+1. Confirm Active Backup and/or Hyper Backup (or Snapshot Replication) includes:
    - Document share: `/volume1/apartments/docs`
-   - App project + volume: `/volume1/docker/clerksuite` **and** the Docker volume backing `clerksuite-data`
+   - Docker volume backing `clerksuite_clerksuite-data` (or `/volume1/@docker/volumes/clerksuite_clerksuite-data`)
 2. Note retention (daily + weekly) and last successful job time in DSM.
 3. Record who can run restores (town IT / mayor / clerk with DSM access).
 
@@ -76,7 +85,7 @@ From a clerk PC on Tailscale / LAN:
 
 | Step                                                       | Date | Operator | Pass |
 | ---------------------------------------------------------- | ---- | -------- | ---- |
-| Hyper Backup covers DB volume + `/volume1/apartments/docs` |      |          |      |
+| Hyper Backup / Active Backup covers DB volume + `/volume1/apartments/docs` |      |          |      |
 | Restore docs share                                         |      |          |      |
 | Restore `clerksuite.db` volume                             |      |          |      |
 | App healthy on :8082                                       |      |          |      |
