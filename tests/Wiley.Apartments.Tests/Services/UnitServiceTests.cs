@@ -10,7 +10,7 @@ namespace Wiley.Apartments.Tests.Services;
 
 public class UnitServiceTests
 {
-    private static UnitService CreateService(ApartmentsDbContext db, int maxUnits = 16)
+    private static UnitService CreateService(ApartmentsDbContext db, int maxUnits = 0)
     {
         var options = Options.Create(new ClerkSuiteOptions { MaxUnits = maxUnits });
         return new UnitService(db, options, NullLogger<UnitService>.Instance);
@@ -26,6 +26,19 @@ public class UnitServiceTests
         var db = new ApartmentsDbContext(options);
         db.Database.EnsureCreated();
         return db;
+    }
+
+    [Fact]
+    public async Task CreateAsync_AllowsBeyondSixteen_WhenUnlimited()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db, maxUnits: 0);
+        for (var i = 1; i <= 17; i++)
+        {
+            await service.CreateAsync(new Unit { Number = i.ToString(), SqFt = 500, Beds = 1, Baths = 1 });
+        }
+
+        (await service.CountAsync()).Should().Be(17);
     }
 
     [Fact]

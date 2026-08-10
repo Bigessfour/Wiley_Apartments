@@ -20,5 +20,6 @@ public interface IUnitService
     /// <summary>Residential unit count only (!IsFacility).</summary>
     Task<int> CountAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Optional residential cap. <c>0</c> = unlimited.</summary>
     int MaxUnits { get; }
 }

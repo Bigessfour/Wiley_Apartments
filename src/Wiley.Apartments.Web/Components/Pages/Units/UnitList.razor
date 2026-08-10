@@ -33,7 +33,7 @@
     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridTemplates>
         <EmptyRecordTemplate>
-            <div class="grid-empty-hint">No units yet — use Add on the toolbar (max @UnitService.MaxUnits residential).</div>
+            <div class="grid-empty-hint">No units yet — use Add on the toolbar.</div>
         </EmptyRecordTemplate>
     </GridTemplates>
     <GridEditSettings AllowAdding="@CanAddUnit"
@@ -134,11 +134,19 @@
     private string? ErrorMessage { get; set; }
     private int ResidentialCount => Units.Count(u => !u.IsFacility);
     private int FacilityCount => Units.Count(u => u.IsFacility);
-    private bool CanAddUnit => ResidentialCount < UnitService.MaxUnits;
-    private string Subtitle =>
-        FacilityCount > 0
-            ? $"Town of Wiley — {ResidentialCount} of {UnitService.MaxUnits} residential + {FacilityCount} facility. Edit layout inline, or Open for inventory."
-            : $"Town of Wiley — {ResidentialCount} of {UnitService.MaxUnits} residential units. Edit layout inline, or Open for inventory.";
+    private bool CanAddUnit => UnitService.MaxUnits <= 0 || ResidentialCount < UnitService.MaxUnits;
+    private string Subtitle
+    {
+        get
+        {
+            var residential = UnitService.MaxUnits > 0
+                ? $"{ResidentialCount} of {UnitService.MaxUnits} residential"
+                : $"{ResidentialCount} residential";
+            return FacilityCount > 0
+                ? $"Town of Wiley — {residential} + {FacilityCount} facility. Edit layout inline, or Open for inventory."
+                : $"Town of Wiley — {residential} units. Edit layout inline, or Open for inventory.";
+        }
+    }
 
     private readonly List<string> ToolbarItems =
     [
@@ -172,7 +180,9 @@
         if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && !CanAddUnit)
         {
             args.Cancel = true;
-            ErrorMessage = $"Portfolio is capped at {UnitService.MaxUnits} residential units.";
+            ErrorMessage = UnitService.MaxUnits > 0
+                ? $"Portfolio is capped at {UnitService.MaxUnits} residential units."
+                : "Cannot add unit right now.";
             return;
         }
 

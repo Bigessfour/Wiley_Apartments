@@ -29,7 +29,8 @@ public sealed class UnitSeeder : IUnitSeeder
         var hasResidential = await _db.Units.AnyAsync(u => !u.IsFacility, cancellationToken);
         if (!hasResidential)
         {
-            var max = Math.Min(_options.MaxUnits, 16);
+            // Initial portfolio seed stays at 16 placeholders; MaxUnits=0 means unlimited creates after that.
+            var max = _options.MaxUnits > 0 ? Math.Min(_options.MaxUnits, 16) : 16;
             for (var i = 1; i <= max; i++)
             {
                 _db.Units.Add(new Unit

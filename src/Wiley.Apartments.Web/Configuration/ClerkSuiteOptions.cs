@@ -11,5 +11,9 @@ public class ClerkSuiteOptions
     public bool LateFeesEnabled { get; set; }
     public decimal LateFeeAmount { get; set; }
     public int LateFeeGraceDays { get; set; }
-    public int MaxUnits { get; set; } = 16;
+    /// <summary>
+    /// Soft residential unit cap. <c>0</c> (default) = unlimited.
+    /// Set a positive value via <c>ClerkSuite__MaxUnits</c> only if you want a hard stop.
+    /// </summary>
+    public int MaxUnits { get; set; }
 }

@@ -70,7 +70,7 @@ public sealed class UnitService : IUnitService
                     "A facility unit already exists. Use Number \"CC\" for Community Center only.");
             }
         }
-        else
+        else if (MaxUnits > 0)
         {
             var residentialCount = await _db.Units.CountAsync(u => !u.IsFacility, cancellationToken);
             if (residentialCount >= MaxUnits)
