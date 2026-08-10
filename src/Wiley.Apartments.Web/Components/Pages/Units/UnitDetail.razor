@@ -109,7 +109,7 @@ else
                                     <GridColumn Field="@nameof(Asset.Serial)" HeaderText="Serial" Width="120" />
                                     <GridColumn Field="@nameof(Asset.WarrantyEnd)"
                                                 HeaderText="Warranty end"
-                                                Format="d"
+                                                Format="MM/dd/yyyy"
                                                 Width="120" />
                                     <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
                                 </GridColumns>
@@ -126,12 +126,12 @@ else
                                     <GridColumn Field="@nameof(Flooring.Type)" HeaderText="Type / material" Width="140" />
                                     <GridColumn Field="@nameof(Flooring.InstallDate)"
                                                 HeaderText="Installed"
-                                                Format="d"
+                                                Format="MM/dd/yyyy"
                                                 Width="110" />
                                     <GridColumn Field="@nameof(Flooring.Condition)" HeaderText="Condition" Width="110" />
                                     <GridColumn Field="@nameof(Flooring.ReplacedDate)"
                                                 HeaderText="Replaced"
-                                                Format="d"
+                                                Format="MM/dd/yyyy"
                                                 Width="110" />
                                     <GridColumn Field="@nameof(Flooring.Notes)" HeaderText="Notes" Width="160" />
                                 </GridColumns>
@@ -177,17 +177,17 @@ else
                             <GridColumn Field="@nameof(Asset.InstallDate)"
                                         HeaderText="Installed"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="d"
+                                        Format="MM/dd/yyyy"
                                         Width="120" />
                             <GridColumn Field="@nameof(Asset.WarrantyStart)"
                                         HeaderText="Warranty start"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="d"
+                                        Format="MM/dd/yyyy"
                                         Width="130" />
                             <GridColumn Field="@nameof(Asset.WarrantyEnd)"
                                         HeaderText="Warranty end"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="d"
+                                        Format="MM/dd/yyyy"
                                         Width="130" />
                             <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
                             <GridColumn Field="@nameof(Asset.Notes)" HeaderText="Notes" Width="180" />
@@ -226,7 +226,7 @@ else
                             <GridColumn Field="@nameof(Flooring.InstallDate)"
                                         HeaderText="Installed"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="d"
+                                        Format="MM/dd/yyyy"
                                         Width="120" />
                             <GridColumn Field="@nameof(Flooring.Condition)"
                                         HeaderText="Condition"
@@ -234,7 +234,7 @@ else
                             <GridColumn Field="@nameof(Flooring.ReplacedDate)"
                                         HeaderText="Replaced"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="d"
+                                        Format="MM/dd/yyyy"
                                         Width="120" />
                             <GridColumn Field="@nameof(Flooring.Notes)"
                                         HeaderText="Notes"
@@ -275,7 +275,7 @@ else
                 return "No flooring records yet.";
             }
 
-            var installed = current.InstallDate?.ToString("d") ?? "unknown date";
+            var installed = current.InstallDate?.ToString("MM/dd/yyyy") ?? "unknown date";
             return $"{current.Type} · installed {installed}";
         }
     }

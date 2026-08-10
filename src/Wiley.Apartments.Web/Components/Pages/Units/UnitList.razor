@@ -39,9 +39,11 @@
                       Mode="EditMode.Normal"
                       ShowDeleteConfirmDialog="true" />
     <GridColumns>
+        <GridColumn Field="@nameof(Unit.Id)"
+                    IsPrimaryKey="true"
+                    Visible="false" />
         <GridColumn Field="@nameof(Unit.Number)"
                     HeaderText="Unit #"
-                    IsPrimaryKey="true"
                     Width="100"
                     ValidationRules="@(new ValidationRules { Required = true })" />
         <GridColumn Field="@nameof(Unit.SqFt)"
@@ -145,6 +147,15 @@
             args.Cancel = true;
             ErrorMessage = $"Portfolio is capped at {UnitService.MaxUnits} units.";
             return;
+        }
+
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && args.Data is not null)
+        {
+            // Stable grid PK (matches Asset/Flooring pattern); service still assigns Id on create if empty.
+            if (args.Data.Id == Guid.Empty)
+            {
+                args.Data.Id = Guid.NewGuid();
+            }
         }
 
         if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null
