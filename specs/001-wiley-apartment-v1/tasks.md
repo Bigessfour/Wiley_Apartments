@@ -227,31 +227,29 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 
 ## Phase 7 — Hardening & Handover
 
-> **Local + NAS progress (2026-08-10):** Product Phases 0–6 + Convergence + dashboard viz + receipts/deposits on `feature/phase2-tenants-t2.1` @ `2c60129`.
-> Offline evidence: `dotnet build` clean; **120 unit** tests green; NAS container Up on **8082** after `./scripts/deploy-to-nas.sh`.
-> Converge report: [docs/handover/SPECKIT-CONVERGE.md](../../docs/handover/SPECKIT-CONVERGE.md) — **product converged**.
-> Done report: [docs/handover/SPECKIT-DONE.md](../../docs/handover/SPECKIT-DONE.md) — **NOT DONE** until T7.1–T7.3 human/NAS sign-off.
+> **Local + NAS progress (2026-08-10):** Product Phases 0–6 + Convergence + dashboard viz + receipts/deposits on `feature/phase2-tenants-t2.1`.
+> Offline evidence: `dotnet build` clean; **120 unit** tests green; NAS container Up on **8082**.
+> **Clerk acceptance (T7.1 / T7.3):** signed 2026-08-10 after live review with both town clerks (Stephen present).
+> Still open: **T7.2** live restore drill (IT), then **T7.4** final Spec Kit done.
 > Status board: [docs/handover/T7-STATUS.md](../../docs/handover/T7-STATUS.md).
-> Still blocked for Done-when: T7.1 Windows dual-clerk sign-off, T7.2 live restore drill, T7.3 clerk signature on guide, T7.4 re-run after those.
 
-- [ ] **T7.1** End-to-end clerk workflow test on real NAS from both Windows 11 machines.
+- [x] **T7.1** End-to-end clerk workflow test on real NAS from both Windows 11 machines.
   - **Done when:** Both clerks complete: create-unit → add-tenant → generate-lease → record-payment → upload-document without errors.
-  - **Evidence:** [quickstart.md](./quickstart.md) sign-off table completed.
-  - **Agent (2026-08-10):** Deployed `clerksuite:2c60129`; `http://mr-storage:8082/Account/Login` → 200. Dual Windows clerk sign-off still required.
+  - **Evidence:** [quickstart.md](./quickstart.md) sign-off table — Clerk A + Clerk B **Pass 2026-08-10**.
 
 - [ ] **T7.2** Backup verification (Hyper Backup / snapshots cover data + docs).
   - **Done when:** Documented restore test succeeds (DB volume + `/volume1/apartments/docs`).
   - **Paths:** `deploy/synology/BACKUP-RESTORE.md`
-  - **Agent (2026-08-10):** Preflight — Active Backup package present; DB at `clerksuite_clerksuite-data` volume; docs share OK. Live restore drill + sign-off still required.
+  - **Agent (2026-08-10):** Preflight — Active Backup package present; DB at `clerksuite_clerksuite-data` volume; docs share OK. Live restore drill + IT sign-off still required.
 
-- [ ] **T7.3** User guide / quick-reference for the two clerks (one-pager + screenshots).
+- [x] **T7.3** User guide / quick-reference for the two clerks (one-pager + screenshots).
   - **Done when:** Guide exists at `docs/clerk-quick-reference.md`; reviewed by at least one clerk.
   - **Paths:** `docs/clerk-quick-reference.md`, `docs/handover/screenshots/`
-  - **Agent (2026-08-10):** One-pager + dashboard/payments/tenants screenshots. Clerk review signature still required.
+  - **Done (2026-08-10):** Both clerks signed the review table after live walkthrough.
 
 - [ ] **T7.4** Final Spec Kit converge / done check.
   - **Done when:** `/speckit.converge` or `speckit-done` skill reports zero Critical/Major gaps against this task list and [spec.md](./spec.md) acceptance criteria.
-  - **Agent (2026-08-10):** Re-audited — remaining Critical/Major are T7.1–T7.3 human evidence only. Re-run after those sign-offs.
+  - **Blocked on T7.2** IT restore drill sign-off; re-run after that.
 
 **Checkpoint:** Project ready for production clerk use.
 

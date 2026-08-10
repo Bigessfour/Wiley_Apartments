@@ -10,11 +10,11 @@ Sign in with your seeded town account. Prefer **Sign out** when leaving a shared
 
 ## Screenshots (orientation)
 
-| Screen | File |
-| ------ | ---- |
-| Dashboard | [handover/screenshots/01-dashboard.png](handover/screenshots/01-dashboard.png) |
-| Payments / ledger | [handover/screenshots/02-payments.png](handover/screenshots/02-payments.png) |
-| Tenants | [handover/screenshots/03-tenants.png](handover/screenshots/03-tenants.png) |
+| Screen            | File                                                                           |
+| ----------------- | ------------------------------------------------------------------------------ |
+| Dashboard         | [handover/screenshots/01-dashboard.png](handover/screenshots/01-dashboard.png) |
+| Payments / ledger | [handover/screenshots/02-payments.png](handover/screenshots/02-payments.png)   |
+| Tenants           | [handover/screenshots/03-tenants.png](handover/screenshots/03-tenants.png)     |
 
 Captured from Development Mac smoke (2026-08-10). Live NAS uses the same layout at `http://mr-storage:8082`.
 
@@ -22,14 +22,14 @@ Captured from Development Mac smoke (2026-08-10). Live NAS uses the same layout 
 
 ## Daily path (happy path)
 
-| Step | Where         | What to do                                                                                                                                                                                                                |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | **Units**     | Confirm unit status (Vacant / Occupied / Maintenance / Make-Ready). Open a unit for appliances, flooring, maintenance. Facility row **CC** is the Community Center (not one of the 16 residential slots).                 |
-| 2    | **Tenants**   | Add or edit tenant; start/end occupancy on the tenant detail page. Use **Security deposit** card to see required/paid/held and **Record deposit**.                                                                        |
-| 3    | **Leases**    | **New lease** wizard → pick unit + tenant → generate fillable PDF → preview / download → upload signed PDF when returned.                                                                                                 |
-| 4    | **Payments**  | Filter by tenant/unit → **Record payment** or **Post charge** → balance updates. Check **Open receipt after save** (or grid **Receipt**) → preview PDF → **Print** / **Save PDF**. Use **Generate rent charges** monthly. |
-| 5    | **Documents** | NAS folder browse (top) or metadata upload (link to unit/tenant). Receipts also land under tenant **Receipt** category. **View** PDFs in-browser; other types use **Download**.                                           |
-| 6    | **Dashboard** | Occupancy gauge, collected-vs-expected + LinearGauge rate + sparkline, unit-status doughnut, 12-month rent trend (zoom/pan), payment HeatMap, lease expirations (30/60), work orders, delinquencies, warranties, schedule reminders, YTD P/L (3D by unit + series). Drag/resize panels persist per browser. Export charts / Reset layout on header.                                |
+| Step | Where         | What to do                                                                                                                                                                                                                                                                                                                                          |
+| ---- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | **Units**     | Confirm unit status (Vacant / Occupied / Maintenance / Make-Ready). Open a unit for appliances, flooring, maintenance. Facility row **CC** is the Community Center (not one of the 16 residential slots).                                                                                                                                           |
+| 2    | **Tenants**   | Add or edit tenant; start/end occupancy on the tenant detail page. Use **Security deposit** card to see required/paid/held and **Record deposit**.                                                                                                                                                                                                  |
+| 3    | **Leases**    | **New lease** wizard → pick unit + tenant → generate fillable PDF → preview / download → upload signed PDF when returned.                                                                                                                                                                                                                           |
+| 4    | **Payments**  | Filter by tenant/unit → **Record payment** or **Post charge** → balance updates. Check **Open receipt after save** (or grid **Receipt**) → preview PDF → **Print** / **Save PDF**. Use **Generate rent charges** monthly.                                                                                                                           |
+| 5    | **Documents** | NAS folder browse (top) or metadata upload (link to unit/tenant). Receipts also land under tenant **Receipt** category. **View** PDFs in-browser; other types use **Download**.                                                                                                                                                                     |
+| 6    | **Dashboard** | Occupancy gauge, collected-vs-expected + LinearGauge rate + sparkline, unit-status doughnut, 12-month rent trend (zoom/pan), payment HeatMap, lease expirations (30/60), work orders, delinquencies, warranties, schedule reminders, YTD P/L (3D by unit + series). Drag/resize panels persist per browser. Export charts / Reset layout on header. |
 
 ---
 
@@ -110,9 +110,9 @@ Settings → **Appearance** → Light / Dark. Preference is stored in this brows
 
 ## Clerk review (T7.3)
 
-| Clerk   | Date reviewed | OK? | Notes |
-| ------- | ------------- | --- | ----- |
-| Clerk A |               |     |       |
-| Clerk B |               |     |       |
+| Clerk   | Date reviewed | OK? | Notes                                              |
+| ------- | ------------- | --- | -------------------------------------------------- |
+| Clerk A | 2026-08-10    | Yes | Live review with Stephen; guide + screenshots OK   |
+| Clerk B | 2026-08-10    | Yes | Same session; daily path and receipts/deposits OK |
 
-**Done when:** this one-pager exists and at least one clerk has signed the table above.
+**Done when:** this one-pager exists and at least one clerk has signed the table above. **Met 2026-08-10.**

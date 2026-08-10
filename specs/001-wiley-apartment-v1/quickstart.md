@@ -61,8 +61,10 @@
 
 ## Sign-off
 
-| Clerk    | Date | Pass |
-| -------- | ---- | ---- |
-| Clerk A  |      |      |
-| Clerk B  |      |      |
-| IT/Mayor |      |      |
+| Clerk    | Date       | Pass |
+| -------- | ---------- | ---- |
+| Clerk A  | 2026-08-10 | Yes  |
+| Clerk B  | 2026-08-10 | Yes  |
+| IT/Mayor |            |      |
+
+**Clerk acceptance (T7.1):** Signed off 2026-08-10 after live review with both town clerks (Stephen present). Workflow create-unit → tenant → lease → payment → document verified on ClerkSuite. IT/Mayor row remains for backup/restore (T7.2).
