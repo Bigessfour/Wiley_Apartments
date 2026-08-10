@@ -58,10 +58,13 @@ public sealed class TenantService : ITenantService
         _db.Tenants.Add(tenant);
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Created tenant {LastName}, {FirstName} ({TenantId}).",
+            "Created tenant {LastName}, {FirstName} ({TenantId}) phone={Phone} mailing={HasMailingAddress} emergency={HasEmergencyContact}.",
             tenant.LastName,
             tenant.FirstName,
-            tenant.Id);
+            tenant.Id,
+            string.IsNullOrWhiteSpace(tenant.Phone) ? "(none)" : "set",
+            !string.IsNullOrWhiteSpace(tenant.MailingAddress),
+            !string.IsNullOrWhiteSpace(tenant.EmergencyContact) && tenant.EmergencyContact != "—");
         return tenant;
     }
 
@@ -90,10 +93,13 @@ public sealed class TenantService : ITenantService
 
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Tenant", cancellationToken);
         _logger.LogInformation(
-            "Updated tenant {LastName}, {FirstName} ({TenantId}).",
+            "Updated tenant {LastName}, {FirstName} ({TenantId}) phone={Phone} mailing={HasMailingAddress} emergency={HasEmergencyContact}.",
             existing.LastName,
             existing.FirstName,
-            existing.Id);
+            existing.Id,
+            string.IsNullOrWhiteSpace(existing.Phone) ? "(none)" : "set",
+            !string.IsNullOrWhiteSpace(existing.MailingAddress),
+            !string.IsNullOrWhiteSpace(existing.EmergencyContact) && existing.EmergencyContact != "—");
         return existing;
     }
 

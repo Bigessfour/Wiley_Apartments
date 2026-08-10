@@ -8,10 +8,12 @@ namespace Wiley.Apartments.Web.Services;
 public sealed class RentRollService : IRentRollService
 {
     private readonly ApartmentsDbContext _db;
+    private readonly ILogger<RentRollService> _logger;
 
-    public RentRollService(ApartmentsDbContext db)
+    public RentRollService(ApartmentsDbContext db, ILogger<RentRollService> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<RentRollRow>> GetRentRollAsync(CancellationToken cancellationToken = default)
@@ -52,6 +54,9 @@ public sealed class RentRollService : IRentRollService
                 .ToDictionaryAsync(t => t.Id, cancellationToken);
 
         var rows = new List<RentRollRow>(units.Count);
+        var rentFromLease = 0;
+        var rentFromRoster = 0;
+        var rentMissing = 0;
         foreach (var unit in units)
         {
             leaseByUnit.TryGetValue(unit.Id, out var lease);
@@ -73,6 +78,23 @@ public sealed class RentRollService : IRentRollService
                 tenantName = $"{t.LastName}, {t.FirstName}";
             }
 
+            decimal? rent;
+            if (lease is not null)
+            {
+                rent = lease.Rent;
+                rentFromLease++;
+            }
+            else if (unit.MonthlyRent > 0)
+            {
+                rent = unit.MonthlyRent;
+                rentFromRoster++;
+            }
+            else
+            {
+                rent = null;
+                rentMissing++;
+            }
+
             rows.Add(new RentRollRow(
                 unit.Id,
                 unit.Number,
@@ -80,10 +102,16 @@ public sealed class RentRollService : IRentRollService
                 tenantId,
                 tenantName,
                 lease?.Id,
-                lease?.Rent ?? (unit.MonthlyRent > 0 ? unit.MonthlyRent : null),
+                rent,
                 balance));
         }
 
+        _logger.LogInformation(
+            "Rent roll generated: {UnitCount} unit(s), rentFromLease={FromLease}, rentFromRoster={FromRoster}, rentMissing={Missing}.",
+            rows.Count,
+            rentFromLease,
+            rentFromRoster,
+            rentMissing);
         return rows;
     }
 
@@ -130,7 +158,11 @@ public sealed class RentRollService : IRentRollService
                 oldestPastDueCharge));
         }
 
-        return rows.OrderByDescending(r => r.Balance).ThenBy(r => r.UnitNumber).ToList();
+        var result = rows.OrderByDescending(r => r.Balance).ThenBy(r => r.UnitNumber).ToList();
+        _logger.LogInformation(
+            "Delinquency report generated: {DelinquentCount} account(s) with positive balance.",
+            result.Count);
+        return result;
     }
 
     private async Task<Dictionary<(Guid TenantId, Guid UnitId), decimal>> LoadBalancesAsync(

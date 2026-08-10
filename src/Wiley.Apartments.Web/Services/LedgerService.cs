@@ -104,7 +104,15 @@ public sealed class LedgerService : ILedgerService
 
         _db.LedgerEntries.Add(entry);
         await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Posted charge {Id} amount {Amount} tenant {TenantId}.", entry.Id, entry.Amount, tenantId);
+        _logger.LogInformation(
+            "Posted charge {Id} amount {Amount} tenant {TenantId} unit {UnitId} lease={LeaseId} lateFee={IsLateFee} notes={Notes}.",
+            entry.Id,
+            entry.Amount,
+            tenantId,
+            unitId,
+            leaseId,
+            isLateFee,
+            entry.Notes);
         return (await GetByIdAsync(entry.Id, cancellationToken))!;
     }
 
@@ -137,8 +145,14 @@ public sealed class LedgerService : ILedgerService
         _db.LedgerEntries.Add(entry);
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Posted payment {Id} amount {Amount} method {Method} tenant {TenantId}.",
-            entry.Id, entry.Amount, method, tenantId);
+            "Posted payment {Id} amount {Amount} method {Method} tenant {TenantId} unit {UnitId} lease={LeaseId} notes={Notes}.",
+            entry.Id,
+            entry.Amount,
+            method,
+            tenantId,
+            unitId,
+            leaseId,
+            entry.Notes);
         return (await GetByIdAsync(entry.Id, cancellationToken))!;
     }
 
@@ -149,7 +163,13 @@ public sealed class LedgerService : ILedgerService
                     ?? throw new InvalidOperationException($"Ledger entry {id} was not found.");
         entry.IsDeleted = true;
         await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Soft-deleted ledger entry {Id}.", id);
+        _logger.LogInformation(
+            "Soft-deleted ledger entry {Id} type={EntryType} amount={Amount} tenant={TenantId} unit={UnitId}.",
+            id,
+            entry.EntryType,
+            entry.Amount,
+            entry.TenantId,
+            entry.UnitId);
     }
 
     public async Task<int> ApplyLateFeesAsync(
@@ -240,11 +260,21 @@ public sealed class LedgerService : ILedgerService
         var charged = new HashSet<(Guid TenantId, Guid UnitId)>(
             existingRentCharges.Select(e => (e.TenantId, e.UnitId)));
 
-        var posted = 0;
+        var postedFromLeases = 0;
+        var postedFromRoster = 0;
+        var skippedAlreadyCharged = 0;
+
+        _logger.LogInformation(
+            "Monthly rent run starting for {Month}: {ActiveLeaseCount} active lease(s), {ExistingChargeCount} existing charge pair(s).",
+            monthStart.ToString("yyyy-MM"),
+            activeLeases.Count,
+            charged.Count);
+
         foreach (var lease in activeLeases)
         {
             if (charged.Contains((lease.TenantId, lease.UnitId)))
             {
+                skippedAlreadyCharged++;
                 continue;
             }
 
@@ -257,7 +287,14 @@ public sealed class LedgerService : ILedgerService
                 notes: $"Rent {monthStart:MMMM yyyy}",
                 cancellationToken: cancellationToken);
             charged.Add((lease.TenantId, lease.UnitId));
-            posted++;
+            postedFromLeases++;
+            _logger.LogInformation(
+                "Monthly rent from lease {LeaseId} unit {UnitId} tenant {TenantId} amount {Amount} for {Month}.",
+                lease.Id,
+                lease.UnitId,
+                lease.TenantId,
+                lease.Rent,
+                monthStart.ToString("yyyy-MM"));
         }
 
         // Occupied units with listed MonthlyRent but no active lease (paper leases / import).
@@ -268,11 +305,16 @@ public sealed class LedgerService : ILedgerService
                 && u.Status == UnitStatus.Occupied)
             .ToListAsync(cancellationToken);
 
+        _logger.LogDebug(
+            "Monthly rent roster candidates: {RosterCandidateCount} occupied unit(s) with MonthlyRent.",
+            rosterUnits.Count);
+
         foreach (var unit in rosterUnits)
         {
             var tenantId = unit.CurrentTenantId!.Value;
             if (charged.Contains((tenantId, unit.Id)))
             {
+                skippedAlreadyCharged++;
                 continue;
             }
 
@@ -290,10 +332,24 @@ public sealed class LedgerService : ILedgerService
                 notes: $"Rent {monthStart:MMMM yyyy} (unit roster)",
                 cancellationToken: cancellationToken);
             charged.Add((tenantId, unit.Id));
-            posted++;
+            postedFromRoster++;
+            _logger.LogInformation(
+                "Monthly rent from unit roster {UnitNumber} ({UnitId}) tenant {TenantId} amount {Amount} for {Month}.",
+                unit.Number,
+                unit.Id,
+                tenantId,
+                unit.MonthlyRent,
+                monthStart.ToString("yyyy-MM"));
         }
 
-        _logger.LogInformation("Posted {Count} monthly rent charge(s) for {Month}.", posted, monthStart.ToString("yyyy-MM"));
+        var posted = postedFromLeases + postedFromRoster;
+        _logger.LogInformation(
+            "Posted {Count} monthly rent charge(s) for {Month} (leases={FromLeases}, roster={FromRoster}, skippedAlreadyCharged={Skipped}).",
+            posted,
+            monthStart.ToString("yyyy-MM"),
+            postedFromLeases,
+            postedFromRoster,
+            skippedAlreadyCharged);
         return posted;
     }
 

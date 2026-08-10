@@ -93,10 +93,14 @@ public sealed class UnitService : IUnitService
         _db.Units.Add(unit);
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Created unit {UnitNumber} ({UnitId}) facility={IsFacility}.",
+            "Created unit {UnitNumber} ({UnitId}) facility={IsFacility} rent={MonthlyRent} deposit={SecurityDeposit} handicap={IsHandicapAccessible} leaseTerm={LeaseTerm}.",
             unit.Number,
             unit.Id,
-            unit.IsFacility);
+            unit.IsFacility,
+            unit.MonthlyRent,
+            unit.SecurityDeposit,
+            unit.IsHandicapAccessible,
+            unit.LeaseTerm);
         return unit;
     }
 
@@ -139,7 +143,16 @@ public sealed class UnitService : IUnitService
         ConcurrencyHelper.BumpRowVersion(existing);
 
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Unit", cancellationToken);
-        _logger.LogInformation("Updated unit {UnitNumber} ({UnitId}).", existing.Number, existing.Id);
+        _logger.LogInformation(
+            "Updated unit {UnitNumber} ({UnitId}) status={Status} rent={MonthlyRent} deposit={SecurityDeposit} handicap={IsHandicapAccessible} leaseTerm={LeaseTerm} currentTenant={CurrentTenantId}.",
+            existing.Number,
+            existing.Id,
+            existing.Status,
+            existing.MonthlyRent,
+            existing.SecurityDeposit,
+            existing.IsHandicapAccessible,
+            existing.LeaseTerm,
+            existing.CurrentTenantId);
         return existing;
     }
 

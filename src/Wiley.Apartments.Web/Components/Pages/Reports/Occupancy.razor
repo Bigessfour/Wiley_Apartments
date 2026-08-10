@@ -10,6 +10,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ILogger<Occupancy> Logger
 
 <PageTitle>Occupancy report</PageTitle>
 
@@ -104,9 +105,15 @@
                     MonthlyRentDisplay = rent is null ? "—" : rent.Value.ToString("C")
                 };
             }).ToList();
+            Logger.LogInformation(
+                "Occupancy report loaded: {Total} units, {Occupied} occupied, {Vacant} vacant.",
+                TotalUnits,
+                OccupiedCount,
+                VacantCount);
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Occupancy report failed to load.");
             ErrorMessage = ex.Message;
         }
     }

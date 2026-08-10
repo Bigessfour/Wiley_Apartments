@@ -44,7 +44,7 @@ public class DashboardServiceTests
         var documents = new DocumentService(db, paths, clock, NullLogger<DocumentService>.Instance);
         var leases = new LeaseService(
             db, opts, paths, env, clock, new LeaseDocumentGenerator(), documents, NullLogger<LeaseService>.Instance);
-        var rentRoll = new RentRollService(db);
+        var rentRoll = new RentRollService(db, NullLogger<RentRollService>.Instance);
         var ops = new UnitOperatingCostService(db, NullLogger<UnitOperatingCostService>.Instance);
         var maintenance = new MaintenanceService(db, ops, clock, NullLogger<MaintenanceService>.Instance);
         var schedule = new ScheduleService(db, clock, NullLogger<ScheduleService>.Instance);
