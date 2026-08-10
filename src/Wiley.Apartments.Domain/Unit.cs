@@ -10,6 +10,12 @@ public class Unit
     public UnitStatus Status { get; set; } = UnitStatus.Vacant;
     public string? Notes { get; set; }
     public Guid? CurrentTenantId { get; set; }
+
+    /// <summary>
+    /// Facility (non-residential) unit such as Community Center. Does not count toward MaxUnits.
+    /// </summary>
+    public bool IsFacility { get; set; }
+
     /// <summary>Optimistic concurrency token (SQLite-friendly Guid).</summary>
     public Guid RowVersion { get; set; } = Guid.NewGuid();
 }

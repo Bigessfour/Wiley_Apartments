@@ -12,7 +12,7 @@
 <PageTitle>Units</PageTitle>
 
 <PageHeader Title="Units"
-            Subtitle="@($"Town of Wiley — {UnitCount} of {UnitService.MaxUnits} units. Edit Sq Ft / Beds / Baths inline, or Open a unit for full layout notes.")" />
+            Subtitle="@Subtitle" />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -33,7 +33,7 @@
     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridTemplates>
         <EmptyRecordTemplate>
-            <div class="grid-empty-hint">No units yet — use Add on the toolbar (max @UnitService.MaxUnits).</div>
+            <div class="grid-empty-hint">No units yet — use Add on the toolbar (max @UnitService.MaxUnits residential).</div>
         </EmptyRecordTemplate>
     </GridTemplates>
     <GridEditSettings AllowAdding="@CanAddUnit"
@@ -50,6 +50,24 @@
                     HeaderText="Unit #"
                     Width="100"
                     ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(Unit.IsFacility)"
+                    HeaderText="Type"
+                    Width="110"
+                    AllowEditing="false">
+            <Template>
+                @{
+                    var row = context as Unit;
+                }
+                @if (row!.IsFacility)
+                {
+                    <span class="badge text-bg-info">Facility</span>
+                }
+                else
+                {
+                    <span class="badge text-bg-secondary">Residential</span>
+                }
+            </Template>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.SqFt)"
                     HeaderText="Sq Ft"
                     TextAlign="TextAlign.Right"
@@ -114,8 +132,13 @@
     private SfGrid<Unit>? GridRef;
     private List<Unit> Units { get; set; } = [];
     private string? ErrorMessage { get; set; }
-    private int UnitCount => Units.Count;
-    private bool CanAddUnit => UnitCount < UnitService.MaxUnits;
+    private int ResidentialCount => Units.Count(u => !u.IsFacility);
+    private int FacilityCount => Units.Count(u => u.IsFacility);
+    private bool CanAddUnit => ResidentialCount < UnitService.MaxUnits;
+    private string Subtitle =>
+        FacilityCount > 0
+            ? $"Town of Wiley — {ResidentialCount} of {UnitService.MaxUnits} residential + {FacilityCount} facility. Edit layout inline, or Open for inventory."
+            : $"Town of Wiley — {ResidentialCount} of {UnitService.MaxUnits} residential units. Edit layout inline, or Open for inventory.";
 
     private readonly List<string> ToolbarItems =
     [
@@ -149,7 +172,15 @@
         if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && !CanAddUnit)
         {
             args.Cancel = true;
-            ErrorMessage = $"Portfolio is capped at {UnitService.MaxUnits} units.";
+            ErrorMessage = $"Portfolio is capped at {UnitService.MaxUnits} residential units.";
+            return;
+        }
+
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null
+            && args.Data.IsFacility)
+        {
+            args.Cancel = true;
+            ErrorMessage = "Community Center facility unit cannot be deleted.";
             return;
         }
 

@@ -10,11 +10,12 @@
 @inject IUnitService UnitService
 @inject IDateTimeService Clock
 @inject IClerkToast Toast
+@inject NavigationManager Navigation
 
 <PageTitle>Operations calendar</PageTitle>
 
 <PageHeader Title="Operations calendar"
-            Subtitle="Cleaning, vacancy, inspection, and other unit work. Drag to reschedule. Upcoming reminders appear on the dashboard.">
+            Subtitle="@HeaderSubtitle">
     <SfButton CssClass="e-outline e-small" Content="Suggest turnover cleans" Disabled="@Busy"
               OnClick="SuggestTurnoverCleansAsync" />
     <SfButton CssClass="e-outline e-small" Content="Refresh" Disabled="@Busy" OnClick="ReloadAsync" />
@@ -104,12 +105,22 @@
 </SfSchedule>
 
 @code {
+    [SupplyParameterFromQuery(Name = "unitId")]
+    public Guid? QueryUnitId { get; set; }
+
     private DateTime SelectedDate { get; set; } = DateTime.Today;
     private List<ScheduleAppointment> DataSource { get; set; } = [];
     private List<UnitOption> UnitOptions { get; set; } = [];
     private string? ErrorMessage { get; set; }
     private bool Busy { get; set; }
     private bool _persisting;
+    private Guid? FilterUnitId { get; set; }
+    private string? FilterUnitLabel { get; set; }
+
+    private string HeaderSubtitle =>
+        FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel)
+            ? $"Showing items for {FilterUnitLabel}. Cleaning, vacancy, inspection, and other unit work. Drag to reschedule."
+            : "Cleaning, vacancy, inspection, and other unit work. Drag to reschedule. Upcoming reminders appear on the dashboard.";
 
     private static readonly List<CategoryOption> CategoryOptions =
     [
@@ -123,10 +134,22 @@
     {
         var units = await UnitService.GetAllAsync();
         UnitOptions = units
-            .OrderBy(u => u.Number)
-            .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .OrderBy(u => u.IsFacility ? 0 : 1)
+            .ThenBy(u => u.Number)
+            .Select(u => new UnitOption
+            {
+                Id = u.Id,
+                Text = u.IsFacility ? $"Facility {u.Number}" : $"Unit {u.Number}"
+            })
             .ToList();
         UnitOptions.Insert(0, new UnitOption { Id = null, Text = "(No unit)" });
+
+        if (QueryUnitId is Guid uid)
+        {
+            FilterUnitId = uid;
+            FilterUnitLabel = UnitOptions.FirstOrDefault(o => o.Id == uid)?.Text ?? "selected unit";
+        }
+
         await ReloadAsync();
     }
 
@@ -136,7 +159,7 @@
         ErrorMessage = null;
         try
         {
-            var items = await ScheduleService.QueryAsync(includeCompleted: true);
+            var items = await ScheduleService.QueryAsync(unitId: FilterUnitId, includeCompleted: true);
             var i = 1;
             DataSource = items.Select(s => ToAppointment(s, i++)).ToList();
         }
@@ -245,13 +268,14 @@
             {
                 foreach (var appt in args.AddedRecords)
                 {
+                    var unitId = NormalizeUnitId(appt.UnitId) ?? FilterUnitId;
                     await ScheduleService.CreateAsync(
                         appt.Subject,
                         ParseCategory(appt.Category),
                         Clock.ToUtc(appt.StartTime),
                         endUtc: Clock.ToUtc(ResolveEnd(appt)),
                         dueUtc: Clock.ToUtc(appt.StartTime),
-                        unitId: NormalizeUnitId(appt.UnitId),
+                        unitId: unitId,
                         notes: appt.Description);
                 }
 

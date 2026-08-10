@@ -15,7 +15,7 @@
 
 <PageTitle>Maintenance</PageTitle>
 
-<PageHeader Title="Maintenance" Subtitle="Work orders linked to units and optional assets.">
+<PageHeader Title="Maintenance" Subtitle="@HeaderSubtitle">
     <SfButton CssClass="e-outline e-small" Content="@(OpenOnly ? "Show all" : "Open only")"
               OnClick="ToggleOpenAsync" />
     <SfButton CssClass="e-primary e-small" Content="New work order" OnClick="@(() => ShowForm = true)" />
@@ -116,6 +116,9 @@
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "unitId")]
+    public Guid? QueryUnitId { get; set; }
+
     private List<Row> Rows { get; set; } = [];
     private List<UnitOption> UnitOptions { get; set; } = [];
     private List<AssetOption> AssetOptions { get; set; } = [];
@@ -124,6 +127,13 @@
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
     private Guid? FormUnitId { get; set; }
+    private Guid? FilterUnitId { get; set; }
+    private string? FilterUnitLabel { get; set; }
+
+    private string HeaderSubtitle =>
+        FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel)
+            ? $"Work orders for {FilterUnitLabel}."
+            : "Work orders linked to units and optional assets.";
     private Guid? FormAssetId { get; set; }
     private MaintenancePriority FormPriority { get; set; } = MaintenancePriority.Normal;
     private string FormDescription { get; set; } = "";
@@ -140,10 +150,24 @@
 
     protected override async Task OnInitializedAsync()
     {
-        UnitOptions = (await UnitService.GetAllAsync())
-            .OrderBy(u => u.Number)
-            .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
+        var units = await UnitService.GetAllAsync();
+        UnitOptions = units
+            .OrderBy(u => u.IsFacility ? 0 : 1)
+            .ThenBy(u => u.Number)
+            .Select(u => new UnitOption
+            {
+                Id = u.Id,
+                Text = u.IsFacility ? $"Facility {u.Number}" : $"Unit {u.Number}"
+            })
             .ToList();
+
+        if (QueryUnitId is Guid uid)
+        {
+            FilterUnitId = uid;
+            FormUnitId = uid;
+            FilterUnitLabel = UnitOptions.FirstOrDefault(o => o.Id == uid)?.Text ?? "selected unit";
+        }
+
         await LoadAsync();
     }
 
@@ -152,7 +176,15 @@
         ErrorMessage = null;
         try
         {
-            var items = await MaintenanceService.GetAllAsync(openOnly: OpenOnly);
+            IReadOnlyList<MaintenanceRequest> items = FilterUnitId is Guid fuid
+                ? await MaintenanceService.GetForUnitAsync(fuid)
+                : await MaintenanceService.GetAllAsync(openOnly: OpenOnly);
+            if (FilterUnitId is Guid && OpenOnly)
+            {
+                items = items
+                    .Where(m => m.Status is not (MaintenanceStatus.Completed or MaintenanceStatus.Cancelled))
+                    .ToList();
+            }
             Rows = items.Select(m => new Row
             {
                 Id = m.Id,

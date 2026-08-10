@@ -7,6 +7,8 @@
 @inject AuthenticationStateProvider AuthState
 @inject IJSRuntime JsRuntime
 @inject IOptions<ClerkSuiteOptions> ClerkOptions
+@inject IUnitService UnitService
+@using Wiley.Apartments.Contracts
 
 <div class="clerksuite-shell">
     <SfSidebar @bind-IsOpen="SidebarOpen"
@@ -45,6 +47,28 @@
                 </NavLink>
                 <NavLink class="nav-link" href="maintenance" @onclick="CloseOnNavigate">
                     <span class="e-icons e-edit" aria-hidden="true"></span><span>Maintenance</span>
+                </NavLink>
+                <div class="nav-section">Community Center</div>
+                <NavLink class="nav-link" href="community-center" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-home" aria-hidden="true"></span><span>CC hub</span>
+                </NavLink>
+                @if (CommunityCenterId is Guid ccId)
+                {
+                    <NavLink class="nav-link" href="@($"schedule?unitId={ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-day" aria-hidden="true"></span><span>CC schedule</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="@($"payments?unitId={ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-circle-info" aria-hidden="true"></span><span>CC payments</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="@($"maintenance?unitId={ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-edit" aria-hidden="true"></span><span>CC maintenance</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="@($"units/{ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-grid-view" aria-hidden="true"></span><span>CC unit record</span>
+                    </NavLink>
+                }
+                <NavLink class="nav-link" href="documents" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-folder" aria-hidden="true"></span><span>CC documents</span>
                 </NavLink>
                 <div class="nav-section">Records</div>
                 <NavLink class="nav-link" href="documents" @onclick="CloseOnNavigate">
@@ -130,6 +154,7 @@
 
 @code {
     private bool SidebarOpen { get; set; } = true;
+    private Guid? CommunityCenterId { get; set; }
     private LoggingErrorBoundary? _boundary;
     private bool IsDarkMode { get; set; }
     private bool _themeLoaded;
@@ -153,6 +178,16 @@
                 ?? user.Identity.Name
                 ?? user.FindFirstValue(ClaimTypes.Name)
                 ?? "Signed in";
+        }
+
+        try
+        {
+            var facility = await UnitService.GetFacilityAsync();
+            CommunityCenterId = facility?.Id;
+        }
+        catch
+        {
+            CommunityCenterId = null;
         }
     }
 

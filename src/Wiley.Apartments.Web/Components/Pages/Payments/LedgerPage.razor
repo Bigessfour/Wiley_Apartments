@@ -18,7 +18,7 @@
 <PageTitle>Ledger</PageTitle>
 
 <PageHeader Title="Tenant ledger"
-            Subtitle="Record charges and payments (cash, check, online reference). Payments reduce the running balance immediately.">
+            Subtitle="@HeaderSubtitle">
     <SfButton CssClass="e-primary e-small" Content="Record payment" Disabled="@Busy"
               OnClick="@(() => OpenFormAsync("payment"))" />
     <SfButton CssClass="e-outline e-small" Content="Post charge" Disabled="@Busy"
@@ -205,8 +205,13 @@
 
         var units = await UnitService.GetAllAsync();
         UnitFormOptions = units
-            .OrderBy(u => u.Number)
-            .Select(u => new IdOption { Id = u.Id, Text = $"Unit {u.Number}" })
+            .OrderBy(u => u.IsFacility ? 0 : 1)
+            .ThenBy(u => u.Number)
+            .Select(u => new IdOption
+            {
+                Id = u.Id,
+                Text = u.IsFacility ? $"Facility {u.Number}" : $"Unit {u.Number}"
+            })
             .ToList();
         UnitFilterOptions =
         [
@@ -234,6 +239,9 @@
         {
             FilterUnitId = uid;
             FormUnitId = uid;
+            FilterUnitLabel = UnitFilterOptions.FirstOrDefault(o => o.Id == uid)?.Text
+                ?? UnitFormOptions.FirstOrDefault(o => o.Id == uid)?.Text
+                ?? "selected unit";
         }
 
         var action = QueryAction?.Trim().ToLowerInvariant();

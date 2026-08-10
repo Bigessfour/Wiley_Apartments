@@ -59,6 +59,7 @@ erDiagram
         string Status
         string Notes
         guid CurrentTenantId FK
+        bool IsFacility
         rowversion RowVersion
     }
 

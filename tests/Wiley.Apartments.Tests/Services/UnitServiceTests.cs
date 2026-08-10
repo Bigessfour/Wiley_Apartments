@@ -38,7 +38,7 @@ public class UnitServiceTests
         var act = () => service.CreateAsync(new Unit { Number = "2", SqFt = 500, Beds = 1, Baths = 1 });
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*more than 1 units*");
+            .WithMessage("*more than 1 residential units*");
     }
 
     [Fact]
@@ -93,5 +93,54 @@ public class UnitServiceTests
 
         updated.Status.Should().Be(UnitStatus.Maintenance);
         (await service.GetByIdAsync(unit.Id))!.Status.Should().Be(UnitStatus.Maintenance);
+    }
+
+    [Fact]
+    public async Task CreateAsync_Facility_DoesNotConsumeResidentialCap()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db, maxUnits: 1);
+        await service.CreateAsync(new Unit { Number = "1", SqFt = 500, Beds = 1, Baths = 1 });
+
+        var facility = await service.CreateAsync(new Unit
+        {
+            Number = "CC",
+            IsFacility = true,
+            SqFt = 2000,
+            Beds = 0,
+            Baths = 2,
+            Notes = "Community Center"
+        });
+
+        facility.IsFacility.Should().BeTrue();
+        facility.Number.Should().Be("CC");
+        (await service.CountAsync()).Should().Be(1);
+        (await service.GetAllAsync()).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetFacilityAsync_ReturnsCommunityCenter()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+        await service.CreateAsync(new Unit { Number = "1", SqFt = 500, Beds = 1, Baths = 1 });
+        await service.CreateAsync(new Unit { Number = "CC", IsFacility = true, SqFt = 1000 });
+
+        var facility = await service.GetFacilityAsync();
+        facility.Should().NotBeNull();
+        facility!.Number.Should().Be("CC");
+        facility.IsFacility.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_Throws_WhenFacility()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+        var facility = await service.CreateAsync(new Unit { Number = "CC", IsFacility = true, SqFt = 1000 });
+
+        var act = () => service.DeleteAsync(facility.Id);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*facility*");
     }
 }

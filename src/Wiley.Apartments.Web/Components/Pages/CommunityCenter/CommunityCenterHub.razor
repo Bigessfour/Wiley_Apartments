@@ -1,0 +1,97 @@
+@page "/community-center"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IUnitService UnitService
+@inject NavigationManager Navigation
+
+<PageTitle>Community Center</PageTitle>
+
+@if (LoadError is not null)
+{
+    <div class="alert alert-warning">@LoadError</div>
+}
+else if (Facility is null)
+{
+    <PageHeader Title="Community Center"
+                Subtitle="Facility unit not found yet. Restart the app so the seeder can create Number=CC (IsFacility)." />
+}
+else
+{
+    <PageHeader Title="Community Center"
+                Subtitle="Facility rental / events — reuses Schedule, Ledger, Maintenance, and the unit inventory. No separate reservation system in this slice.">
+        <SfButton CssClass="e-outline e-small" Content="Open unit record"
+                  OnClick="@(() => Navigation.NavigateTo($"/units/{Facility.Id}"))" />
+    </PageHeader>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <SfCard CssClass="h-100">
+                <CardHeader Title="Facility unit" />
+                <CardContent>
+                    <p class="mb-1"><strong>Number</strong> @Facility.Number</p>
+                    <p class="mb-1"><strong>Status</strong> @Facility.Status</p>
+                    <p class="mb-0 text-muted small">@(string.IsNullOrWhiteSpace(Facility.Notes) ? "No notes." : Facility.Notes)</p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <SfCard CssClass="h-100">
+                <CardHeader Title="Layout" />
+                <CardContent>
+                    <p class="mb-1">@Facility.SqFt.ToString("N0") sq ft</p>
+                    <p class="mb-0">@Facility.Beds bed · @Facility.Baths bath</p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-12 col-xl-6">
+            <SfCard CssClass="h-100">
+                <CardHeader Title="How clerks use this hub" />
+                <CardContent>
+                    <ul class="mb-0 small">
+                        <li>Schedule cleanings, events prep, and inspections on the operations calendar filtered to CC.</li>
+                        <li>Post facility-related charges or deposits on the ledger filtered to CC (tenant optional).</li>
+                        <li>Open work orders against the CC unit for repairs and setups.</li>
+                        <li>Documents vault is NAS-wide — upload under Documents and link to the CC unit when entity metadata supports it.</li>
+                    </ul>
+                </CardContent>
+            </SfCard>
+        </div>
+    </div>
+
+    <h2 class="h6 mb-2">Quick links (CC-scoped)</h2>
+    <div class="d-flex flex-wrap gap-2">
+        <SfButton CssClass="e-primary" Content="Schedule"
+                  OnClick="@(() => Navigation.NavigateTo($"/schedule?unitId={Facility.Id}"))" />
+        <SfButton CssClass="e-outline" Content="Payments / ledger"
+                  OnClick="@(() => Navigation.NavigateTo($"/payments?unitId={Facility.Id}"))" />
+        <SfButton CssClass="e-outline" Content="Maintenance"
+                  OnClick="@(() => Navigation.NavigateTo($"/maintenance?unitId={Facility.Id}"))" />
+        <SfButton CssClass="e-outline" Content="Unit inventory"
+                  OnClick="@(() => Navigation.NavigateTo($"/units/{Facility.Id}"))" />
+        <SfButton CssClass="e-outline" Content="Documents vault"
+                  OnClick="@(() => Navigation.NavigateTo("/documents"))" />
+        <SfButton CssClass="e-flat" Content="All units"
+                  OnClick="@(() => Navigation.NavigateTo("/units"))" />
+    </div>
+}
+
+@code {
+    private Unit? Facility { get; set; }
+    private string? LoadError { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Facility = await UnitService.GetFacilityAsync();
+        }
+        catch (Exception ex)
+        {
+            LoadError = ex.Message;
+        }
+    }
+}

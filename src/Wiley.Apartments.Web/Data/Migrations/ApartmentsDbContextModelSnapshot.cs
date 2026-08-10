@@ -773,6 +773,11 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Property<Guid?>("CurrentTenantId")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsFacility")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
@@ -795,6 +800,8 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsFacility");
 
                     b.HasIndex("Number")
                         .IsUnique();

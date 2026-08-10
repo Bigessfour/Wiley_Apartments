@@ -386,3 +386,15 @@ Deep re-converge (2026-08-09) post–Phase 9, stressing edge cases, vault-contro
   - **Done (2026-08-09):** `PaymentPortalConfiguration.TryResolve`; tenant/lease/settings show IT contact error.
 - [x] **T033** Reconcile plan.md tech stack (.NET 8 / ASP.NET Core 8) with actual `net9.0` target across all projects per plan: Tech Stack Decision (`contradicts`)
   - **Done (2026-08-09):** plan.md updated to .NET 9 / ASP.NET Core 9.
+
+---
+
+## Convergence note — Community Center hub (post-MVP UI)
+
+**2026-08-10:** Community Center hub + Facility unit (reuse Schedule / Ledger / Maintenance). **Not** a new Spec Kit phase / 002- feature.
+
+- `Unit.IsFacility` + seed `Number=CC` (outside residential MaxUnits=16 cap)
+- Sidebar **Community Center** section + `/community-center` hub
+- Existing pages accept `?unitId=` filter (Schedule, Payments, Maintenance); Documents remains NAS-wide vault
+- Explicitly deferred: FacilityReservation entity, separate SfSchedule, CC rental agreement PDF, dedicated P&L page
+
