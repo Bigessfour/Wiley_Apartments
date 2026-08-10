@@ -11,28 +11,19 @@
 @inject IAssetService AssetService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject IClerkToast Toast
 
 <PageTitle>Maintenance</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <div>
-        <h1 class="h3 mb-1">Maintenance</h1>
-        <p class="text-muted mb-0 small">Work orders linked to units and optional assets.</p>
-    </div>
-    <div class="d-flex gap-2">
-        <SfButton CssClass="e-outline e-small" Content="@(OpenOnly ? "Show all" : "Open only")"
-                  OnClick="ToggleOpenAsync" />
-        <SfButton CssClass="e-primary e-small" Content="New work order" OnClick="@(() => ShowForm = true)" />
-    </div>
-</div>
+<PageHeader Title="Maintenance" Subtitle="Work orders linked to units and optional assets.">
+    <SfButton CssClass="e-outline e-small" Content="@(OpenOnly ? "Show all" : "Open only")"
+              OnClick="ToggleOpenAsync" />
+    <SfButton CssClass="e-primary e-small" Content="New work order" OnClick="@(() => ShowForm = true)" />
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
-}
-@if (!string.IsNullOrEmpty(SuccessMessage))
-{
-    <div class="alert alert-success">@SuccessMessage</div>
 }
 
 @if (ShowForm)
@@ -75,6 +66,11 @@
 
 <SfGrid TValue="Row" DataSource="@Rows" AllowPaging="true" AllowSorting="true">
     <GridPageSettings PageSize="20" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No work orders yet — use New work order on the toolbar.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridColumns>
         <GridColumn Field="@nameof(Row.CreatedDisplay)" HeaderText="Created" Width="110" />
         <GridColumn Field="@nameof(Row.UnitNumber)" HeaderText="Unit" Width="80" />
@@ -127,7 +123,6 @@
     private bool ShowForm { get; set; }
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
-    private string? SuccessMessage { get; set; }
     private Guid? FormUnitId { get; set; }
     private Guid? FormAssetId { get; set; }
     private MaintenancePriority FormPriority { get; set; } = MaintenancePriority.Normal;
@@ -206,7 +201,6 @@
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             await MaintenanceService.CreateAsync(
@@ -214,7 +208,7 @@
                 FormDescription,
                 FormPriority,
                 FormAssetId);
-            SuccessMessage = "Work order created.";
+            await Toast.ShowSuccessAsync("Work order created.");
             ShowForm = false;
             FormDescription = "";
             FormAssetId = null;
@@ -273,13 +267,12 @@
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var done = await MaintenanceService.CompleteAsync(id, CompleteCost);
-            SuccessMessage = done.OperatingCostId is null
+            await Toast.ShowSuccessAsync(done.OperatingCostId is null
                 ? "Work order completed."
-                : "Work order completed; Repair ops cost recorded.";
+                : "Work order completed; Repair ops cost recorded.");
             CompletingId = null;
             await LoadAsync();
         }

@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Cards
@@ -9,18 +9,14 @@
 @inject IPortfolioProfitLossService ProfitLoss
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <div>
-        <h1 class="h3 mb-1">ClerkSuite dashboard</h1>
-        <p class="text-muted mb-0 small">
-            Occupancy, expirations, work orders, delinquencies, warranties · Mountain Time @DisplayTime
-        </p>
-    </div>
-    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
-</div>
+<PageHeader Title="ClerkSuite dashboard"
+            Subtitle="@($"Occupancy, expirations, work orders, delinquencies, warranties · Mountain Time {DisplayTime}")">
+    <SfButton CssClass="e-outline" Content="Refresh" OnClick="LoadAsync" />
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -32,45 +28,45 @@ else if (Snap is null)
 }
 else
 {
-    <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-            <SfCard>
-                <CardContent>
-                    <div class="text-muted small">Occupied</div>
-                    <a class="h3 text-decoration-none" href="units">@Snap.Occupied / @Snap.TotalUnits</a>
-                </CardContent>
-            </SfCard>
-        </div>
-        <div class="col-6 col-md-3">
-            <SfCard>
-                <CardContent>
-                    <div class="text-muted small">Vacant</div>
-                    <div class="h3 mb-0">@Snap.Vacant</div>
-                </CardContent>
-            </SfCard>
-        </div>
-        <div class="col-6 col-md-3">
-            <SfCard>
-                <CardContent>
-                    <div class="text-muted small">Open work orders</div>
-                    <a class="h3 text-decoration-none" href="maintenance">@Snap.OpenWorkOrders.Count</a>
-                </CardContent>
-            </SfCard>
-        </div>
-        <div class="col-6 col-md-3">
-            <SfCard>
-                <CardContent>
-                    <div class="text-muted small">Delinquent accounts</div>
-                    <a class="h3 text-decoration-none" href="reports/delinquency">@Snap.Delinquencies.Count</a>
-                </CardContent>
-            </SfCard>
-        </div>
+    <div class="kpi-grid">
+        <SfCard CssClass="kpi-card kpi-card--accent">
+            <CardContent>
+                <div class="kpi-label">Occupied</div>
+                <div class="kpi-value"><a href="units">@Snap.Occupied / @Snap.TotalUnits</a></div>
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card">
+            <CardContent>
+                <div class="kpi-label">Vacant</div>
+                <div class="kpi-value">@Snap.Vacant</div>
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card kpi-card--warn">
+            <CardContent>
+                <div class="kpi-label">Open work orders</div>
+                <div class="kpi-value"><a href="maintenance">@Snap.OpenWorkOrders.Count</a></div>
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card kpi-card--danger">
+            <CardContent>
+                <div class="kpi-label">Delinquent accounts</div>
+                <div class="kpi-value"><a href="reports/delinquency">@Snap.Delinquencies.Count</a></div>
+            </CardContent>
+        </SfCard>
     </div>
 
-    <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 12, 12 })" AllowResizing="false" AllowDragging="false">
+    <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 14, 14 })" AllowResizing="false" AllowDragging="false">
         <DashboardLayoutPanels>
             <DashboardLayoutPanel Id="exp30" SizeX="3" SizeY="2" Row="0" Column="0">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Leases expiring (≤30 days)</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Leases expiring (≤30 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ExpiringLeasesWithin30.Count</span>
+                            <a class="panel-view-all" href="leases">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
                         @if (Snap.ExpiringLeasesWithin30.Count == 0)
@@ -94,7 +90,15 @@ else
                 </ContentTemplate>
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="exp60" SizeX="3" SizeY="2" Row="0" Column="3">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Leases expiring (31–60 days)</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Leases expiring (31–60 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ExpiringLeasesWithin60.Count</span>
+                            <a class="panel-view-all" href="leases">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
                         @if (Snap.ExpiringLeasesWithin60.Count == 0)
@@ -118,7 +122,15 @@ else
                 </ContentTemplate>
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="schedule" SizeX="3" SizeY="2" Row="2" Column="3">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Schedule reminders (14 days)</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Schedule reminders (14 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ScheduleReminders.Count</span>
+                            <a class="panel-view-all" href="schedule">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
                         @if (Snap.ScheduleReminders.Count == 0)
@@ -142,7 +154,15 @@ else
                 </ContentTemplate>
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="4" Column="0">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Open maintenance</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Open maintenance</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.OpenWorkOrders.Count</span>
+                            <a class="panel-view-all" href="maintenance">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
                         @if (Snap.OpenWorkOrders.Count == 0)
@@ -165,7 +185,15 @@ else
                 </ContentTemplate>
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="4" Column="3">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Delinquencies</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Delinquencies</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.Delinquencies.Count</span>
+                            <a class="panel-view-all" href="reports/delinquency">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
                         @if (Snap.Delinquencies.Count == 0)
@@ -188,7 +216,15 @@ else
                 </ContentTemplate>
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="6" Column="0">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Warranties (90 days)</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Warranties (90 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ExpiringWarranties.Count</span>
+                            <a class="panel-view-all" href="reports/warranty">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="p-2" style="overflow:auto; height:100%;">
                         @if (Snap.ExpiringWarranties.Count == 0)
@@ -212,7 +248,7 @@ else
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="6" Column="3">
                 <HeaderTemplate>
-                    <div class="fw-semibold px-2 py-1 d-flex justify-content-between">
+                    <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
                         <span>P/L by unit (YTD)</span>
                         <a class="small" href="reports/profit-loss">Full report</a>
                     </div>
@@ -225,7 +261,7 @@ else
                         }
                         else
                         {
-                            <SfChart Width="100%" Height="100%">
+                            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
                                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
                                 <ChartSeriesCollection>
                                     <ChartSeries DataSource="@UnitChart" XName="Label" YName="Net" Type="ChartSeriesType.Column" Name="Net" />
@@ -236,7 +272,7 @@ else
                 </ContentTemplate>
             </DashboardLayoutPanel>
             <DashboardLayoutPanel Id="plSeries" SizeX="6" SizeY="3" Row="9" Column="0">
-                <HeaderTemplate><div class="fw-semibold px-2 py-1">Portfolio net (YTD by month)</div></HeaderTemplate>
+                <HeaderTemplate><div class="panel-header-title">Portfolio net (YTD by month)</div></HeaderTemplate>
                 <ContentTemplate>
                     <div style="height:100%; width:100%; padding:4px;">
                         @if (SeriesChart.Count == 0)
@@ -245,7 +281,7 @@ else
                         }
                         else
                         {
-                            <SfChart Width="100%" Height="100%">
+                            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
                                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
                                 <ChartSeriesCollection>
                                     <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
@@ -267,9 +303,26 @@ else
     private string? ErrorMessage { get; set; }
     private List<ChartPoint> UnitChart { get; set; } = [];
     private List<ChartPoint> SeriesChart { get; set; } = [];
+    private Theme ChartTheme { get; set; } = Theme.Fluent2;
     private string DisplayTime => Clock.ToDisplayTime(Clock.UtcNow).ToString("f");
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var isDark = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+        var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
+        if (next != ChartTheme)
+        {
+            ChartTheme = next;
+            StateHasChanged();
+        }
+    }
 
     private async Task LoadAsync()
     {

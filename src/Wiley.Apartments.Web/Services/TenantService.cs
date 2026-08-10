@@ -84,7 +84,10 @@ public sealed class TenantService : ITenantService
         existing.EmergencyContact = tenant.EmergencyContact.Trim();
         existing.Notes = tenant.Notes;
 
-        await _db.SaveChangesAsync(cancellationToken);
+        _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = tenant.RowVersion;
+        ConcurrencyHelper.BumpRowVersion(existing);
+
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Tenant", cancellationToken);
         _logger.LogInformation(
             "Updated tenant {LastName}, {FirstName} ({TenantId}).",
             existing.LastName,
@@ -104,7 +107,8 @@ public sealed class TenantService : ITenantService
         }
 
         tenant.IsDeleted = true;
-        await _db.SaveChangesAsync(cancellationToken);
+        ConcurrencyHelper.BumpRowVersion(tenant);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Tenant", cancellationToken);
         _logger.LogInformation("Soft-deleted tenant {TenantId}.", id);
     }
 

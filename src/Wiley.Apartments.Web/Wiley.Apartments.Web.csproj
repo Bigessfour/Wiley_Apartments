@@ -28,6 +28,7 @@
     <PackageReference Include="Syncfusion.Blazor.Inputs" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Layouts" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Navigations" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.Notifications" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Schedule" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="34.2.2" />
     <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.2" />

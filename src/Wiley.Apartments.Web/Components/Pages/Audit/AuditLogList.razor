@@ -8,10 +8,7 @@
 
 <PageTitle>Audit log</PageTitle>
 
-<div class="mb-3">
-    <h1 class="h3 mb-1">Audit log</h1>
-    <p class="text-muted mb-0">Append-only mutation history (Constitution III). Newest first.</p>
-</div>
+<PageHeader Title="Audit log" Subtitle="Append-only mutation history (Constitution III). Newest first." />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -33,8 +30,14 @@
     </div>
 </div>
 
-<SfGrid TValue="AuditLog" DataSource="@Rows" AllowPaging="true" AllowSorting="true" Height="480">
+<SfGrid TValue="AuditLog" DataSource="@Rows" AllowPaging="true" AllowSorting="true" AllowFiltering="true" Height="480">
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridPageSettings PageSize="25" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No audit rows for this filter.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridColumns>
         <GridColumn HeaderText="When (MT)" Width="160">
             <Template>

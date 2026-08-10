@@ -1,5 +1,3 @@
-
-
 # Tasks: ClerkSuite — Wiley Apartment Management v1
 
 **Input**: [spec.md](./spec.md) · [plan.md](./plan.md) · [data-model.md](./data-model.md) · [quickstart.md](./quickstart.md)
@@ -227,20 +225,30 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
 
 ## Phase 7 — Hardening & Handover
 
+> **Local progress (2026-08-09):** Dual Windows clerk terminals unavailable until tomorrow.
+> Completed offline: local Release build + full test suite (103 unit / 13 integration / 7 E2E),
+> Syncfusion Fluent2 theme/API polish + Chrome DevTools control poke across all clerk routes,
+> `docs/clerk-quick-reference.md` draft, `deploy/synology/BACKUP-RESTORE.md` runbook.
+> Still blocked for Done-when: T7.1 NAS dual-clerk sign-off, T7.2 live restore drill, T7.3 clerk review of guide, T7.4 final converge.
+
 - [ ] **T7.1** End-to-end clerk workflow test on real NAS from both Windows 11 machines.
   - **Done when:** Both clerks complete: create-unit → add-tenant → generate-lease → record-payment → upload-document without errors.
   - **Evidence:** [quickstart.md](./quickstart.md) sign-off table completed.
+  - **Blocked:** Windows 11 clerk terminals unavailable until 2026-08-10. Local Mac smoke of the same routes passed via Chrome DevTools (login → Units/Tenants/Leases/Payments/Schedule/Documents/Reports/Audit/Settings).
 
 - [ ] **T7.2** Backup verification (Hyper Backup / snapshots cover data + docs).
   - **Done when:** Documented restore test succeeds (DB volume + `/volume1/apartments/docs`).
   - **Paths:** `deploy/synology/BACKUP-RESTORE.md`
+  - **Local (2026-08-09):** Runbook written with sign-off table. Live Hyper Backup restore drill still required on NAS.
 
 - [ ] **T7.3** User guide / quick-reference for the two clerks (one-pager + screenshots).
   - **Done when:** Guide exists at `docs/clerk-quick-reference.md`; reviewed by at least one clerk.
   - **Paths:** `docs/clerk-quick-reference.md`
+  - **Local (2026-08-09):** One-pager drafted. Clerk review / screenshot pass deferred until terminals available.
 
 - [ ] **T7.4** Final Spec Kit converge / done check.
   - **Done when:** `/speckit.converge` or `speckit-done` skill reports zero Critical/Major gaps against this task list and [spec.md](./spec.md) acceptance criteria.
+  - **Local (2026-08-09):** Partial audit — remaining Critical/Major blockers are T7.1–T7.3 acceptance evidence (NAS + clerk sign-off), not missing product code for FR-1–FR-7. Re-run `speckit-done` after T7.1–T7.3.
 
 **Checkpoint:** Project ready for production clerk use.
 
@@ -351,3 +359,30 @@ Post–Phase 6 re-converge (2026-08-09). Phase 7 handover (T7.1–T7.4) remains 
 
 - [x] **T023** LOW: Document optional Synology reverse-proxy HTTPS for LAN/Tailscale exposure per FR-026 / Constitution VI (`missing`)
   - **Done (2026-08-09):** `deploy/synology/DEPLOY.md` reverse-proxy HTTPS section.
+
+---
+
+## Phase 10: Convergence
+
+Deep re-converge (2026-08-09) post–Phase 9, stressing edge cases, vault-controller security/audit, report coverage, and test health. Phase 7 handover (T7.1–T7.4) remains open and is not duplicated below.
+
+- [x] **T024** CRITICAL: Audit-log all mutating document-vault FileManager operations (delete/rename/move/copy/create/upload in `DocumentVaultFileManagerController`) with user, timestamp, and before/after paths — file mutations currently bypass the EF audit interceptor entirely per Constitution III / FR-025 (`contradicts`)
+  - **Done (2026-08-09):** `IDocumentVaultAuditService` writes `AuditLog` rows for mutating vault ops.
+- [x] **T025** Fix integration test host: all 11 tests in `Wiley.Apartments.IntegrationTests` fail with `FileNotFoundException: Syncfusion.Blazor.FileManager.PhysicalFileProvider` after T015 package addition; restore green suite per plan: T0.7 test policy / Constitution VIII (`contradicts`)
+  - **Done (2026-08-09):** Explicit `PhysicalFileProvider` PackageReference on IntegrationTests; suite green (13 tests).
+- [x] **T026** Keep `Document` metadata consistent with NAS files: FileManager delete/rename/move leaves `Document.FilePathOnNas` stale (orphaned grid rows, broken viewer/download); restrict destructive FileManager operations or synchronize metadata on file ops per plan: Decision 3 / FR-019 (`partial`)
+  - **Done (2026-08-09):** `IDocumentVaultMetadataSync` soft-deletes / renames / moves matching `Document` rows after FileManager mutations.
+- [x] **T027** Add optimistic concurrency (RowVersion/concurrency token) to governed entities (Unit, Tenant, Lease at minimum) with clerk-friendly conflict message on `DbUpdateConcurrencyException` per spec Edge Case 1 / data-model Lease.RowVersion / SC-006 (`missing`)
+  - **Done (2026-08-09):** `RowVersion` Guid tokens + migration; `ConcurrencyConflictException`; unit service tests.
+- [x] **T028** Add NAS document-root availability check (startup health check + clear clerk-facing error on document save when share unavailable; no false "saved" state) per spec Edge Case 2 / plan: Risks mitigation (`missing`)
+  - **Done (2026-08-09):** `DocumentRootHealthCheck` at `/health`; `DocumentRootAvailability.EnsureWritable` in upload + FileManager.
+- [x] **T029** Add maintenance-cost-by-unit report (or reconcile FR-023 to the ops-cost report) — reports hub lacks the explicitly required maintenance cost report per FR-023 (`partial`)
+  - **Done (2026-08-09):** `/reports/maintenance-costs` SfGrid + hub link.
+- [x] **T030** Harden vault file-op endpoints: remove `[IgnoreAntiforgeryToken]` or add equivalent CSRF mitigation for cookie-authenticated delete/upload per Constitution VI / FR-021 (`missing`)
+  - **Done (2026-08-09):** `DocumentVaultAntiforgeryFilter` on FileOperations/Upload; SfFileManager OnSend sends token.
+- [x] **T031** Add test coverage for `DocumentVaultFileManagerController` (unit + integration at minimum) per plan: T0.7 test-pyramid policy (`missing`)
+  - **Done (2026-08-09):** Audit + metadata unit tests; vault controller + `/health` integration tests.
+- [x] **T032** Surface a visible configuration error with IT contact note when `PaymentPortalUrl` is missing/invalid instead of silent hardcoded fallback per spec Edge Case 4 (`partial`)
+  - **Done (2026-08-09):** `PaymentPortalConfiguration.TryResolve`; tenant/lease/settings show IT contact error.
+- [x] **T033** Reconcile plan.md tech stack (.NET 8 / ASP.NET Core 8) with actual `net9.0` target across all projects per plan: Tech Stack Decision (`contradicts`)
+  - **Done (2026-08-09):** plan.md updated to .NET 9 / ASP.NET Core 9.

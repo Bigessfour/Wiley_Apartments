@@ -5,13 +5,14 @@
 @using Syncfusion.Blazor.Grids
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Configuration
+@using Wiley.Apartments.Web.Components.Shared
 @inject ITenantService TenantService
 @inject IOccupancyService OccupancyService
 @inject ILeaseService LeaseService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
-@inject Microsoft.Extensions.Options.IOptions<Wiley.Apartments.Web.Configuration.ClerkSuiteOptions> ClerkOptions
-@using Wiley.Apartments.Web.Components.Shared
+@inject Microsoft.Extensions.Options.IOptions<ClerkSuiteOptions> ClerkOptions
 
 <PageTitle>@(Tenant is null ? "Tenant" : $"{Tenant.LastName}, {Tenant.FirstName}")</PageTitle>
 
@@ -25,14 +26,8 @@ else
         <SfButton CssClass="e-outline e-small" Content="← Tenants" OnClick="@(() => Navigation.NavigateTo("/tenants"))" />
     </div>
 
-    <h1 class="h3">@Tenant.LastName, @Tenant.FirstName</h1>
-    <p class="text-muted">
-        @Tenant.Phone
-        @if (!string.IsNullOrWhiteSpace(Tenant.Email))
-        {
-            <span> · @Tenant.Email</span>
-        }
-    </p>
+    <PageHeader Title="@($"{Tenant.LastName}, {Tenant.FirstName}")"
+                Subtitle="@TenantSubtitle" />
     @if (!string.IsNullOrWhiteSpace(Tenant.EmergencyContact))
     {
         <p><strong>Emergency:</strong> @Tenant.EmergencyContact</p>
@@ -199,8 +194,15 @@ else
     <p class="text-muted small mb-1">
         <a href="/payments">Open tenant ledger</a>
         ·
-        <a href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Town PayStar payment portal</a>
-        (staff deep-link only — no card data in ClerkSuite).
+        @if (PaymentPortalConfigured)
+        {
+            <a href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Town PayStar payment portal</a>
+            <span class="text-muted">(staff deep-link only — no card data in ClerkSuite).</span>
+        }
+        else
+        {
+            <span class="text-danger">@PaymentPortalError</span>
+        }
     </p>
 
     <EntityDocumentsPanel EntityType="DocumentEntityType.Tenant"
@@ -219,10 +221,41 @@ else
     private List<Lease> Leases { get; set; } = [];
     private string StatusMessage { get; set; } = "Loading…";
     private string? ErrorMessage { get; set; }
+
+    private string TenantSubtitle
+    {
+        get
+        {
+            if (Tenant is null)
+            {
+                return string.Empty;
+            }
+
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Tenant.Phone))
+            {
+                parts.Add(Tenant.Phone);
+            }
+
+            if (!string.IsNullOrWhiteSpace(Tenant.Email))
+            {
+                parts.Add(Tenant.Email);
+            }
+
+            return string.Join(" · ", parts);
+        }
+    }
+
+    private bool PaymentPortalConfigured =>
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out _);
     private string PaymentPortalUrl =>
-        string.IsNullOrWhiteSpace(ClerkOptions.Value.PaymentPortalUrl)
-            ? "https://www.townofwiley.gov/government/departments/finance/utility-billing"
-            : ClerkOptions.Value.PaymentPortalUrl;
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out var url, out _)
+            ? url
+            : string.Empty;
+    private string PaymentPortalError =>
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out var err)
+            ? string.Empty
+            : (err ?? PaymentPortalConfiguration.ItContactNote);
 
     protected override async Task OnParametersSetAsync() => await ReloadAsync();
 

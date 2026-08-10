@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -46,6 +47,13 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IDashboardService, DashboardService>();
         builder.Services.AddScoped<IPortfolioProfitLossService, PortfolioProfitLossService>();
         builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+        builder.Services.AddScoped<IDocumentVaultAuditService, DocumentVaultAuditService>();
+        builder.Services.AddScoped<IDocumentVaultMetadataSync, DocumentVaultMetadataSync>();
+        builder.Services.AddScoped<ClerkToastService>();
+        builder.Services.AddScoped<IClerkToast>(sp => sp.GetRequiredService<ClerkToastService>());
+        builder.Services.AddScoped<DocumentVaultAntiforgeryFilter>();
+        builder.Services.AddHealthChecks()
+            .AddCheck<DocumentRootHealthCheck>("document-root");
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";
@@ -78,7 +86,12 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddControllers();
         builder.Services.AddSyncfusionBlazor();
-        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        builder.Services.AddScoped<CircuitHandler, LoggingCircuitHandler>();
+        builder.Services.AddRazorComponents()
+            .AddInteractiveServerComponents(options =>
+            {
+                options.DetailedErrors = builder.Environment.IsDevelopment();
+            });
 
         return builder;
     }

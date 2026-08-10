@@ -11,12 +11,7 @@
 
 <PageTitle>Units</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h1 class="h3 mb-1">Units</h1>
-        <p class="text-muted mb-0">Town of Wiley — @UnitCount of @UnitService.MaxUnits units</p>
-    </div>
-</div>
+<PageHeader Title="Units" Subtitle="@($"Town of Wiley — {UnitCount} of {UnitService.MaxUnits} units")" />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -29,10 +24,17 @@
         Toolbar="@ToolbarItems"
         AllowPaging="true"
         AllowSorting="true"
+        AllowFiltering="true"
         Height="420">
     <GridEvents TValue="Unit"
                 OnActionBegin="OnActionBeginAsync"
                 OnActionComplete="OnActionCompleteAsync" />
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No units yet — use Add on the toolbar (max @UnitService.MaxUnits).</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridEditSettings AllowAdding="@CanAddUnit"
                       AllowEditing="true"
                       AllowDeleting="true"
@@ -82,7 +84,7 @@
                 @{
                     var row = context as Unit;
                 }
-                <span class="badge @StatusBadgeClass(row!.Status)">@FormatStatus(row.Status)</span>
+                <UnitStatusChip Status="row!.Status" />
             </Template>
         </GridColumn>
         <GridColumn Field="@nameof(Unit.Notes)"
@@ -192,21 +194,6 @@
             }
         }
     }
-
-    private static string FormatStatus(UnitStatus status) => status switch
-    {
-        UnitStatus.MakeReady => "Make-Ready",
-        _ => status.ToString()
-    };
-
-    private static string StatusBadgeClass(UnitStatus status) => status switch
-    {
-        UnitStatus.Occupied => "text-bg-success",
-        UnitStatus.Vacant => "text-bg-secondary",
-        UnitStatus.Maintenance => "text-bg-warning",
-        UnitStatus.MakeReady => "text-bg-info",
-        _ => "text-bg-light"
-    };
 
     private sealed record UnitStatusOption(UnitStatus Value, string Text);
 }

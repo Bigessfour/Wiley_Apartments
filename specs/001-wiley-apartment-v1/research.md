@@ -65,7 +65,7 @@ attributed in AuditLog. **No role differentiation** — every authenticated user
 to all features. Remove Clerk / ReadOnly / Elevated roles. Seed **1–2 full-access accounts**
 on first deploy (passwords chosen at deploy).
 
-**Rationale**: Simplifies v1 for two staff; audit still captures *who* changed data. Role-based
+**Rationale**: Simplifies v1 for two staff; audit still captures _who_ changed data. Role-based
 access deferred unless town requests it later.
 
 **Alternatives considered**:
@@ -90,14 +90,14 @@ level where supported; app layer rejects audit mutations.
 `sf-blazor-mcp` (`sf_blazor_assistant`), and official Blazor docs. Non-Syncfusion UI is out of
 compliance.
 
-| Surface         | Syncfusion component               |
-| --------------- | ---------------------------------- |
-| Grids           | SfGrid                             |
-| Dashboard       | SfDashboardLayout, SfCard, SfChart |
-| Lease templates | Fillable AcroForm PDF + DocIO bootstrap from Brookside DOCX |
-| PDF read        | SfPdfViewer / SfPdfViewer2         |
+| Surface         | Syncfusion component                                          |
+| --------------- | ------------------------------------------------------------- |
+| Grids           | SfGrid                                                        |
+| Dashboard       | SfDashboardLayout, SfCard, SfChart                            |
+| Lease templates | Fillable AcroForm PDF + DocIO bootstrap from Brookside DOCX   |
+| PDF read        | SfPdfViewer / SfPdfViewer2                                    |
 | File vault      | SfFileManager (T6.1); DocumentEditor optional for Office edit |
-| Forms / dialogs | SfDataForm, SfDialog               |
+| Forms / dialogs | SfDataForm, SfDialog                                          |
 
 **Rationale**: Constitution V (strict); clerk-quality enterprise UI; MCP-assisted correct APIs.
 

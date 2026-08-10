@@ -137,6 +137,7 @@ public sealed class DocumentService : IDocumentService
         }
 
         var root = ResolveDocumentRoot();
+        DocumentRootAvailability.EnsureWritable(root);
         var relativeDir = relativeDirectory.Replace('\\', '/').Trim('/');
         var absDir = Path.Combine(root, relativeDir.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(absDir);

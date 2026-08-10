@@ -12,25 +12,16 @@
 @inject IUnitService UnitService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject IClerkToast Toast
 
 <PageTitle>Ledger</PageTitle>
 
-<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-    <div>
-        <h1 class="h3 mb-1">Tenant ledger</h1>
-        <p class="text-muted mb-0 small">
-            Charges and payments with running balance. Landlord ops costs are separate (T4.5).
-        </p>
-    </div>
-</div>
+<PageHeader Title="Tenant ledger"
+            Subtitle="Charges and payments with running balance. Landlord ops costs are separate (T4.5)." />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
-}
-@if (!string.IsNullOrEmpty(SuccessMessage))
-{
-    <div class="alert alert-success">@SuccessMessage</div>
 }
 
 <div class="row g-3 mb-4" style="max-width: 960px;">
@@ -123,8 +114,14 @@
 
 <p class="small text-muted">Balance (filter): @Balance.ToString("C")</p>
 
-<SfGrid TValue="LedgerRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true">
+<SfGrid TValue="LedgerRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true" AllowFiltering="true">
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridPageSettings PageSize="25" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No ledger entries for this filter — post a charge or payment above.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridColumns>
         <GridColumn Field="@nameof(LedgerRow.DateDisplay)" HeaderText="Date" Width="110" />
         <GridColumn Field="@nameof(LedgerRow.TenantName)" HeaderText="Tenant" Width="140" />
@@ -145,7 +142,6 @@
     private Guid? FilterUnitId { get; set; }
     private decimal Balance { get; set; }
     private string? ErrorMessage { get; set; }
-    private string? SuccessMessage { get; set; }
     private bool Busy { get; set; }
     private string? ShowForm { get; set; }
     private Guid? FormTenantId { get; set; }
@@ -224,7 +220,6 @@
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var dateUtc = Clock.ToUtc(FormDate.Value.Date);
@@ -236,7 +231,7 @@
                     FormAmount.Value,
                     dateUtc,
                     notes: FormNotes);
-                SuccessMessage = "Charge posted.";
+                await Toast.ShowSuccessAsync("Charge posted.");
             }
             else
             {
@@ -247,7 +242,7 @@
                     dateUtc,
                     FormMethod,
                     notes: FormNotes);
-                SuccessMessage = "Payment posted.";
+                await Toast.ShowSuccessAsync("Payment posted.");
             }
 
             ShowForm = null;
@@ -269,13 +264,12 @@
     {
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var count = await LedgerService.PostMonthlyRentChargesAsync();
-            SuccessMessage = count == 0
+            await Toast.ShowSuccessAsync(count == 0
                 ? "No new rent charges needed for this month."
-                : $"Posted {count} rent charge(s) for active leases.";
+                : $"Posted {count} rent charge(s) for active leases.");
             await LoadAsync();
         }
         catch (Exception ex)

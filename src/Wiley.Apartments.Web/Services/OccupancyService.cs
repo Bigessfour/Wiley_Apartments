@@ -104,8 +104,9 @@ public sealed class OccupancyService : IOccupancyService
         _db.Occupancies.Add(occupancy);
         unit.CurrentTenantId = tenantId;
         unit.Status = UnitStatus.Occupied;
+        ConcurrencyHelper.BumpRowVersion(unit);
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Unit", cancellationToken);
         _logger.LogInformation(
             "Started occupancy {OccupancyId} unit {UnitNumber} tenant {TenantId}.",
             occupancy.Id,
@@ -151,7 +152,8 @@ public sealed class OccupancyService : IOccupancyService
             unit.Status = UnitStatus.Vacant;
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        ConcurrencyHelper.BumpRowVersion(unit);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Unit", cancellationToken);
         _logger.LogInformation(
             "Ended occupancy {OccupancyId} unit {UnitNumber}.",
             occupancy.Id,

@@ -11,13 +11,9 @@
 
 <PageTitle>New lease</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h1 class="h3 mb-1">Generate lease</h1>
-        <p class="text-muted mb-0">Fill Brookside blank template from unit + tenant data</p>
-    </div>
+<PageHeader Title="Generate lease" Subtitle="Fill Brookside blank template from unit + tenant data">
     <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
-</div>
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {

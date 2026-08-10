@@ -31,7 +31,7 @@ NAS. Colorado-aware leasing. Syncfusion-polished UI.
 Authentication is **required** so AuditLog attributes every mutation to a user. All authenticated
 users have identical full access — no Clerk / ReadOnly / Elevated roles in v1.
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Unit and Asset Management (Priority: P1) — FR-1
 
@@ -209,7 +209,7 @@ via Synology reverse proxy.
 - Warranty expiration with no replacement date: dashboard still flags expiring warranty.
 - Soft-deleted tenant with open balance: remains visible on delinquency until resolved.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -351,7 +351,7 @@ authoritative spec workup and map to tasks Phases 1–7 and [quickstart.md](./qu
 
 **Spec done signal**: All FR groups above have measurable criteria; no open TBD on core workflows.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

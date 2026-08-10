@@ -9,30 +9,20 @@
 @inject IScheduleService ScheduleService
 @inject IUnitService UnitService
 @inject IDateTimeService Clock
+@inject IClerkToast Toast
 
 <PageTitle>Operations calendar</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <div>
-        <h1 class="h3 mb-1">Operations calendar</h1>
-        <p class="text-muted mb-0 small">
-            Cleaning, vacancy, inspection, and other unit work. Drag to reschedule. Upcoming reminders appear on the dashboard.
-        </p>
-    </div>
-    <div class="d-flex gap-2">
-        <SfButton CssClass="e-outline e-small" Content="Suggest turnover cleans" Disabled="@Busy"
-                  OnClick="SuggestTurnoverCleansAsync" />
-        <SfButton CssClass="e-outline e-small" Content="Refresh" Disabled="@Busy" OnClick="ReloadAsync" />
-    </div>
-</div>
+<PageHeader Title="Operations calendar"
+            Subtitle="Cleaning, vacancy, inspection, and other unit work. Drag to reschedule. Upcoming reminders appear on the dashboard.">
+    <SfButton CssClass="e-outline e-small" Content="Suggest turnover cleans" Disabled="@Busy"
+              OnClick="SuggestTurnoverCleansAsync" />
+    <SfButton CssClass="e-outline e-small" Content="Refresh" Disabled="@Busy" OnClick="ReloadAsync" />
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
-}
-@if (!string.IsNullOrEmpty(SuccessMessage))
-{
-    <div class="alert alert-success">@SuccessMessage</div>
 }
 
 <SfSchedule TValue="ScheduleAppointment"
@@ -118,7 +108,6 @@
     private List<ScheduleAppointment> DataSource { get; set; } = [];
     private List<UnitOption> UnitOptions { get; set; } = [];
     private string? ErrorMessage { get; set; }
-    private string? SuccessMessage { get; set; }
     private bool Busy { get; set; }
     private bool _persisting;
 
@@ -168,7 +157,6 @@
     {
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var units = await UnitService.GetAllAsync();
@@ -198,9 +186,9 @@
                 created++;
             }
 
-            SuccessMessage = created == 0
+            await Toast.ShowSuccessAsync(created == 0
                 ? "No new turnover cleans suggested (no uncovered vacant units)."
-                : $"Created {created} turnover clean item(s) for vacant units.";
+                : $"Created {created} turnover clean item(s) for vacant units.");
             await ReloadAsync();
         }
         catch (Exception ex)
@@ -328,6 +316,8 @@
             ScheduledItemCategory.Inspection => "#198754",
             _ => "#6c757d"
         };
+
+        args.Attributes ??= new Dictionary<string, object>();
         args.Attributes["style"] = $"background:{color}; border-color:{color};";
     }
 

@@ -49,7 +49,7 @@ public interface ILedgerService
         CancellationToken cancellationToken = default);
 
     /// <summary>Posts monthly rent charges for active leases missing a rent charge in the target month.</summary>
-  /// <returns>Number of rent charges posted.</returns>
+    /// <returns>Number of rent charges posted.</returns>
     Task<int> PostMonthlyRentChargesAsync(
         DateTime? asOfUtc = null,
         CancellationToken cancellationToken = default);

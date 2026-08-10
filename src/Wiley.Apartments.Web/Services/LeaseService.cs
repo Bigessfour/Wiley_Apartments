@@ -363,7 +363,8 @@ public sealed class LeaseService : ILeaseService
 
         lease.Status = LeaseStatus.Amended;
         lease.LifecycleNote = TrimNote(note) ?? lease.LifecycleNote;
-        await _db.SaveChangesAsync(cancellationToken);
+        ConcurrencyHelper.BumpRowVersion(lease);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
         _logger.LogInformation("Amended lease {LeaseId}.", lease.Id);
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
     }
@@ -409,9 +410,10 @@ public sealed class LeaseService : ILeaseService
         prior.Status = LeaseStatus.Renewed;
         prior.SuccessorLeaseId = successor.Id;
         prior.LifecycleNote = TrimNote(note) ?? prior.LifecycleNote;
+        ConcurrencyHelper.BumpRowVersion(prior);
 
         _db.Leases.Add(successor);
-        await _db.SaveChangesAsync(cancellationToken);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
         _logger.LogInformation(
             "Renewed lease {PriorId} → successor draft {SuccessorId}.",
             prior.Id, successor.Id);
@@ -438,7 +440,8 @@ public sealed class LeaseService : ILeaseService
 
         lease.Status = LeaseStatus.Terminated;
         lease.LifecycleNote = TrimNote(note) ?? lease.LifecycleNote;
-        await _db.SaveChangesAsync(cancellationToken);
+        ConcurrencyHelper.BumpRowVersion(lease);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
         _logger.LogInformation("Terminated lease {LeaseId} effective {End}.", lease.Id, lease.EndUtc);
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
     }
@@ -448,7 +451,8 @@ public sealed class LeaseService : ILeaseService
         var lease = await _db.Leases.FindAsync([id], cancellationToken)
             ?? throw new InvalidOperationException($"Lease {id} was not found.");
         lease.IsDeleted = true;
-        await _db.SaveChangesAsync(cancellationToken);
+        ConcurrencyHelper.BumpRowVersion(lease);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
     }
 
     private async Task<Lease> RequireLifecycleLeaseAsync(Guid leaseId, CancellationToken cancellationToken)

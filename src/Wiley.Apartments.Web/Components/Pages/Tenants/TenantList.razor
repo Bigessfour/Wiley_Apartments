@@ -10,12 +10,8 @@
 
 <PageTitle>Tenants</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h1 class="h3 mb-1">Tenants</h1>
-        <p class="text-muted mb-0">@TenantCount active tenants (Delete soft-removes; hidden from this list)</p>
-    </div>
-</div>
+<PageHeader Title="Tenants"
+            Subtitle="@($"{TenantCount} active tenants (Delete soft-removes; hidden from this list)")" />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -28,9 +24,16 @@
         Toolbar="@ToolbarItems"
         AllowPaging="true"
         AllowSorting="true"
+        AllowFiltering="true"
         Height="420">
     <GridEvents TValue="Tenant"
                 OnActionComplete="OnActionCompleteAsync" />
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No tenants yet — use Add on the toolbar.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridEditSettings AllowAdding="true"
                       AllowEditing="true"
                       AllowDeleting="true"

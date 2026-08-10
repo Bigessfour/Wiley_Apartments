@@ -17,6 +17,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthState
+@inject IClerkToast Toast
 
 <PageTitle>Lease preview</PageTitle>
 
@@ -26,37 +27,31 @@
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-        <div>
-            <h1 class="h3 mb-1">Lease — unit @(Lease.Unit?.Number)</h1>
-            <p class="text-muted mb-0">
-                @(Lease.Tenant is null ? "" : $"{Lease.Tenant.FirstName} {Lease.Tenant.LastName}")
-                · @Lease.Status · @Lease.TemplateUsed
-            </p>
-            <p class="small mb-0">
-                @Clock.ToDisplayTime(Lease.StartUtc).ToString("d") – @Clock.ToDisplayTime(Lease.EndUtc).ToString("d")
-                · Rent @Lease.Rent.ToString("C") · Deposit @Lease.Deposit.ToString("C")
-            </p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-            <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
+    <PageHeader Title="@($"Lease — unit {Lease.Unit?.Number}")"
+                Subtitle="@LeaseHeaderSubtitle">
+        <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
+        @if (PaymentPortalConfigured)
+        {
             <a class="e-btn e-outline" href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Payment portal</a>
-            @if (string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
-            {
-                <SfButton CssClass="e-primary" Content="Generate PDF" Disabled="@Busy" OnClick="GenerateAsync" />
-            }
-        </div>
-    </div>
+        }
+        else
+        {
+            <span class="text-danger small align-self-center">@PaymentPortalError</span>
+        }
+        @if (string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+        {
+            <SfButton CssClass="e-primary" Content="Generate PDF" Disabled="@Busy" OnClick="GenerateAsync" />
+        }
+    </PageHeader>
+    <p class="small mb-3">
+        @Clock.ToDisplayTime(Lease.StartUtc).ToString("d") – @Clock.ToDisplayTime(Lease.EndUtc).ToString("d")
+        · Rent @Lease.Rent.ToString("C") · Deposit @Lease.Deposit.ToString("C")
+    </p>
 
     @if (!string.IsNullOrEmpty(ErrorMessage))
     {
         <div class="alert alert-warning">@ErrorMessage</div>
     }
-    @if (!string.IsNullOrEmpty(SuccessMessage))
-    {
-        <div class="alert alert-success">@SuccessMessage</div>
-    }
-
     @if (!string.IsNullOrWhiteSpace(Lease.LifecycleNote))
     {
         <p class="small text-muted">Lifecycle note: @Lease.LifecycleNote</p>
@@ -233,7 +228,6 @@ else
     private Wiley.Apartments.Contracts.DocumentInfo? SignedInfo { get; set; }
     private SfPdfViewer2? PdfViewer { get; set; }
     private string? ErrorMessage { get; set; }
-    private string? SuccessMessage { get; set; }
     private bool Busy { get; set; }
     private byte[]? _pdfBytes;
     private bool _pendingLoad;
@@ -250,10 +244,33 @@ else
     private string? LifecycleNote { get; set; }
     private Guid? _loadedLeaseId;
 
+    private string LeaseHeaderSubtitle
+    {
+        get
+        {
+            if (Lease is null)
+            {
+                return string.Empty;
+            }
+
+            var tenant = Lease.Tenant is null
+                ? ""
+                : $"{Lease.Tenant.FirstName} {Lease.Tenant.LastName}";
+            return string.Join(" · ", new[] { tenant, Lease.Status.ToString(), Lease.TemplateUsed }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+        }
+    }
+
+    private bool PaymentPortalConfigured =>
+        PaymentPortalConfiguration.TryResolve(Options.Value.PaymentPortalUrl, out _, out _);
     private string PaymentPortalUrl =>
-        string.IsNullOrWhiteSpace(Options.Value.PaymentPortalUrl)
-            ? "https://www.townofwiley.gov/government/departments/finance/utility-billing"
-            : Options.Value.PaymentPortalUrl;
+        PaymentPortalConfiguration.TryResolve(Options.Value.PaymentPortalUrl, out var url, out _)
+            ? url
+            : string.Empty;
+    private string PaymentPortalError =>
+        PaymentPortalConfiguration.TryResolve(Options.Value.PaymentPortalUrl, out _, out var err)
+            ? string.Empty
+            : (err ?? PaymentPortalConfiguration.ItContactNote);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -261,7 +278,6 @@ else
         {
             ShowPanel = null;
             ErrorMessage = null;
-            SuccessMessage = null;
             await LoadAsync();
         }
     }
@@ -309,7 +325,6 @@ else
     {
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             DateTime? endUtc = AmendEnd is null
@@ -323,7 +338,7 @@ else
                 AmendClauses,
                 LifecycleNote);
             ShowPanel = null;
-            SuccessMessage = "Lease amended.";
+            await Toast.ShowSuccessAsync("Lease amended.");
             await LoadAsync();
         }
         catch (Exception ex)
@@ -346,7 +361,6 @@ else
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var successor = await LeaseService.RenewAsync(
@@ -377,7 +391,6 @@ else
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             Lease = await LeaseService.TerminateAsync(
@@ -385,7 +398,7 @@ else
                 Clock.ToUtc(TerminateEnd.Value.Date),
                 LifecycleNote);
             ShowPanel = null;
-            SuccessMessage = "Lease terminated.";
+            await Toast.ShowSuccessAsync("Lease terminated.");
             await LoadAsync();
         }
         catch (Exception ex)
@@ -435,7 +448,6 @@ else
     {
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             Lease = await LeaseService.GenerateDocumentsAsync(LeaseId);
@@ -477,7 +489,6 @@ else
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var auth = await AuthState.GetAuthenticationStateAsync();
@@ -492,7 +503,7 @@ else
                 stream,
                 user);
             _pendingSigned = null;
-            SuccessMessage = "Signed lease attached. Status is now Active.";
+            await Toast.ShowSuccessAsync("Signed lease attached. Status is now Active.");
             await LoadAsync();
             _pendingLoad = true;
         }
@@ -526,7 +537,6 @@ else
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var auth = await AuthState.GetAuthenticationStateAsync();
@@ -539,11 +549,11 @@ else
                 user);
             if (result.Status == "NotConfigured")
             {
-                SuccessMessage = result.Message;
+                await Toast.ShowSuccessAsync(result.Message);
             }
             else
             {
-                SuccessMessage = $"{result.Status}: {result.Message}";
+                await Toast.ShowSuccessAsync($"{result.Status}: {result.Message}");
             }
         }
         catch (Exception ex)

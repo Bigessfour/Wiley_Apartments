@@ -1,30 +1,48 @@
 @page "/reports"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Cards
 @inject NavigationManager Navigation
 
 <PageTitle>Reports</PageTitle>
 
-<h1 class="h3 mb-3">Reports</h1>
-<p class="text-muted mb-4">Operational reports for clerks and town council packets.</p>
+<PageHeader Title="Reports" Subtitle="Operational reports for clerks and town council packets." />
 
-<ul class="list-unstyled">
-    <li class="mb-2">
-        <SfButton CssClass="e-outline" Content="Rent roll" OnClick="@(() => Navigation.NavigateTo("/reports/rent-roll"))" />
-    </li>
-    <li class="mb-2">
-        <SfButton CssClass="e-outline" Content="Occupancy" OnClick="@(() => Navigation.NavigateTo("/reports/occupancy"))" />
-    </li>
-    <li class="mb-2">
-        <SfButton CssClass="e-outline" Content="Warranty status" OnClick="@(() => Navigation.NavigateTo("/reports/warranty"))" />
-    </li>
-    <li class="mb-2">
-        <SfButton CssClass="e-outline" Content="Delinquency" OnClick="@(() => Navigation.NavigateTo("/reports/delinquency"))" />
-    </li>
-    <li class="mb-2">
-        <SfButton CssClass="e-outline" Content="Operating costs" OnClick="@(() => Navigation.NavigateTo("/reports/operating-costs"))" />
-    </li>
-    <li class="mb-2">
-        <SfButton CssClass="e-outline" Content="Portfolio P/L" OnClick="@(() => Navigation.NavigateTo("/reports/profit-loss"))" />
-    </li>
-</ul>
+<div class="report-card-grid">
+    @foreach (var report in Reports)
+    {
+        <div role="button" tabindex="0" class="report-card-hit"
+             @onclick="@(() => Navigation.NavigateTo(report.Href))"
+             @onkeydown="@(e => OnReportKey(e, report.Href))">
+            <SfCard CssClass="report-card">
+                <CardContent>
+                    <h2>@report.Title</h2>
+                    <p>@report.Blurb</p>
+                </CardContent>
+            </SfCard>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly ReportLink[] Reports =
+    [
+        new("/reports/rent-roll", "Rent roll", "Current rent status across all 16 units."),
+        new("/reports/occupancy", "Occupancy", "Occupied vs vacant portfolio snapshot."),
+        new("/reports/warranty", "Warranty status", "Appliance warranties nearing expiration."),
+        new("/reports/delinquency", "Delinquency", "Accounts with outstanding balances."),
+        new("/reports/operating-costs", "Operating costs", "Landlord ops costs by unit and category."),
+        new("/reports/maintenance-costs", "Maintenance cost by unit", "Work-order spend rolled up by unit."),
+        new("/reports/profit-loss", "Portfolio P/L", "Council income, expense, and net charts.")
+    ];
+
+    private void OnReportKey(KeyboardEventArgs e, string href)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            Navigation.NavigateTo(href);
+        }
+    }
+
+    private sealed record ReportLink(string Href, string Title, string Blurb);
+}

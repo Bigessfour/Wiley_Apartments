@@ -11,26 +11,20 @@
 
 <PageTitle>Portfolio P/L</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
-    <div>
-        <h1 class="h3 mb-1">Council portfolio P/L</h1>
-        <p class="text-muted mb-0 small">
-            Income from ledger payments · expenses from unit operating costs (common upkeep allocated)
-        </p>
+<PageHeader Title="Council portfolio P/L"
+            Subtitle="Income from ledger payments · expenses from unit operating costs (common upkeep allocated)"
+            CssClass="d-print-none">
+    <div style="min-width: 160px;">
+        <label class="form-label">Period</label>
+        <SfDropDownList TValue="ProfitLossPeriod" TItem="PeriodOption" DataSource="@PeriodOptions"
+                        @bind-Value="Period" ValueChange="OnPeriodChanged">
+            <DropDownListFieldSettings Text="Text" Value="Value" />
+        </SfDropDownList>
     </div>
-    <div class="d-flex gap-2 align-items-end">
-        <div style="min-width: 160px;">
-            <label class="form-label">Period</label>
-            <SfDropDownList TValue="ProfitLossPeriod" TItem="PeriodOption" DataSource="@PeriodOptions"
-                            @bind-Value="Period" ValueChange="OnPeriodChanged">
-                <DropDownListFieldSettings Text="Text" Value="Value" />
-            </SfDropDownList>
-        </div>
-        <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick='() => Navigation.NavigateTo("/reports")' />
-        <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
-        <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
-    </div>
-</div>
+    <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick='() => Navigation.NavigateTo("/reports")' />
+    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+    <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -51,7 +45,7 @@ else
 
         <h2 class="h6">By unit</h2>
         <div style="height: 320px;" class="mb-4">
-            <SfChart Width="100%" Height="100%">
+            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
                 <ChartSeriesCollection>
                     <ChartSeries DataSource="@UnitChart" XName="Label" YName="Income" Type="ChartSeriesType.StackingColumn" Name="Income" />
@@ -72,7 +66,7 @@ else
 
         <h2 class="h6">Period series</h2>
         <div style="height: 280px;" class="mb-3">
-            <SfChart Width="100%" Height="100%">
+            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
                 <ChartSeriesCollection>
                     <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
@@ -92,6 +86,7 @@ else
     private List<ChartPoint> SeriesChart { get; set; } = [];
     private List<UnitPlRow> UnitRows { get; set; } = [];
     private string? ErrorMessage { get; set; }
+    private Theme ChartTheme { get; set; } = Theme.Fluent2;
 
     private static readonly List<PeriodOption> PeriodOptions =
     [
@@ -101,6 +96,22 @@ else
     ];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var isDark = await Js.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+        var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
+        if (next != ChartTheme)
+        {
+            ChartTheme = next;
+            StateHasChanged();
+        }
+    }
 
     private async Task OnPeriodChanged(ChangeEventArgs<ProfitLossPeriod, PeriodOption> args)
     {

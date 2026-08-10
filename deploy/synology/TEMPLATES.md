@@ -5,12 +5,12 @@ Blank Brookside / Wiley Housing Authority lease forms live on the documents shar
 
 ## Canonical paths (production)
 
-| File | Term | Host path |
-| ---- | ---- | --------- |
-| Year lease (source DOCX) | 1 calendar year | `/volume1/apartments/docs/templates/brookside-year-lease.docx` |
-| Month-to-month (source DOCX) | 1 calendar month | `/volume1/apartments/docs/templates/brookside-month-to-month-lease.docx` |
-| Year lease (fillable PDF) | preferred runtime | `/volume1/apartments/docs/templates/brookside-year-lease.pdf` |
-| Month-to-month (fillable PDF) | preferred runtime | `/volume1/apartments/docs/templates/brookside-month-to-month-lease.pdf` |
+| File                          | Term              | Host path                                                                |
+| ----------------------------- | ----------------- | ------------------------------------------------------------------------ |
+| Year lease (source DOCX)      | 1 calendar year   | `/volume1/apartments/docs/templates/brookside-year-lease.docx`           |
+| Month-to-month (source DOCX)  | 1 calendar month  | `/volume1/apartments/docs/templates/brookside-month-to-month-lease.docx` |
+| Year lease (fillable PDF)     | preferred runtime | `/volume1/apartments/docs/templates/brookside-year-lease.pdf`            |
+| Month-to-month (fillable PDF) | preferred runtime | `/volume1/apartments/docs/templates/brookside-month-to-month-lease.pdf`  |
 
 Container path: `/docs/templates/brookside-*`
 

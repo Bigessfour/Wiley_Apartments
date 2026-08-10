@@ -14,6 +14,7 @@ try
 
     app.MapStaticAssets();
     app.MapControllers();
+    app.MapHealthChecks("/health");
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
 
@@ -39,7 +40,9 @@ try
     var urls = builder.Configuration["ASPNETCORE_URLS"]
         ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
         ?? "http://localhost:5077";
-    Log.Information("ClerkSuite is ready. Open {LoginUrl} (Ctrl+C to stop).", $"{urls.TrimEnd('/')}/Account/Login");
+    Log.Information("ClerkSuite is ready. Open {LoginUrl} (Ctrl+C to stop). File logs: {LogDir}",
+        $"{urls.TrimEnd('/')}/Account/Login",
+        Path.Combine(app.Environment.ContentRootPath, "logs"));
 
     app.Run();
 }

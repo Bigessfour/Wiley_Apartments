@@ -27,4 +27,6 @@ public class Lease
     public Guid? SuccessorLeaseId { get; set; }
     /// <summary>Clerk note for terminate / amend / renew actions.</summary>
     public string? LifecycleNote { get; set; }
+    /// <summary>Optimistic concurrency token (SQLite-friendly Guid).</summary>
+    public Guid RowVersion { get; set; } = Guid.NewGuid();
 }

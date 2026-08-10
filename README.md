@@ -23,14 +23,14 @@ maintenance, appliance/carpet inventory, and documents.
 
 ## Spec Kit workflow
 
-| Step                    | Status                                                                                                                                    |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `/speckit-constitution` | Done v1.2.0 — Syncfusion mandate (strict) + Keychain keys                                                                                 |
-| `/speckit-specify`      | Done — ClerkSuite FR-1–FR-7                                                                                                               |
-| `/speckit-plan`         | Done                                                                                                                                      |
-| `/speckit-tasks`        | Done — Phases 0–7                                                                                                                         |
-| `/speckit-analyze`      | Done — [analyze-report](specs/001-wiley-apartment-v1/checklists/analyze-report.md)                                                        |
-| **Planning gate**       | **Passed** 2026-08-09 — [READINESS.md](specs/001-wiley-apartment-v1/READINESS.md)                                                         |
+| Step                    | Status                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/speckit-constitution` | Done v1.2.0 — Syncfusion mandate (strict) + Keychain keys                                                                                        |
+| `/speckit-specify`      | Done — ClerkSuite FR-1–FR-7                                                                                                                      |
+| `/speckit-plan`         | Done                                                                                                                                             |
+| `/speckit-tasks`        | Done — Phases 0–7                                                                                                                                |
+| `/speckit-analyze`      | Done — [analyze-report](specs/001-wiley-apartment-v1/checklists/analyze-report.md)                                                               |
+| **Planning gate**       | **Passed** 2026-08-09 — [READINESS.md](specs/001-wiley-apartment-v1/READINESS.md)                                                                |
 | `/speckit-implement`    | **T2.3 + T3.1–T3.2 done** — fillable Brookside PDF + SfPdfViewer; Phase 3.5 Scheduler queued ([tasks.md](specs/001-wiley-apartment-v1/tasks.md)) |
 
 ## Stack (from plan)

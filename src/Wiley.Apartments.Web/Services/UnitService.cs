@@ -78,7 +78,11 @@ public sealed class UnitService : IUnitService
         existing.Notes = unit.Notes;
         existing.CurrentTenantId = unit.CurrentTenantId;
 
-        await _db.SaveChangesAsync(cancellationToken);
+        // Client must send current RowVersion for optimistic concurrency (edge case 1).
+        _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = unit.RowVersion;
+        ConcurrencyHelper.BumpRowVersion(existing);
+
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Unit", cancellationToken);
         _logger.LogInformation("Updated unit {UnitNumber} ({UnitId}).", existing.Number, existing.Id);
         return existing;
     }

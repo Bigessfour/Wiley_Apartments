@@ -3,22 +3,20 @@
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Inputs
 @using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Web.Configuration
 @inject IJSRuntime JsRuntime
 @inject ILateFeeSettingsService LateFeeSettings
 @inject ILedgerService LedgerService
-@inject Microsoft.Extensions.Options.IOptions<Wiley.Apartments.Web.Configuration.ClerkSuiteOptions> ClerkOptions
+@inject IClerkToast Toast
+@inject Microsoft.Extensions.Options.IOptions<ClerkSuiteOptions> ClerkOptions
 
 <PageTitle>Settings</PageTitle>
 
-<h1 class="h3 mb-4">Settings</h1>
+<PageHeader Title="Settings" Subtitle="Appearance, late fees, and payment portal deep-link." />
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
-}
-@if (!string.IsNullOrEmpty(SuccessMessage))
-{
-    <div class="alert alert-success">@SuccessMessage</div>
 }
 
 <section class="settings-panel e-card p-4 mb-4" aria-labelledby="appearance-heading">
@@ -70,9 +68,16 @@
         Staff deep-link only — no card data in ClerkSuite. Configure via
         <code>ClerkSuite__PaymentPortalUrl</code> / <code>PaymentPortalUrl</code> env.
     </p>
-    <p class="mb-0">
-        <a href="@PortalUrl" target="_blank" rel="noopener noreferrer">@PortalUrl</a>
-    </p>
+    @if (PortalConfigured)
+    {
+        <p class="mb-0">
+            <a href="@PortalUrl" target="_blank" rel="noopener noreferrer">@PortalUrl</a>
+        </p>
+    }
+    else
+    {
+        <div class="alert alert-warning mb-0">@PortalError</div>
+    }
 </section>
 
 @code {
@@ -83,12 +88,17 @@
     private int LateFeeGraceDays { get; set; }
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
-    private string? SuccessMessage { get; set; }
 
+    private bool PortalConfigured =>
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out _);
     private string PortalUrl =>
-        string.IsNullOrWhiteSpace(ClerkOptions.Value.PaymentPortalUrl)
-            ? "https://www.townofwiley.gov/government/departments/finance/utility-billing"
-            : ClerkOptions.Value.PaymentPortalUrl;
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out var url, out _)
+            ? url
+            : string.Empty;
+    private string PortalError =>
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out var err)
+            ? string.Empty
+            : (err ?? PaymentPortalConfiguration.ItContactNote);
 
     protected override async Task OnInitializedAsync()
     {
@@ -126,14 +136,13 @@
     {
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var saved = await LateFeeSettings.UpdateAsync(LateFeesEnabled, LateFeeAmount, LateFeeGraceDays);
             LateFeesEnabled = saved.Enabled;
             LateFeeAmount = saved.Amount;
             LateFeeGraceDays = saved.GraceDays;
-            SuccessMessage = "Late-fee settings saved.";
+            await Toast.ShowSuccessAsync("Late-fee settings saved.");
         }
         catch (Exception ex)
         {
@@ -149,14 +158,13 @@
     {
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             await LateFeeSettings.UpdateAsync(LateFeesEnabled, LateFeeAmount, LateFeeGraceDays);
             var count = await LedgerService.ApplyLateFeesAsync();
-            SuccessMessage = count == 0
+            await Toast.ShowSuccessAsync(count == 0
                 ? "No late fees assessed (none eligible or already assessed this month)."
-                : $"Posted {count} late-fee charge(s).";
+                : $"Posted {count} late-fee charge(s).");
         }
         catch (Exception ex)
         {

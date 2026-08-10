@@ -8,20 +8,22 @@
 
 <PageTitle>Leases</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h1 class="h3 mb-1">Leases</h1>
-        <p class="text-muted mb-0">Brookside templates under DocumentRoot/templates</p>
-    </div>
+<PageHeader Title="Leases" Subtitle="Brookside templates under DocumentRoot/templates">
     <SfButton CssClass="e-primary" Content="New lease" OnClick="@(() => Navigation.NavigateTo("/leases/new"))" />
-</div>
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
 }
 
-<SfGrid TValue="Lease" DataSource="@Leases" AllowPaging="true" AllowSorting="true" Height="420">
+<SfGrid TValue="Lease" DataSource="@Leases" AllowPaging="true" AllowSorting="true" AllowFiltering="true" Height="420">
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No leases yet — use New lease on the toolbar.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridColumns>
         <GridColumn Field="@nameof(Lease.Id)" IsPrimaryKey="true" Visible="false" />
         <GridColumn HeaderText="Unit" Width="90">
@@ -40,7 +42,14 @@
                 @(row.Tenant is null ? "—" : $"{row.Tenant.LastName}, {row.Tenant.FirstName}")
             </Template>
         </GridColumn>
-        <GridColumn Field="@nameof(Lease.Status)" HeaderText="Status" Width="110" />
+        <GridColumn HeaderText="Status" Width="130">
+            <Template>
+                @{
+                    var row = (Lease)context;
+                }
+                <LeaseStatusChip Status="row.Status" />
+            </Template>
+        </GridColumn>
         <GridColumn Field="@nameof(Lease.TemplateUsed)" HeaderText="Template" Width="220" />
         <GridColumn Field="@nameof(Lease.Rent)" HeaderText="Rent" Width="100" Format="C2" />
         <GridColumn HeaderText="" Width="100" TextAlign="TextAlign.Center">

@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.FileManager
 @using Syncfusion.Blazor.Grids
@@ -10,24 +11,22 @@
 @using Syncfusion.Blazor.SfPdfViewer
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Infrastructure
 @inject IDocumentService DocumentService
 @inject IUnitService UnitService
 @inject ITenantService TenantService
 @inject IDateTimeService Clock
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Navigation
+@inject AntiforgeryStateProvider AntiforgeryState
+@inject IClerkToast Toast
 
 <PageTitle>Document vault</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <div>
-        <h1 class="h3 mb-1">Document vault</h1>
-        <p class="text-muted mb-0 small">
-            NAS-backed vault: folder browse (SfFileManager) + metadata grid. PDF in-browser; Office/images via download (FR-020).
-        </p>
-    </div>
+<PageHeader Title="Document vault"
+            Subtitle="NAS-backed vault: folder browse (SfFileManager) + metadata grid. PDF in-browser; Office/images via download (FR-020).">
     <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
-</div>
+</PageHeader>
 
 <h2 class="h6 mt-3">NAS folder browse</h2>
 <div style="height: 420px;" class="mb-4 border rounded">
@@ -36,6 +35,8 @@
                                  UploadUrl="/api/document-vault/Upload"
                                  DownloadUrl="/api/document-vault/Download"
                                  GetImageUrl="/api/document-vault/GetImage" />
+        <FileManagerUploadSettings UploadMode="UploadMode.HttpClient" />
+        <FileManagerEvents TValue="FileManagerDirectoryContent" OnSend="OnFileManagerSend" />
     </SfFileManager>
 </div>
 
@@ -44,10 +45,6 @@
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
-}
-@if (!string.IsNullOrEmpty(SuccessMessage))
-{
-    <div class="alert alert-success">@SuccessMessage</div>
 }
 
 <div class="row g-2 mb-3" style="max-width: 960px;">
@@ -114,8 +111,14 @@
     </div>
 </div>
 
-<SfGrid TValue="DocRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true">
+<SfGrid TValue="DocRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true" AllowFiltering="true">
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridPageSettings PageSize="20" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No document metadata yet — upload a file or browse the NAS vault above.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridColumns>
         <GridColumn Field="@nameof(DocRow.UploadedDisplay)" HeaderText="Uploaded" Width="120" />
         <GridColumn Field="@nameof(DocRow.EntityType)" HeaderText="Entity" Width="100" />
@@ -129,7 +132,8 @@
                 }
                 <div class="d-flex gap-1">
                     <SfButton CssClass="e-small e-outline" Content="View" OnClick="@(() => ViewAsync(row))" />
-                    <a class="e-btn e-small e-flat" href="@($"/api/documents/{row.Id}/download")" target="_blank">Download</a>
+                    <SfButton CssClass="e-small e-flat" Content="Download"
+                              OnClick="@(() => Navigation.NavigateTo($"/api/documents/{row.Id}/download", forceLoad: true))" />
                 </div>
             </Template>
         </GridColumn>
@@ -162,7 +166,6 @@ else if (!string.IsNullOrEmpty(ViewerHint))
     private DocumentCategory UploadCategory { get; set; } = DocumentCategory.Other;
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
-    private string? SuccessMessage { get; set; }
     private string? ViewerHint { get; set; }
     private string? _viewLabel;
     private byte[]? _pdfBytes;
@@ -208,6 +211,19 @@ else if (!string.IsNullOrEmpty(ViewerHint))
             _pendingLoad = false;
             await PdfViewer.LoadAsync(_pdfBytes);
         }
+    }
+
+    private void OnFileManagerSend(BeforeSendEventArgs args)
+    {
+        var token = AntiforgeryState.GetAntiforgeryToken()?.Value;
+        if (string.IsNullOrEmpty(token) || args.HttpClientInstance is null)
+        {
+            return;
+        }
+
+        args.HttpClientInstance.DefaultRequestHeaders.Remove(DocumentVaultAntiforgeryFilter.HeaderName);
+        args.HttpClientInstance.DefaultRequestHeaders.Add(
+            DocumentVaultAntiforgeryFilter.HeaderName, token);
     }
 
     private async Task LoadAsync()
@@ -266,7 +282,6 @@ else if (!string.IsNullOrEmpty(ViewerHint))
 
         Busy = true;
         ErrorMessage = null;
-        SuccessMessage = null;
         try
         {
             var auth = await AuthState.GetAuthenticationStateAsync();
@@ -290,7 +305,7 @@ else if (!string.IsNullOrEmpty(ViewerHint))
                 stream,
                 user,
                 relative);
-            SuccessMessage = "Document uploaded.";
+            await Toast.ShowSuccessAsync("Document uploaded.");
             _pending = null;
             await LoadAsync();
         }

@@ -427,6 +427,10 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("SignedDocumentId")
                         .HasColumnType("TEXT");
 
@@ -743,6 +747,10 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("LastName", "IsDeleted");
@@ -772,6 +780,10 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Property<string>("Number")
                         .IsRequired()
                         .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("SqFt")
