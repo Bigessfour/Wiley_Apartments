@@ -6,14 +6,9 @@ using Wiley.Apartments.IntegrationTests.Support;
 
 namespace Wiley.Apartments.IntegrationTests.Web;
 
-public sealed class DocumentVaultControllerIntegrationTests : IClassFixture<ClerkSuiteWebApplicationFactory>
+public sealed class DocumentVaultControllerIntegrationTests(ClerkSuiteWebApplicationFactory factory) : IClassFixture<ClerkSuiteWebApplicationFactory>
 {
-    private readonly ClerkSuiteWebApplicationFactory _factory;
-
-    public DocumentVaultControllerIntegrationTests(ClerkSuiteWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
+    private readonly ClerkSuiteWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task FileOperations_Unauthenticated_ReturnsUnauthorized()

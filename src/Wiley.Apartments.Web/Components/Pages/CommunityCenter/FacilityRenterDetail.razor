@@ -1,0 +1,90 @@
+@page "/community-center/renters/{Id:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject IFacilityRenterService RenterService
+@inject IFacilityReservationService ReservationService
+@inject NavigationManager Navigation
+@inject ILogger<FacilityRenterDetail> Logger
+
+<PageTitle>CC Renter</PageTitle>
+
+@if (LoadError is not null)
+{
+    <div class="alert alert-warning">@LoadError</div>
+}
+else if (Renter is null)
+{
+    <PageHeader Title="Renter" Subtitle="Loading…" />
+}
+else
+{
+    <PageHeader Title="@($"{Renter.LastName}, {Renter.FirstName}")"
+                Subtitle="@(Renter.Organization ?? "Community Center renter")">
+        <SfButton CssClass="e-outline e-small" Content="All renters"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/renters"))" />
+        <SfButton CssClass="e-primary e-small" Content="New reservation"
+                  OnClick="@(() => Navigation.NavigateTo($"/community-center/reservations?renterId={Renter.Id}"))" />
+    </PageHeader>
+
+    <div class="mb-3">
+        <p class="mb-1"><strong>Phone</strong> @Renter.Phone</p>
+        <p class="mb-1"><strong>Email</strong> @Renter.Email</p>
+        <p class="mb-1"><strong>Address</strong> @Renter.MailingAddress</p>
+        <p class="mb-1"><strong>Alternate</strong> @(Renter.AlternateContact ?? "—")</p>
+        <p class="mb-0"><strong>ID</strong> @(Renter.IdType ?? "—") @(Renter.IdReference)</p>
+    </div>
+
+    <h2 class="h6">Reservations</h2>
+    @if (Reservations.Count == 0)
+    {
+        <p class="text-muted">No reservations yet.</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var r in Reservations)
+            {
+                <li>
+                    <a href="@($"/community-center/reservations/{r.Id}")">
+                        @r.StartUtc.ToString("u") → @r.EndUtc.ToString("u") · @r.Status · @r.RentalFee.ToString("C")
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private FacilityRenter? Renter { get; set; }
+    private List<FacilityReservation> Reservations { get; set; } = [];
+    private string? LoadError { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            Renter = await RenterService.GetByIdAsync(Id);
+            if (Renter is null || Renter.IsDeleted)
+            {
+                Logger.LogWarning("FacilityRenterDetail: renter {RenterId} not found or deleted.", Id);
+                LoadError = "Renter not found.";
+                return;
+            }
+
+            Reservations = [.. await ReservationService.ListAsync(facilityRenterId: Id)];
+            Logger.LogInformation(
+                "FacilityRenterDetail loaded renter {RenterId} name={LastName},{FirstName} reservations={Count}.",
+                Id, Renter.LastName, Renter.FirstName, Reservations.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityRenterDetail load failed for {RenterId}.", Id);
+            LoadError = ex.Message;
+        }
+    }
+}

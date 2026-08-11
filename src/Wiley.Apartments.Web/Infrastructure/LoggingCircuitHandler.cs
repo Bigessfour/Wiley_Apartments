@@ -6,11 +6,9 @@ namespace Wiley.Apartments.Web.Infrastructure;
 /// Logs Blazor Interactive Server circuit lifecycle and connection drops so
 /// UI "unhandled error" banners can be correlated with server logs.
 /// </summary>
-public sealed class LoggingCircuitHandler : CircuitHandler
+public sealed class LoggingCircuitHandler(ILogger<LoggingCircuitHandler> logger) : CircuitHandler
 {
-    private readonly ILogger<LoggingCircuitHandler> _logger;
-
-    public LoggingCircuitHandler(ILogger<LoggingCircuitHandler> logger) => _logger = logger;
+    private readonly ILogger<LoggingCircuitHandler> _logger = logger;
 
     public override Task OnCircuitOpenedAsync(Circuit circuit, CancellationToken cancellationToken)
     {

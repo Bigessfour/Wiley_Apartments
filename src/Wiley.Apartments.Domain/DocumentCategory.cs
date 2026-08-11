@@ -11,5 +11,6 @@ public enum DocumentCategory
     Screening = 6,
     Correspondence = 7,
     Other = 8,
-    SignedLease = 9
+    SignedLease = 9,
+    FacilityAgreement = 10
 }

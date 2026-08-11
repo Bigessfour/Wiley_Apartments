@@ -4,14 +4,9 @@ using Wiley.Apartments.Domain;
 
 namespace Wiley.Apartments.IntegrationTests.Data;
 
-public class TenantIntegrationTests : IClassFixture<Support.ClerkSuiteWebApplicationFactory>
+public class TenantIntegrationTests(Support.ClerkSuiteWebApplicationFactory factory) : IClassFixture<Support.ClerkSuiteWebApplicationFactory>
 {
-    private readonly Support.ClerkSuiteWebApplicationFactory _factory;
-
-    public TenantIntegrationTests(Support.ClerkSuiteWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
+    private readonly Support.ClerkSuiteWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task TenantService_CreateSearchSoftDelete_RoundTrip()

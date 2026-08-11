@@ -12,23 +12,16 @@ namespace Wiley.Apartments.Web.Services;
 /// Prefers <c>DocumentRoot/templates/Wiley_Payment_Receipt_Template.pdf</c>;
 /// falls back to the shipped Templates folder, then a simple drawn PDF.
 /// </summary>
-public sealed class PaymentReceiptGenerator
+public sealed class PaymentReceiptGenerator(
+    IDocumentPathResolver paths,
+    IHostEnvironment env,
+    ILogger<PaymentReceiptGenerator> logger)
 {
     public const string TemplateFileName = "Wiley_Payment_Receipt_Template.pdf";
 
-    private readonly IDocumentPathResolver _paths;
-    private readonly IHostEnvironment _env;
-    private readonly ILogger<PaymentReceiptGenerator> _logger;
-
-    public PaymentReceiptGenerator(
-        IDocumentPathResolver paths,
-        IHostEnvironment env,
-        ILogger<PaymentReceiptGenerator> logger)
-    {
-        _paths = paths;
-        _env = env;
-        _logger = logger;
-    }
+    private readonly IDocumentPathResolver _paths = paths;
+    private readonly IHostEnvironment _env = env;
+    private readonly ILogger<PaymentReceiptGenerator> _logger = logger;
 
     /// <summary>Parameterless ctor for unit tests that only exercise the drawn fallback.</summary>
     internal PaymentReceiptGenerator()

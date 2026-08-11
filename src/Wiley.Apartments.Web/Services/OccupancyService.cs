@@ -5,21 +5,14 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class OccupancyService : IOccupancyService
+public sealed class OccupancyService(
+    ApartmentsDbContext db,
+    IDateTimeService clock,
+    ILogger<OccupancyService> logger) : IOccupancyService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<OccupancyService> _logger;
-
-    public OccupancyService(
-        ApartmentsDbContext db,
-        IDateTimeService clock,
-        ILogger<OccupancyService> logger)
-    {
-        _db = db;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<OccupancyService> _logger = logger;
 
     public async Task<Occupancy?> GetCurrentForUnitAsync(
         Guid unitId,

@@ -5,21 +5,14 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class ScheduleService : IScheduleService
+public sealed class ScheduleService(
+    ApartmentsDbContext db,
+    IDateTimeService clock,
+    ILogger<ScheduleService> logger) : IScheduleService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<ScheduleService> _logger;
-
-    public ScheduleService(
-        ApartmentsDbContext db,
-        IDateTimeService clock,
-        ILogger<ScheduleService> logger)
-    {
-        _db = db;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<ScheduleService> _logger = logger;
 
     public async Task<ScheduledItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _db.ScheduledItems

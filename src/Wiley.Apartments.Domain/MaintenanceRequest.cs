@@ -13,6 +13,10 @@ public class MaintenanceRequest
     public decimal? Cost { get; set; }
     public DateTime CreatedUtc { get; set; }
     public DateTime? CompletedUtc { get; set; }
+    public string? CompletedByUserId { get; set; }
+    public string? CompletedByDisplay { get; set; }
+    public Guid? FacilityReservationId { get; set; }
+    public FacilityReservation? FacilityReservation { get; set; }
     public string? Notes { get; set; }
     public bool IsDeleted { get; set; }
     /// <summary>When a completed WO posts landlord expense, links to <see cref="UnitOperatingCost"/>.</summary>

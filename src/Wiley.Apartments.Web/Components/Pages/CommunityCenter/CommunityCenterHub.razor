@@ -23,7 +23,7 @@ else if (Facility is null)
 else
 {
     <PageHeader Title="Community Center"
-                Subtitle="Facility rental / events — reuses Schedule, Ledger, Maintenance, and the unit inventory. No separate reservation system in this slice.">
+                Subtitle="Facility rentals, inventory, inspections, and maintenance — data lives on CC tabs. Calendar is shared with apartments.">
         <SfButton CssClass="e-outline e-small" Content="Open unit record"
                   OnClick="@(() => Navigation.NavigateTo($"/units/{Facility.Id}"))" />
     </PageHeader>
@@ -44,39 +44,42 @@ else
                 <CardHeader Title="Layout" />
                 <CardContent>
                     <p class="mb-1">@Facility.SqFt.ToString("N0") sq ft</p>
-                    <p class="mb-0">@Facility.Beds bed · @Facility.Baths bath</p>
+                    <p class="mb-0">Hall / kitchen facility</p>
                 </CardContent>
             </SfCard>
         </div>
         <div class="col-md-12 col-xl-6">
             <SfCard CssClass="h-100">
-                <CardHeader Title="How clerks use this hub" />
+                <CardHeader Title="Clerk workflow" />
                 <CardContent>
                     <ul class="mb-0 small">
-                        <li>Schedule cleanings, events prep, and inspections on the operations calendar filtered to CC.</li>
-                        <li>Post facility-related charges or deposits on the ledger filtered to CC (tenant optional).</li>
-                        <li>Open work orders against the CC unit for repairs and setups.</li>
-                        <li>Documents vault is NAS-wide — upload under Documents and link to the CC unit when entity metadata supports it.</li>
+                        <li>Renters → reservation (confirm) → agreement PDF → deposit/fee + receipt.</li>
+                        <li>Shared schedule shows confirmed rentals and CC maintenance.</li>
+                        <li>Post-rental inspection before completing; inventory for chairs/kitchen/etc.</li>
                     </ul>
                 </CardContent>
             </SfCard>
         </div>
     </div>
 
-    <h2 class="h6 mb-2">Quick links (CC-scoped)</h2>
+    <h2 class="h6 mb-2">Community Center tabs</h2>
     <div class="d-flex flex-wrap gap-2">
-        <SfButton CssClass="e-primary" Content="Schedule"
+        <SfButton CssClass="e-primary" Content="Renters"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/renters"))" />
+        <SfButton CssClass="e-primary" Content="Reservations"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/reservations"))" />
+        <SfButton CssClass="e-outline" Content="Schedule"
                   OnClick="@(() => Navigation.NavigateTo($"/schedule?unitId={Facility.Id}"))" />
-        <SfButton CssClass="e-outline" Content="Payments / ledger"
+        <SfButton CssClass="e-outline" Content="Payments"
                   OnClick="@(() => Navigation.NavigateTo($"/payments?unitId={Facility.Id}"))" />
+        <SfButton CssClass="e-outline" Content="Inspections"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/inspections"))" />
+        <SfButton CssClass="e-outline" Content="Inventory"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/inventory"))" />
         <SfButton CssClass="e-outline" Content="Maintenance"
                   OnClick="@(() => Navigation.NavigateTo($"/maintenance?unitId={Facility.Id}"))" />
-        <SfButton CssClass="e-outline" Content="Unit inventory"
-                  OnClick="@(() => Navigation.NavigateTo($"/units/{Facility.Id}"))" />
-        <SfButton CssClass="e-outline" Content="Documents vault"
+        <SfButton CssClass="e-outline" Content="Documents"
                   OnClick="@(() => Navigation.NavigateTo("/documents"))" />
-        <SfButton CssClass="e-flat" Content="All units"
-                  OnClick="@(() => Navigation.NavigateTo("/units"))" />
     </div>
 }
 
@@ -89,10 +92,20 @@ else
         try
         {
             Facility = await UnitService.GetFacilityAsync();
+            if (Facility is null)
+            {
+                Logger.LogWarning("CommunityCenterHub: facility unit CC not found (seeder may not have run).");
+            }
+            else
+            {
+                Logger.LogInformation(
+                    "CommunityCenterHub loaded facility unit {UnitId} number={Number} status={Status}.",
+                    Facility.Id, Facility.Number, Facility.Status);
+            }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "CommunityCenterHub operation failed.");
+            Logger.LogError(ex, "CommunityCenterHub load failed.");
             LoadError = ex.Message;
         }
     }

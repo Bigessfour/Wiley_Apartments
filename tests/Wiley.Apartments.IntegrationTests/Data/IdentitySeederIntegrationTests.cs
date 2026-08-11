@@ -8,14 +8,9 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.IntegrationTests.Data;
 
-public class IdentitySeederIntegrationTests : IClassFixture<ClerkSuiteWebApplicationFactory>
+public class IdentitySeederIntegrationTests(ClerkSuiteWebApplicationFactory factory) : IClassFixture<ClerkSuiteWebApplicationFactory>
 {
-    private readonly ClerkSuiteWebApplicationFactory _factory;
-
-    public IdentitySeederIntegrationTests(ClerkSuiteWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
+    private readonly ClerkSuiteWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task SeedAsync_CreatesConfiguredUser()

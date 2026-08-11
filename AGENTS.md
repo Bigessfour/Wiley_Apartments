@@ -73,9 +73,19 @@ Do **not** treat the NAS as a CI box or continuous deploy target.
 ## Spec Kit
 
 - Constitution: `.specify/memory/constitution.md` v1.2.0
-- Feature: `specs/001-wiley-apartment-v1/`
-- **Do not implement** until [READINESS.md](specs/001-wiley-apartment-v1/READINESS.md) gate passed
-- Start implement at **T0.0**, then T0.1
+- **Active feature (development):** [`specs/002-community-center-facility/`](specs/002-community-center-facility/) — Community Center renters, reservations, agreements, inspections, inventory, WO completion
+- Prior feature (complete / handover): [`specs/001-wiley-apartment-v1/`](specs/001-wiley-apartment-v1/)
+- Shell: `export SPECIFY_FEATURE=002-community-center-facility`
+- **Do not implement 002 UI** until [002 READINESS.md](specs/002-community-center-facility/READINESS.md) marked PASSED; start at tasks Phase 1–2 (foundation), then US1
+- Syncfusion: T0.0 toolchain still required before any new `.razor` work
+
+## Skills
+
+- **project-completion** (surface evaluation / finish workflow):
+  Open `.cursor/skills/project-completion/SKILL.md` when finishing, UAT,
+  page-by-page clerk/ops review, dead links, or “is it done?”.
+  App inventory: `references/clerk-suite-surfaces.md` (or app-specific).
+  Portable export: `exports/project-completion-skill/` (also `.grok/skills/project-completion/`).
 
 ## Repository
 

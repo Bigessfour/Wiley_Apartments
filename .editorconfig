@@ -1,0 +1,23 @@
+# Repo analyzer hygiene — keep Problems focused on real app/test code.
+root = true
+
+[*.{cs,csx}]
+dotnet_sort_system_directives_first = true
+
+# EF migrations are generated — ignore style noise on CreateIndex arrays.
+[**/Migrations/*.cs]
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+
+# Syncfusion skill templates are dotnet-script samples, not project code.
+[**/.agents/**.csx]
+dotnet_diagnostic.CS0103.severity = none
+dotnet_diagnostic.CS0246.severity = none
+
+[**/apm_modules/**.csx]
+dotnet_diagnostic.CS0103.severity = none
+dotnet_diagnostic.CS0246.severity = none
+
+# EF Core IQueryable search uses ToLower()+Contains for SQLite translation.
+[**/Services/TenantService.cs]
+dotnet_diagnostic.CA1862.severity = none

@@ -5,29 +5,22 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class LedgerService : ILedgerService
+public sealed class LedgerService(
+    ApartmentsDbContext db,
+    ILateFeeSettingsService lateFees,
+    IDateTimeService clock,
+    ILogger<LedgerService> logger) : ILedgerService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILateFeeSettingsService _lateFees;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<LedgerService> _logger;
-
-    public LedgerService(
-        ApartmentsDbContext db,
-        ILateFeeSettingsService lateFees,
-        IDateTimeService clock,
-        ILogger<LedgerService> logger)
-    {
-        _db = db;
-        _lateFees = lateFees;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILateFeeSettingsService _lateFees = lateFees;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<LedgerService> _logger = logger;
 
     public async Task<LedgerEntry?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _db.LedgerEntries
             .AsNoTracking()
             .Include(e => e.Tenant)
+            .Include(e => e.FacilityRenter)
             .Include(e => e.Unit)
             .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, cancellationToken);
 
@@ -39,6 +32,7 @@ public sealed class LedgerService : ILedgerService
         var query = _db.LedgerEntries
             .AsNoTracking()
             .Include(e => e.Tenant)
+            .Include(e => e.FacilityRenter)
             .Include(e => e.Unit)
             .Where(e => !e.IsDeleted);
 
@@ -345,6 +339,144 @@ public sealed class LedgerService : ILedgerService
             entry.UnitId);
     }
 
+    public async Task<LedgerEntry> PostFacilityChargeAsync(
+        Guid facilityRenterId,
+        Guid unitId,
+        Guid facilityReservationId,
+        decimal amount,
+        DateTime dateUtc,
+        string? notes = null,
+        bool isDeposit = false,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureFacilityPartyAsync(facilityRenterId, unitId, facilityReservationId, cancellationToken);
+        var normalized = RequirePositiveAmount(amount);
+        var entry = new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            EntryType = LedgerEntryType.Charge,
+            FacilityRenterId = facilityRenterId,
+            FacilityReservationId = facilityReservationId,
+            UnitId = unitId,
+            Amount = normalized,
+            DateUtc = EnsureUtc(dateUtc),
+            Notes = TrimNotes(notes),
+            IsLateFee = false,
+            IsDeposit = isDeposit,
+            IsDeleted = false
+        };
+        _db.LedgerEntries.Add(entry);
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Posted facility charge {Id} amount {Amount} renter {RenterId} reservation {ReservationId}.",
+            entry.Id, entry.Amount, facilityRenterId, facilityReservationId);
+        return (await GetByIdAsync(entry.Id, cancellationToken))!;
+    }
+
+    public async Task<LedgerEntry> PostFacilityPaymentAsync(
+        Guid facilityRenterId,
+        Guid unitId,
+        Guid facilityReservationId,
+        decimal amount,
+        DateTime dateUtc,
+        PaymentMethod method,
+        string? notes = null,
+        bool isDeposit = false,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureFacilityPartyAsync(facilityRenterId, unitId, facilityReservationId, cancellationToken);
+        var normalized = RequirePositiveAmount(amount);
+        var entry = new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            EntryType = LedgerEntryType.Payment,
+            FacilityRenterId = facilityRenterId,
+            FacilityReservationId = facilityReservationId,
+            UnitId = unitId,
+            Amount = normalized,
+            DateUtc = EnsureUtc(dateUtc),
+            Method = method,
+            Notes = TrimNotes(notes),
+            IsLateFee = false,
+            IsDeposit = isDeposit,
+            IsDeleted = false
+        };
+        _db.LedgerEntries.Add(entry);
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Posted facility payment {Id} amount {Amount} method {Method} renter {RenterId} reservation {ReservationId}.",
+            entry.Id, entry.Amount, method, facilityRenterId, facilityReservationId);
+        return (await GetByIdAsync(entry.Id, cancellationToken))!;
+    }
+
+    public async Task<decimal> GetFacilityBalanceAsync(
+        Guid facilityRenterId,
+        Guid? facilityReservationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted && e.FacilityRenterId == facilityRenterId);
+
+        if (facilityReservationId is Guid rid)
+        {
+            query = query.Where(e => e.FacilityReservationId == rid);
+        }
+
+        var entries = await query
+            .OrderBy(e => e.DateUtc)
+            .ThenBy(e => e.Id)
+            .ToListAsync(cancellationToken);
+
+        return entries.Aggregate(0m, (balance, e) => balance + SignedAmount(e));
+    }
+
+    public async Task<bool> HasFacilityChargesAsync(
+        Guid facilityReservationId,
+        CancellationToken cancellationToken = default) =>
+        await _db.LedgerEntries.AsNoTracking().AnyAsync(
+            e => !e.IsDeleted
+                 && e.FacilityReservationId == facilityReservationId
+                 && e.EntryType == LedgerEntryType.Charge,
+            cancellationToken);
+
+    public async Task<bool> HasFacilityPaymentsAsync(
+        Guid facilityReservationId,
+        CancellationToken cancellationToken = default) =>
+        await _db.LedgerEntries.AsNoTracking().AnyAsync(
+            e => !e.IsDeleted
+                 && e.FacilityReservationId == facilityReservationId
+                 && e.EntryType == LedgerEntryType.Payment,
+            cancellationToken);
+
+    private async Task EnsureFacilityPartyAsync(
+        Guid facilityRenterId,
+        Guid unitId,
+        Guid facilityReservationId,
+        CancellationToken cancellationToken)
+    {
+        if (!await _db.FacilityRenters.AnyAsync(r => r.Id == facilityRenterId && !r.IsDeleted, cancellationToken))
+        {
+            throw new InvalidOperationException($"Facility renter {facilityRenterId} was not found.");
+        }
+
+        var unit = await _db.Units.AsNoTracking()
+                       .FirstOrDefaultAsync(u => u.Id == unitId, cancellationToken)
+                   ?? throw new InvalidOperationException($"Unit {unitId} was not found.");
+        if (!unit.IsFacility)
+        {
+            throw new InvalidOperationException("Facility ledger posts require the Community Center facility unit.");
+        }
+
+        var reservation = await _db.FacilityReservations.AsNoTracking()
+                              .FirstOrDefaultAsync(r => r.Id == facilityReservationId && !r.IsDeleted, cancellationToken)
+                          ?? throw new InvalidOperationException($"Facility reservation {facilityReservationId} was not found.");
+        if (reservation.FacilityRenterId != facilityRenterId || reservation.UnitId != unitId)
+        {
+            throw new InvalidOperationException("Reservation does not match facility renter/unit.");
+        }
+    }
+
     public async Task<int> ApplyLateFeesAsync(
         DateTime? asOfUtc = null,
         CancellationToken cancellationToken = default)
@@ -365,7 +497,9 @@ public sealed class LedgerService : ILedgerService
             .ToListAsync(cancellationToken);
 
         var assessed = 0;
-        foreach (var group in entries.GroupBy(e => new { e.TenantId, e.UnitId }))
+        foreach (var group in entries
+                     .Where(e => e.TenantId is not null)
+                     .GroupBy(e => new { TenantId = e.TenantId!.Value, e.UnitId }))
         {
             decimal balance = 0;
             var hasPastDueCharge = false;
@@ -427,9 +561,10 @@ public sealed class LedgerService : ILedgerService
                 && e.EntryType == LedgerEntryType.Charge
                 && !e.IsLateFee
                 && !e.IsDeposit
+                && e.TenantId != null
                 && e.DateUtc >= monthStart
                 && e.DateUtc < monthEnd)
-            .Select(e => new { e.TenantId, e.UnitId })
+            .Select(e => new { TenantId = e.TenantId!.Value, e.UnitId })
             .ToListAsync(cancellationToken);
 
         var charged = new HashSet<(Guid TenantId, Guid UnitId)>(

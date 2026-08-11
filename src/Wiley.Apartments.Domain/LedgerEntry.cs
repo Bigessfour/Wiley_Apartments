@@ -7,8 +7,13 @@ public class LedgerEntry
     public LedgerEntryType EntryType { get; set; }
     public Guid? LeaseId { get; set; }
     public Lease? Lease { get; set; }
-    public Guid TenantId { get; set; }
+    /// <summary>Residential tenant party. Null when <see cref="FacilityRenterId"/> is set.</summary>
+    public Guid? TenantId { get; set; }
     public Tenant? Tenant { get; set; }
+    public Guid? FacilityRenterId { get; set; }
+    public FacilityRenter? FacilityRenter { get; set; }
+    public Guid? FacilityReservationId { get; set; }
+    public FacilityReservation? FacilityReservation { get; set; }
     public Guid UnitId { get; set; }
     public Unit? Unit { get; set; }
     /// <summary>Always stored as a positive amount; sign applied by <see cref="EntryType"/>.</summary>

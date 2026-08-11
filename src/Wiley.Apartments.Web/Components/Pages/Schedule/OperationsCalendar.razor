@@ -137,6 +137,7 @@
         new() { Value = nameof(ScheduledItemCategory.Cleaning), Text = "Cleaning" },
         new() { Value = nameof(ScheduledItemCategory.Vacancy), Text = "Vacancy" },
         new() { Value = nameof(ScheduledItemCategory.Inspection), Text = "Inspection" },
+        new() { Value = nameof(ScheduledItemCategory.FacilityRental), Text = "CC rental" },
         new() { Value = nameof(ScheduledItemCategory.Other), Text = "Other" }
     ];
 
@@ -363,6 +364,7 @@
                 ScheduledItemCategory.Cleaning => "cs-sched-cleaning",
                 ScheduledItemCategory.Vacancy => "cs-sched-vacancy",
                 ScheduledItemCategory.Inspection => "cs-sched-inspection",
+                ScheduledItemCategory.FacilityRental => "cs-sched-facility-rental",
                 _ => "cs-sched-other"
             };
 

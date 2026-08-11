@@ -7,21 +7,14 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class LateFeeSettingsService : ILateFeeSettingsService
+public sealed class LateFeeSettingsService(
+    ApartmentsDbContext db,
+    IOptions<ClerkSuiteOptions> options,
+    ILogger<LateFeeSettingsService> logger) : ILateFeeSettingsService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ClerkSuiteOptions _defaults;
-    private readonly ILogger<LateFeeSettingsService> _logger;
-
-    public LateFeeSettingsService(
-        ApartmentsDbContext db,
-        IOptions<ClerkSuiteOptions> options,
-        ILogger<LateFeeSettingsService> logger)
-    {
-        _db = db;
-        _defaults = options.Value;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ClerkSuiteOptions _defaults = options.Value;
+    private readonly ILogger<LateFeeSettingsService> _logger = logger;
 
     public async Task<LateFeeSettings> GetAsync(CancellationToken cancellationToken = default)
     {

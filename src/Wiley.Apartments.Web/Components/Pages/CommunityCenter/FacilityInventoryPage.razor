@@ -1,0 +1,149 @@
+@page "/community-center/inventory"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject IFacilityInventoryService InventoryService
+@inject IUnitService UnitService
+@inject NavigationManager Navigation
+@inject ILogger<FacilityInventoryPage> Logger
+
+<PageTitle>CC Inventory</PageTitle>
+
+<PageHeader Title="Community Center inventory"
+            Subtitle="Kitchen items, chairs, tables, appliances, fixtures.">
+    <SfButton CssClass="e-outline e-small" Content="CC hub"
+              OnClick="@(() => Navigation.NavigateTo("/community-center"))" />
+</PageHeader>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+else if (FacilityUnitId is null)
+{
+    <div class="alert alert-warning">Facility unit not found.</div>
+}
+else
+{
+    <SfGrid TValue="FacilityInventoryItem"
+            DataSource="@Rows"
+            Toolbar="@(new List<string> { "Add", "Edit", "Delete", "Update", "Cancel" })"
+            AllowPaging="true"
+            AllowSorting="true"
+            Height="420">
+        <GridEvents TValue="FacilityInventoryItem" OnActionBegin="OnActionBeginAsync" />
+        <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true"
+                          Mode="EditMode.Dialog" ShowDeleteConfirmDialog="true" />
+        <GridColumns>
+            <GridColumn Field="@nameof(FacilityInventoryItem.Id)" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.UnitId)" Visible="false" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Category)" HeaderText="Category" Width="120" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Name)" HeaderText="Name" Width="180"
+                        ValidationRules="@(new ValidationRules { Required = true })" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Quantity)" HeaderText="Qty" Width="80" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Condition)" HeaderText="Condition" Width="100" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Location)" HeaderText="Location" Width="120" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Serial)" HeaderText="Serial" Width="120" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.Notes)" HeaderText="Notes" Width="160" />
+            <GridColumn Field="@nameof(FacilityInventoryItem.RowVersion)" Visible="false" />
+        </GridColumns>
+    </SfGrid>
+}
+
+@code {
+    private Guid? FacilityUnitId { get; set; }
+    private List<FacilityInventoryItem> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var facility = await UnitService.GetFacilityAsync();
+            FacilityUnitId = facility?.Id;
+            if (FacilityUnitId is Guid id)
+            {
+                Logger.LogInformation("FacilityInventoryPage opening for facility unit {UnitId}.", id);
+                await LoadAsync(id);
+            }
+            else
+            {
+                Logger.LogWarning("FacilityInventoryPage: facility unit not found.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityInventoryPage init failed.");
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task LoadAsync(Guid unitId)
+    {
+        try
+        {
+            Rows = [.. await InventoryService.ListAsync(unitId)];
+            Logger.LogInformation(
+                "FacilityInventoryPage loaded {Count} items for unit {UnitId}.", Rows.Count, unitId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityInventoryPage load failed unit={UnitId}.", unitId);
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task OnActionBeginAsync(ActionEventArgs<FacilityInventoryItem> args)
+    {
+        if (FacilityUnitId is not Guid unitId)
+        {
+            Logger.LogWarning("FacilityInventoryPage mutation cancelled: no facility unit.");
+            args.Cancel = true;
+            return;
+        }
+
+        try
+        {
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save && args.Data is not null)
+            {
+                args.Data.UnitId = unitId;
+                if (args.Action == "Add")
+                {
+                    Logger.LogInformation(
+                        "FacilityInventoryPage creating item {Name} category={Category} qty={Qty}.",
+                        args.Data.Name, args.Data.Category, args.Data.Quantity);
+                    await InventoryService.CreateAsync(args.Data);
+                    Logger.LogInformation("FacilityInventoryPage created item {ItemId}.", args.Data.Id);
+                }
+                else
+                {
+                    Logger.LogInformation(
+                        "FacilityInventoryPage updating item {ItemId} condition={Condition} qty={Qty}.",
+                        args.Data.Id, args.Data.Condition, args.Data.Quantity);
+                    await InventoryService.UpdateAsync(args.Data);
+                    Logger.LogInformation("FacilityInventoryPage updated item {ItemId}.", args.Data.Id);
+                }
+
+                await LoadAsync(unitId);
+            }
+            else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
+            {
+                Logger.LogInformation("FacilityInventoryPage soft-deleting item {ItemId}.", args.Data.Id);
+                await InventoryService.SoftDeleteAsync(args.Data.Id);
+                Logger.LogInformation("FacilityInventoryPage soft-deleted item {ItemId}.", args.Data.Id);
+                await LoadAsync(unitId);
+            }
+        }
+        catch (Exception ex)
+        {
+            args.Cancel = true;
+            Logger.LogError(ex, "FacilityInventoryPage mutation failed action={Action} request={RequestType}.",
+                args.Action, args.RequestType);
+            ErrorMessage = ex.Message;
+        }
+    }
+}

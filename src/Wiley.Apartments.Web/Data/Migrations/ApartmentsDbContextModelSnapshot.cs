@@ -325,6 +325,235 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.ToTable("Documents", (string)null);
                 });
 
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityInspection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChecklistNotes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DamageNotes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FacilityReservationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("InspectedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InspectorDisplay")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InspectorUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsSatisfactory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityReservationId", "Type");
+
+                    b.ToTable("FacilityInspections", (string)null);
+                });
+
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityInventoryItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Serial")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UnitId", "Category", "IsDeleted");
+
+                    b.ToTable("FacilityInventoryItems", (string)null);
+                });
+
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityRenter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AlternateContact")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IdReference")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IdType")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MailingAddress")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Organization")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastName", "IsDeleted");
+
+                    b.ToTable("FacilityRenters", (string)null);
+                });
+
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityReservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DepositAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EndUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FacilityRenterId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GeneratedPdfRelativePath")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("RentalFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ScheduledItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SignedDocumentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FacilityRenterId", "IsDeleted");
+
+                    b.HasIndex("StartUtc", "EndUtc");
+
+                    b.HasIndex("UnitId", "IsDeleted", "Status");
+
+                    b.ToTable("FacilityReservations", (string)null);
+                });
+
             modelBuilder.Entity("Wiley.Apartments.Domain.Flooring", b =>
                 {
                     b.Property<Guid>("Id")
@@ -512,6 +741,12 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("FacilityRenterId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FacilityReservationId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
@@ -532,13 +767,17 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("TenantId")
+                    b.Property<Guid?>("TenantId")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("UnitId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FacilityRenterId");
+
+                    b.HasIndex("FacilityReservationId");
 
                     b.HasIndex("LeaseId");
 
@@ -558,6 +797,14 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Property<Guid?>("AssetId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CompletedByDisplay")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompletedByUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("CompletedUtc")
                         .HasColumnType("TEXT");
 
@@ -571,6 +818,9 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("FacilityReservationId")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
@@ -597,6 +847,8 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FacilityReservationId");
 
                     b.HasIndex("OperatingCostId");
 
@@ -688,6 +940,9 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Property<DateTime?>("EndUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("FacilityReservationId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("INTEGER");
 
@@ -719,6 +974,8 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FacilityReservationId");
 
                     b.HasIndex("IsCompleted");
 
@@ -1065,6 +1322,47 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityInspection", b =>
+                {
+                    b.HasOne("Wiley.Apartments.Domain.FacilityReservation", "FacilityReservation")
+                        .WithMany()
+                        .HasForeignKey("FacilityReservationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FacilityReservation");
+                });
+
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityInventoryItem", b =>
+                {
+                    b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("Wiley.Apartments.Domain.FacilityReservation", b =>
+                {
+                    b.HasOne("Wiley.Apartments.Domain.FacilityRenter", "FacilityRenter")
+                        .WithMany()
+                        .HasForeignKey("FacilityRenterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FacilityRenter");
+
+                    b.Navigation("Unit");
+                });
+
             modelBuilder.Entity("Wiley.Apartments.Domain.Flooring", b =>
                 {
                     b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
@@ -1108,6 +1406,16 @@ namespace Wiley.Apartments.Web.Data.Migrations
 
             modelBuilder.Entity("Wiley.Apartments.Domain.LedgerEntry", b =>
                 {
+                    b.HasOne("Wiley.Apartments.Domain.FacilityRenter", "FacilityRenter")
+                        .WithMany()
+                        .HasForeignKey("FacilityRenterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Wiley.Apartments.Domain.FacilityReservation", "FacilityReservation")
+                        .WithMany()
+                        .HasForeignKey("FacilityReservationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Wiley.Apartments.Domain.Lease", "Lease")
                         .WithMany()
                         .HasForeignKey("LeaseId")
@@ -1116,14 +1424,17 @@ namespace Wiley.Apartments.Web.Data.Migrations
                     b.HasOne("Wiley.Apartments.Domain.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("FacilityRenter");
+
+                    b.Navigation("FacilityReservation");
 
                     b.Navigation("Lease");
 
@@ -1139,6 +1450,11 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .HasForeignKey("AssetId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Wiley.Apartments.Domain.FacilityReservation", "FacilityReservation")
+                        .WithMany()
+                        .HasForeignKey("FacilityReservationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Wiley.Apartments.Domain.Unit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
@@ -1146,6 +1462,8 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Asset");
+
+                    b.Navigation("FacilityReservation");
 
                     b.Navigation("Unit");
                 });
@@ -1182,6 +1500,11 @@ namespace Wiley.Apartments.Web.Data.Migrations
 
             modelBuilder.Entity("Wiley.Apartments.Domain.ScheduledItem", b =>
                 {
+                    b.HasOne("Wiley.Apartments.Domain.FacilityReservation", "FacilityReservation")
+                        .WithMany()
+                        .HasForeignKey("FacilityReservationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Wiley.Apartments.Domain.Lease", "Lease")
                         .WithMany()
                         .HasForeignKey("LeaseId")
@@ -1196,6 +1519,8 @@ namespace Wiley.Apartments.Web.Data.Migrations
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("FacilityReservation");
 
                     b.Navigation("Lease");
 

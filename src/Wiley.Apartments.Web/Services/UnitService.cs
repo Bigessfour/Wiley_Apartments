@@ -7,23 +7,16 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class UnitService : IUnitService
+public sealed class UnitService(
+    ApartmentsDbContext db,
+    IOptions<ClerkSuiteOptions> options,
+    ILogger<UnitService> logger) : IUnitService
 {
     public const string CommunityCenterNumber = "CC";
 
-    private readonly ApartmentsDbContext _db;
-    private readonly ClerkSuiteOptions _options;
-    private readonly ILogger<UnitService> _logger;
-
-    public UnitService(
-        ApartmentsDbContext db,
-        IOptions<ClerkSuiteOptions> options,
-        ILogger<UnitService> logger)
-    {
-        _db = db;
-        _options = options.Value;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ClerkSuiteOptions _options = options.Value;
+    private readonly ILogger<UnitService> _logger = logger;
 
     public int MaxUnits => _options.MaxUnits;
 

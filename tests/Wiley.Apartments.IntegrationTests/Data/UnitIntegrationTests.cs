@@ -6,14 +6,9 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.IntegrationTests.Data;
 
-public class UnitSeederIntegrationTests : IClassFixture<Support.ClerkSuiteWebApplicationFactory>
+public class UnitSeederIntegrationTests(Support.ClerkSuiteWebApplicationFactory factory) : IClassFixture<Support.ClerkSuiteWebApplicationFactory>
 {
-    private readonly Support.ClerkSuiteWebApplicationFactory _factory;
-
-    public UnitSeederIntegrationTests(Support.ClerkSuiteWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
+    private readonly Support.ClerkSuiteWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task UnitSeeder_SeedsSixteenResidentialPlusCommunityCenter()

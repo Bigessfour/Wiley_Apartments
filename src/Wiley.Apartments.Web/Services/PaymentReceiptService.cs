@@ -7,33 +7,22 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class PaymentReceiptService : IPaymentReceiptService
+public sealed class PaymentReceiptService(
+    ApartmentsDbContext db,
+    ILedgerService ledger,
+    IDocumentService documents,
+    IDateTimeService clock,
+    PaymentReceiptGenerator generator,
+    IHttpContextAccessor httpContextAccessor,
+    ILogger<PaymentReceiptService> logger) : IPaymentReceiptService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILedgerService _ledger;
-    private readonly IDocumentService _documents;
-    private readonly IDateTimeService _clock;
-    private readonly PaymentReceiptGenerator _generator;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<PaymentReceiptService> _logger;
-
-    public PaymentReceiptService(
-        ApartmentsDbContext db,
-        ILedgerService ledger,
-        IDocumentService documents,
-        IDateTimeService clock,
-        PaymentReceiptGenerator generator,
-        IHttpContextAccessor httpContextAccessor,
-        ILogger<PaymentReceiptService> logger)
-    {
-        _db = db;
-        _ledger = ledger;
-        _documents = documents;
-        _clock = clock;
-        _generator = generator;
-        _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILedgerService _ledger = ledger;
+    private readonly IDocumentService _documents = documents;
+    private readonly IDateTimeService _clock = clock;
+    private readonly PaymentReceiptGenerator _generator = generator;
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+    private readonly ILogger<PaymentReceiptService> _logger = logger;
 
     public async Task<PaymentReceiptResult> GenerateAsync(
         Guid paymentEntryId,
@@ -44,6 +33,7 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         var entry = await _db.LedgerEntries
                         .AsNoTracking()
                         .Include(e => e.Tenant)
+                        .Include(e => e.FacilityRenter)
                         .Include(e => e.Unit)
                         .FirstOrDefaultAsync(e => e.Id == paymentEntryId && !e.IsDeleted, cancellationToken)
                     ?? throw new InvalidOperationException($"Ledger entry {paymentEntryId} was not found.");
@@ -53,18 +43,43 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
             throw new InvalidOperationException("Receipts can only be generated for payment entries.");
         }
 
-        var tenant = entry.Tenant
-                     ?? throw new InvalidOperationException("Payment is missing tenant data.");
         var unit = entry.Unit
                    ?? throw new InvalidOperationException("Payment is missing unit data.");
+
+        string payeeName;
+        Guid? vaultEntityId;
+        DocumentEntityType vaultEntityType;
+        decimal balance;
+        if (entry.FacilityRenterId is Guid frId)
+        {
+            var renter = entry.FacilityRenter
+                         ?? await _db.FacilityRenters.AsNoTracking()
+                             .FirstOrDefaultAsync(r => r.Id == frId, cancellationToken)
+                         ?? throw new InvalidOperationException("Payment is missing facility renter data.");
+            payeeName = $"{renter.FirstName} {renter.LastName}".Trim();
+            vaultEntityId = frId;
+            vaultEntityType = DocumentEntityType.FacilityRenter;
+            balance = await _ledger.GetFacilityBalanceAsync(
+                frId, entry.FacilityReservationId, cancellationToken);
+        }
+        else
+        {
+            var tenant = entry.Tenant
+                         ?? throw new InvalidOperationException("Payment is missing tenant data.");
+            payeeName = $"{tenant.FirstName} {tenant.LastName}".Trim();
+            vaultEntityId = entry.TenantId;
+            vaultEntityType = DocumentEntityType.Tenant;
+            balance = await _ledger.GetBalanceAsync(entry.TenantId!.Value, entry.UnitId, cancellationToken);
+        }
 
         var localDate = _clock.ToDisplayTime(entry.DateUtc);
         var receiptNumber =
             $"WR-{localDate:yyyy}-{localDate:MMdd}-{paymentEntryId.ToString("N")[..3].ToUpperInvariant()}";
-        var balance = await _ledger.GetBalanceAsync(entry.TenantId, entry.UnitId, cancellationToken);
 
         var clerkName = string.IsNullOrWhiteSpace(uploadedBy) ? "Town Clerk" : uploadedBy.Trim();
-        var paymentType = ResolvePaymentType(entry);
+        var paymentType = entry.FacilityReservationId is not null
+            ? (entry.IsDeposit ? "CC damage deposit" : "Community Center rental")
+            : ResolvePaymentType(entry);
         var method = MapPaymentMethod(entry.Method);
         var reference = ExtractReference(entry.Notes, entry.Method);
         var description = BuildDescription(entry, paymentType, localDate);
@@ -73,7 +88,7 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         var pdf = _generator.Generate(new PaymentReceiptData(
             receiptNumber,
             localDate.ToString("MM/dd/yyyy"),
-            $"{tenant.FirstName} {tenant.LastName}".Trim(),
+            payeeName,
             unit.Number,
             paymentType,
             entry.Amount.ToString("0.00"),
@@ -90,8 +105,8 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         {
             var existing = await _db.Documents.AsNoTracking()
                 .Where(d => !d.IsDeleted
-                            && d.EntityType == DocumentEntityType.Tenant
-                            && d.EntityId == entry.TenantId
+                            && d.EntityType == vaultEntityType
+                            && d.EntityId == vaultEntityId
                             && d.Category == DocumentCategory.Receipt
                             && d.OriginalFileName == fileName)
                 .OrderByDescending(d => d.UploadedAtUtc)
@@ -109,15 +124,18 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
             else
             {
                 await using var stream = new MemoryStream(pdf);
+                var relativeDir = vaultEntityType == DocumentEntityType.FacilityRenter
+                    ? $"community-center/renters/{vaultEntityId:N}/receipts"
+                    : $"tenants/{vaultEntityId:N}/receipts";
                 var doc = await _documents.UploadAsync(
-                    DocumentEntityType.Tenant,
-                    entry.TenantId,
+                    vaultEntityType,
+                    vaultEntityId!.Value,
                     DocumentCategory.Receipt,
                     fileName,
                     "application/pdf",
                     stream,
                     uploadedBy,
-                    $"tenants/{entry.TenantId:N}/receipts",
+                    relativeDir,
                     cancellationToken);
                 documentId = doc.Id;
             }
@@ -126,7 +144,7 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         await WriteReceiptAuditAsync(
             receiptNumber,
             paymentEntryId,
-            entry.TenantId,
+            vaultEntityId,
             unit.Number,
             entry.Amount,
             fileName,
@@ -135,10 +153,10 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
             cancellationToken);
 
         _logger.LogInformation(
-            "Generated payment receipt {ReceiptNumber} for payment {PaymentId} tenant {TenantId} unit {UnitNumber} vaultDoc={DocumentId}.",
+            "Generated payment receipt {ReceiptNumber} for payment {PaymentId} party {PartyId} unit {UnitNumber} vaultDoc={DocumentId}.",
             receiptNumber,
             paymentEntryId,
-            entry.TenantId,
+            vaultEntityId,
             unit.Number,
             documentId);
 
@@ -148,7 +166,7 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
     private async Task WriteReceiptAuditAsync(
         string receiptNumber,
         Guid paymentEntryId,
-        Guid tenantId,
+        Guid? partyId,
         string unitNumber,
         decimal amount,
         string fileName,
@@ -164,7 +182,7 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         {
             receiptNumber,
             paymentEntryId,
-            tenantId,
+            partyId,
             unitNumber,
             amount,
             fileName,
@@ -235,7 +253,7 @@ public sealed class PaymentReceiptService : IPaymentReceiptService
         var hash = trimmed.IndexOf('#');
         if (hash >= 0 && hash < trimmed.Length - 1)
         {
-            var token = new string(trimmed[(hash + 1)..].TakeWhile(c => char.IsLetterOrDigit(c)).ToArray());
+            var token = new string([.. trimmed[(hash + 1)..].TakeWhile(c => char.IsLetterOrDigit(c))]);
             if (!string.IsNullOrEmpty(token))
             {
                 return token;

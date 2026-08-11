@@ -4,14 +4,9 @@ using Wiley.Apartments.Domain;
 
 namespace Wiley.Apartments.Web.Data;
 
-public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
+public sealed class AuditSaveChangesInterceptor(IHttpContextAccessor httpContextAccessor) : SaveChangesInterceptor
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public AuditSaveChangesInterceptor(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
 
     public override InterceptionResult<int> SavingChanges(
         DbContextEventData eventData,

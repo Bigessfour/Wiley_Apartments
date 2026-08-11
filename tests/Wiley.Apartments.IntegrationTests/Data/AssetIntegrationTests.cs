@@ -7,14 +7,9 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.IntegrationTests.Data;
 
-public class AssetIntegrationTests : IClassFixture<ClerkSuiteWebApplicationFactory>
+public class AssetIntegrationTests(ClerkSuiteWebApplicationFactory factory) : IClassFixture<ClerkSuiteWebApplicationFactory>
 {
-    private readonly ClerkSuiteWebApplicationFactory _factory;
-
-    public AssetIntegrationTests(ClerkSuiteWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
+    private readonly ClerkSuiteWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task AssetService_CreatesAssetForUnit()

@@ -5,33 +5,22 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class DashboardService : IDashboardService
+public sealed class DashboardService(
+    ApartmentsDbContext db,
+    IRentRollService rentRoll,
+    ILeaseService leases,
+    IMaintenanceService maintenance,
+    IScheduleService schedule,
+    IDateTimeService clock,
+    ILogger<DashboardService> logger) : IDashboardService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly IRentRollService _rentRoll;
-    private readonly ILeaseService _leases;
-    private readonly IMaintenanceService _maintenance;
-    private readonly IScheduleService _schedule;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<DashboardService> _logger;
-
-    public DashboardService(
-        ApartmentsDbContext db,
-        IRentRollService rentRoll,
-        ILeaseService leases,
-        IMaintenanceService maintenance,
-        IScheduleService schedule,
-        IDateTimeService clock,
-        ILogger<DashboardService> logger)
-    {
-        _db = db;
-        _rentRoll = rentRoll;
-        _leases = leases;
-        _maintenance = maintenance;
-        _schedule = schedule;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IRentRollService _rentRoll = rentRoll;
+    private readonly ILeaseService _leases = leases;
+    private readonly IMaintenanceService _maintenance = maintenance;
+    private readonly IScheduleService _schedule = schedule;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<DashboardService> _logger = logger;
 
     public async Task<DashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {

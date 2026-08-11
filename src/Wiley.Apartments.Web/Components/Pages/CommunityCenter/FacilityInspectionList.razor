@@ -1,0 +1,84 @@
+@page "/community-center/inspections"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject IFacilityInspectionService InspectionService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject ILogger<FacilityInspectionList> Logger
+
+<PageTitle>CC Inspections</PageTitle>
+
+<PageHeader Title="Community Center inspections"
+            Subtitle="Pre- and post-rental condition checks.">
+    <SfButton CssClass="e-outline e-small" Content="Reservations"
+              OnClick="@(() => Navigation.NavigateTo("/community-center/reservations"))" />
+</PageHeader>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<SfGrid TValue="Row" DataSource="@Rows" AllowPaging="true" AllowSorting="true" Height="420">
+    <GridColumns>
+        <GridColumn Field="@nameof(Row.InspectedDisplay)" HeaderText="When" Width="140" />
+        <GridColumn Field="@nameof(Row.Type)" HeaderText="Type" Width="110" />
+        <GridColumn Field="@nameof(Row.RenterName)" HeaderText="Renter" Width="160" />
+        <GridColumn Field="@nameof(Row.Satisfactory)" HeaderText="OK?" Width="80" />
+        <GridColumn Field="@nameof(Row.Inspector)" HeaderText="Inspector" Width="120" />
+        <GridColumn HeaderText="" Width="100">
+            <Template>
+                @{
+                    var row = (Row)context;
+                }
+                <SfButton CssClass="e-small e-link" Content="Reservation"
+                          OnClick="@(() => Navigation.NavigateTo($"/community-center/reservations/{row.ReservationId}"))" />
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<Row> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var list = await InspectionService.ListRecentAsync(100);
+            Rows = list.Select(i => new Row
+            {
+                ReservationId = i.FacilityReservationId,
+                InspectedDisplay = Clock.ToDisplayTime(i.InspectedUtc).ToString("g"),
+                Type = i.Type.ToString(),
+                RenterName = i.FacilityReservation?.FacilityRenter is null
+                    ? ""
+                    : $"{i.FacilityReservation.FacilityRenter.LastName}, {i.FacilityReservation.FacilityRenter.FirstName}",
+                Satisfactory = i.IsSatisfactory ? "Yes" : "No",
+                Inspector = i.InspectorDisplay
+            }).ToList();
+            Logger.LogInformation("FacilityInspectionList loaded {Count} inspections.", Rows.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityInspectionList load failed.");
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private sealed class Row
+    {
+        public Guid ReservationId { get; set; }
+        public string InspectedDisplay { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string RenterName { get; set; } = "";
+        public string Satisfactory { get; set; } = "";
+        public string Inspector { get; set; } = "";
+    }
+}

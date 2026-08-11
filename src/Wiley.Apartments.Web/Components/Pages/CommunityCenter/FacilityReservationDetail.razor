@@ -1,0 +1,346 @@
+@page "/community-center/reservations/{Id:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.DropDowns
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject IFacilityReservationService ReservationService
+@inject IFacilityRentalAgreementService AgreementService
+@inject IFacilityInspectionService InspectionService
+@inject ILedgerService LedgerService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject ILogger<FacilityReservationDetail> Logger
+
+<PageTitle>CC Reservation</PageTitle>
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+else if (Reservation is null)
+{
+    <PageHeader Title="Reservation" Subtitle="Loading…" />
+}
+else
+{
+    <PageHeader Title="Reservation"
+                Subtitle="@($"{Reservation.Status} · {Clock.ToDisplayTime(Reservation.StartUtc):g} – {Clock.ToDisplayTime(Reservation.EndUtc):g}")">
+        <SfButton CssClass="e-outline e-small" Content="All reservations"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/reservations"))" />
+    </PageHeader>
+
+    <p>
+        <strong>Renter</strong>
+        @if (Reservation.FacilityRenter is not null)
+        {
+            <a href="@($"/community-center/renters/{Reservation.FacilityRenterId}")">
+                @Reservation.FacilityRenter.FirstName @Reservation.FacilityRenter.LastName
+            </a>
+        }
+    </p>
+    <p><strong>Fee</strong> @Reservation.RentalFee.ToString("C") · <strong>Deposit</strong> @Reservation.DepositAmount.ToString("C")</p>
+    <p class="text-muted">@(Reservation.Notes ?? "No notes.")</p>
+
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <SfButton CssClass="e-primary e-small" Content="Confirm" Disabled="@(Busy || Reservation.Status == FacilityReservationStatus.Confirmed)"
+                  OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Confirmed))" />
+        <SfButton CssClass="e-outline e-small" Content="Cancel booking" Disabled="@Busy"
+                  OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Cancelled))" />
+        <SfButton CssClass="e-success e-small" Content="Mark completed"
+                  Disabled="@(Busy || !CanComplete)"
+                  Title="@(CanComplete ? "Complete reservation" : "Record a PostRental inspection first")"
+                  OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Completed))" />
+        <SfButton CssClass="e-outline e-small" Content="Generate agreement" Disabled="@Busy" OnClick="GenerateAgreementAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Post deposit + fee charges"
+                  Disabled="@(Busy || HasCharges)"
+                  Title="@(HasCharges ? "Charges already posted" : "Post deposit and fee charges")"
+                  OnClick="PostChargesAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Record payment (full)"
+                  Disabled="@(Busy || HasPayments || !HasCharges)"
+                  Title="@(HasPayments ? "Payment already recorded" : (!HasCharges ? "Post charges first" : "Record payment"))"
+                  OnClick="PostPaymentAsync" />
+        @if (LatestPaymentId is Guid payId)
+        {
+            <SfButton CssClass="e-flat e-small" Content="Open receipt"
+                      OnClick="@(() => Navigation.NavigateTo($"/payments/receipt/{payId}"))" />
+        }
+    </div>
+
+    @if (!CanComplete && Reservation.Status is not FacilityReservationStatus.Completed and not FacilityReservationStatus.Cancelled)
+    {
+        <p class="small text-muted">Mark completed unlocks after a PostRental inspection is saved below.</p>
+    }
+
+    @if (AgreementMessage is not null)
+    {
+        <div class="alert alert-info">@AgreementMessage</div>
+    }
+
+    <h2 class="h6">Inspections</h2>
+    <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Type</label>
+                <SfDropDownList TValue="FacilityInspectionType" TItem="FacilityInspectionType"
+                                DataSource="@InspectionTypeValues"
+                                @bind-Value="InspectType" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Satisfactory</label>
+                <SfCheckBox @bind-Checked="InspectOk" Label="Yes" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Inspector</label>
+                <SfTextBox @bind-Value="InspectBy" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Notes / damage</label>
+                <SfTextBox @bind-Value="InspectNotes" />
+            </div>
+            <div class="col-12">
+                <SfButton CssClass="e-small e-primary" Content="Save inspection" Disabled="@Busy" OnClick="SaveInspectionAsync" />
+            </div>
+        </div>
+        <ul class="mt-3 mb-0">
+            @foreach (var i in Inspections)
+            {
+                <li>@i.Type · @(i.IsSatisfactory ? "OK" : "Issues") · @i.InspectorDisplay · @Clock.ToDisplayTime(i.InspectedUtc).ToString("g")</li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private FacilityReservation? Reservation { get; set; }
+    private List<FacilityInspection> Inspections { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private string? AgreementMessage { get; set; }
+    private bool Busy { get; set; }
+    private bool HasCharges { get; set; }
+    private bool HasPayments { get; set; }
+    private Guid? LatestPaymentId { get; set; }
+    private bool CanComplete => Inspections.Any(i => i.Type == FacilityInspectionType.PostRental);
+    private FacilityInspectionType InspectType { get; set; } = FacilityInspectionType.PostRental;
+    private bool InspectOk { get; set; } = true;
+    private string InspectBy { get; set; } = "Clerk";
+    private string? InspectNotes { get; set; }
+    private List<FacilityInspectionType> InspectionTypeValues { get; } =
+    [
+        FacilityInspectionType.PreRental,
+        FacilityInspectionType.PostRental
+    ];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            Reservation = await ReservationService.GetByIdAsync(Id);
+            if (Reservation is null)
+            {
+                Logger.LogWarning("FacilityReservationDetail: reservation {ReservationId} not found.", Id);
+                ErrorMessage = "Reservation not found.";
+                return;
+            }
+
+            Inspections = [.. await InspectionService.ListForReservationAsync(Id)];
+            HasCharges = await LedgerService.HasFacilityChargesAsync(Id);
+            HasPayments = await LedgerService.HasFacilityPaymentsAsync(Id);
+            LatestPaymentId = null;
+            if (HasPayments)
+            {
+                var lines = await LedgerService.GetLedgerAsync(unitId: Reservation.UnitId);
+                LatestPaymentId = lines
+                    .Where(l => l.Entry.FacilityReservationId == Id
+                                && l.Entry.EntryType == LedgerEntryType.Payment)
+                    .Select(l => l.Entry.Id)
+                    .LastOrDefault();
+                if (LatestPaymentId == Guid.Empty)
+                {
+                    LatestPaymentId = null;
+                }
+            }
+
+            Logger.LogInformation(
+                "FacilityReservationDetail loaded reservation {ReservationId} status={Status} renter={RenterId} inspections={InspectionCount} charges={HasCharges} payments={HasPayments}.",
+                Id, Reservation.Status, Reservation.FacilityRenterId, Inspections.Count, HasCharges, HasPayments);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail load failed for {ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task SetStatusAsync(FacilityReservationStatus status)
+    {
+        Busy = true;
+        try
+        {
+            if (status == FacilityReservationStatus.Completed && !CanComplete)
+            {
+                Logger.LogWarning(
+                    "FacilityReservationDetail complete blocked reservation={ReservationId}: no PostRental inspection.",
+                    Id);
+                ErrorMessage = "Record a PostRental inspection before marking completed.";
+                return;
+            }
+
+            Logger.LogInformation(
+                "FacilityReservationDetail status change requested reservation={ReservationId} -> {Status}.",
+                Id, status);
+            await ReservationService.SetStatusAsync(Id, status);
+            Logger.LogInformation(
+                "FacilityReservationDetail status change succeeded reservation={ReservationId} status={Status}.",
+                Id, status);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail status change failed reservation={ReservationId} status={Status}.", Id, status);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task GenerateAgreementAsync()
+    {
+        Busy = true;
+        AgreementMessage = null;
+        try
+        {
+            Logger.LogInformation("FacilityReservationDetail generating agreement for {ReservationId}.", Id);
+            var result = await AgreementService.GenerateAsync(Id);
+            AgreementMessage = $"Agreement generated ({result.FileName}). Path: {result.RelativePath}";
+            Logger.LogInformation(
+                "FacilityReservationDetail agreement generated reservation={ReservationId} document={DocumentId} path={Path}.",
+                Id, result.DocumentId, result.RelativePath);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail agreement generate failed for {ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task PostChargesAsync()
+    {
+        if (Reservation is null) return;
+        Busy = true;
+        try
+        {
+            if (await LedgerService.HasFacilityChargesAsync(Reservation.Id))
+            {
+                Logger.LogWarning(
+                    "FacilityReservationDetail post charges blocked reservation={ReservationId}: already posted.",
+                    Reservation.Id);
+                AgreementMessage = "Charges already posted for this reservation.";
+                HasCharges = true;
+                return;
+            }
+
+            var now = Clock.UtcNow;
+            Logger.LogInformation(
+                "FacilityReservationDetail posting charges reservation={ReservationId} deposit={Deposit} fee={Fee}.",
+                Reservation.Id, Reservation.DepositAmount, Reservation.RentalFee);
+            await LedgerService.PostFacilityChargeAsync(
+                Reservation.FacilityRenterId, Reservation.UnitId, Reservation.Id,
+                Reservation.DepositAmount, now, "CC damage deposit", isDeposit: true);
+            await LedgerService.PostFacilityChargeAsync(
+                Reservation.FacilityRenterId, Reservation.UnitId, Reservation.Id,
+                Reservation.RentalFee, now, "CC rental fee");
+            AgreementMessage = "Deposit and fee charges posted.";
+            Logger.LogInformation(
+                "FacilityReservationDetail charges posted reservation={ReservationId}.", Reservation.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail post charges failed reservation={ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task PostPaymentAsync()
+    {
+        if (Reservation is null) return;
+        Busy = true;
+        try
+        {
+            if (await LedgerService.HasFacilityPaymentsAsync(Reservation.Id))
+            {
+                Logger.LogWarning(
+                    "FacilityReservationDetail post payment blocked reservation={ReservationId}: already paid.",
+                    Reservation.Id);
+                AgreementMessage = "A payment is already recorded for this reservation.";
+                HasPayments = true;
+                return;
+            }
+
+            if (!await LedgerService.HasFacilityChargesAsync(Reservation.Id))
+            {
+                ErrorMessage = "Post deposit and fee charges before recording payment.";
+                return;
+            }
+
+            var total = Reservation.DepositAmount + Reservation.RentalFee;
+            Logger.LogInformation(
+                "FacilityReservationDetail posting payment reservation={ReservationId} amount={Amount}.",
+                Reservation.Id, total);
+            var payment = await LedgerService.PostFacilityPaymentAsync(
+                Reservation.FacilityRenterId, Reservation.UnitId, Reservation.Id,
+                total, Clock.UtcNow, PaymentMethod.Cash, "CC rental payment (deposit+fee)");
+            AgreementMessage = "Payment recorded. Use Open receipt to print.";
+            Logger.LogInformation(
+                "FacilityReservationDetail payment posted reservation={ReservationId} payment={PaymentId} amount={Amount}.",
+                Reservation.Id, payment.Id, total);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail post payment failed reservation={ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task SaveInspectionAsync()
+    {
+        Busy = true;
+        try
+        {
+            Logger.LogInformation(
+                "FacilityReservationDetail saving inspection reservation={ReservationId} type={Type} satisfactory={Ok}.",
+                Id, InspectType, InspectOk);
+            await InspectionService.CreateAsync(new FacilityInspection
+            {
+                FacilityReservationId = Id,
+                Type = InspectType,
+                IsSatisfactory = InspectOk,
+                DamageNotes = InspectOk ? null : InspectNotes,
+                ChecklistNotes = InspectOk ? InspectNotes : null,
+                InspectorDisplay = InspectBy,
+                InspectedUtc = Clock.UtcNow
+            });
+            Logger.LogInformation(
+                "FacilityReservationDetail inspection saved reservation={ReservationId} type={Type}.",
+                Id, InspectType);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail save inspection failed reservation={ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+}

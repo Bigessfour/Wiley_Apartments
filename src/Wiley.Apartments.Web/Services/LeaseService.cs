@@ -7,7 +7,15 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class LeaseService : ILeaseService
+public sealed class LeaseService(
+    ApartmentsDbContext db,
+    IOptions<ClerkSuiteOptions> options,
+    IDocumentPathResolver paths,
+    IHostEnvironment environment,
+    IDateTimeService clock,
+    LeaseDocumentGenerator generator,
+    IDocumentService documents,
+    ILogger<LeaseService> logger) : ILeaseService
 {
     private static readonly (string BaseName, string DisplayName, string Term)[] KnownTemplates =
     [
@@ -15,34 +23,14 @@ public sealed class LeaseService : ILeaseService
         ("brookside-month-to-month-lease", "Brookside — month-to-month", "One calendar month (auto-renew monthly)")
     ];
 
-    private readonly ApartmentsDbContext _db;
-    private readonly ClerkSuiteOptions _options;
-    private readonly IDocumentPathResolver _paths;
-    private readonly IHostEnvironment _environment;
-    private readonly IDateTimeService _clock;
-    private readonly LeaseDocumentGenerator _generator;
-    private readonly IDocumentService _documents;
-    private readonly ILogger<LeaseService> _logger;
-
-    public LeaseService(
-        ApartmentsDbContext db,
-        IOptions<ClerkSuiteOptions> options,
-        IDocumentPathResolver paths,
-        IHostEnvironment environment,
-        IDateTimeService clock,
-        LeaseDocumentGenerator generator,
-        IDocumentService documents,
-        ILogger<LeaseService> logger)
-    {
-        _db = db;
-        _options = options.Value;
-        _paths = paths;
-        _environment = environment;
-        _clock = clock;
-        _generator = generator;
-        _documents = documents;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ClerkSuiteOptions _options = options.Value;
+    private readonly IDocumentPathResolver _paths = paths;
+    private readonly IHostEnvironment _environment = environment;
+    private readonly IDateTimeService _clock = clock;
+    private readonly LeaseDocumentGenerator _generator = generator;
+    private readonly IDocumentService _documents = documents;
+    private readonly ILogger<LeaseService> _logger = logger;
 
     public Task<IReadOnlyList<LeaseTemplateInfo>> ListTemplatesAsync(
         CancellationToken cancellationToken = default)
@@ -153,13 +141,8 @@ public sealed class LeaseService : ILeaseService
         var selected = templates.FirstOrDefault(t =>
             t.FileName.Equals(templateFileName, StringComparison.OrdinalIgnoreCase)
             || Path.GetFileNameWithoutExtension(t.FileName)
-                .Equals(baseName, StringComparison.OrdinalIgnoreCase));
-        if (selected is null)
-        {
-            throw new InvalidOperationException(
+                .Equals(baseName, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidOperationException(
                 $"Template '{templateFileName}' not found under DocumentRoot/templates. See deploy/synology/TEMPLATES.md.");
-        }
-
         var clauses = string.IsNullOrWhiteSpace(customClauses) ? null : customClauses.Trim();
         if (clauses is { Length: > 4000 })
         {
@@ -321,10 +304,7 @@ public sealed class LeaseService : ILeaseService
         int withinDays,
         CancellationToken cancellationToken = default)
     {
-        if (withinDays < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(withinDays));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(withinDays);
 
         var now = _clock.UtcNow;
         var until = now.AddDays(withinDays);

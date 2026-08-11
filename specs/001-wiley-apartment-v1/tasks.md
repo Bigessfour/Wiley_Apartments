@@ -398,7 +398,8 @@ Deep re-converge (2026-08-09) post–Phase 9, stressing edge cases, vault-contro
 - `Unit.IsFacility` + seed `Number=CC` (outside residential MaxUnits=16 cap)
 - Sidebar **Community Center** section + `/community-center` hub
 - Existing pages accept `?unitId=` filter (Schedule, Payments, Maintenance); Documents remains NAS-wide vault
-- Explicitly deferred: FacilityReservation entity, separate SfSchedule, CC rental agreement PDF, dedicated P&L page
+- Explicitly deferred in 001 hub slice: FacilityReservation entity, separate SfSchedule, CC rental agreement PDF, dedicated P&L page
+- **2026-08-11:** Facility reservation + CC agreement + facility ops formalized under [`specs/002-community-center-facility/`](../002-community-center-facility/) (shared calendar kept; no second SfSchedule product)
 
 ---
 
@@ -409,7 +410,7 @@ Recorded **2026-08-10** from clerk pilot feedback. Formalize under `specs/002-*`
 - [x] **NV-1** Payment receipt PDF — after clerk accepts/records a ledger payment, generate printable/emailable PDF receipt (town header, unit, tenant, amount, date, method/ref). Syncfusion PDF + optional vault copy. **Done 2026-08-10.**
 - [x] **NV-4** Tenant security deposit panel — required/paid/held on Tenant page; record deposit to ledger. **Done 2026-08-10.**
 - [ ] **NV-2** DocuSign / e-sign (post-v1 assumption)
-- [ ] **NV-3** Facility reservation + CC rental agreement PDF
+- [x] **NV-3** Facility reservation + CC rental agreement PDF — **moved to** [`specs/002-community-center-facility/`](../002-community-center-facility/) (2026-08-11); implement under 002 tasks, not 001.
 - [x] **NV-5** Dashboard viz Phase 2 — LinearGauge collection target, HeatMap (unit×month), chart zoom/pan range UX on collection/P/L. **Done 2026-08-10.**
 - [x] **NV-6** Dashboard viz Phase 3 — Pivot Table `/reports/rent-pivot`, Charts3D P/L by unit, chart PNG export, persisted dashboard layouts. **Done 2026-08-10.**
 

@@ -58,7 +58,9 @@ public class DemoDataSeederTests
             charges.Should().BeGreaterThanOrEqualTo(25);
 
             var cc = await db.Units.FirstAsync(u => u.IsFacility);
-            (await db.Leases.CountAsync(l => l.UnitId == cc.Id)).Should().Be(5);
+            (await db.FacilityRenters.CountAsync(r => !r.IsDeleted)).Should().Be(5);
+            (await db.FacilityReservations.CountAsync(r => r.UnitId == cc.Id)).Should().Be(5);
+            (await db.FacilityInventoryItems.CountAsync(i => i.UnitId == cc.Id && !i.IsDeleted)).Should().BeGreaterThanOrEqualTo(6);
 
             var report = await seeder.ValidateAsync();
             report.Pass.Should().BeTrue(string.Join("; ", report.Checks.Where(c => !c.Pass).Select(c => c.Area + ": " + c.Detail)));

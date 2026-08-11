@@ -4,13 +4,8 @@ using Wiley.Apartments.Domain;
 
 namespace Wiley.Apartments.Web.Data;
 
-public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
+public class ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {
-    public ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options)
-        : base(options)
-    {
-    }
-
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<Asset> Assets => Set<Asset>();
@@ -28,6 +23,10 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<UnitOperatingCost> UnitOperatingCosts => Set<UnitOperatingCost>();
     public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<FacilityRenter> FacilityRenters => Set<FacilityRenter>();
+    public DbSet<FacilityReservation> FacilityReservations => Set<FacilityReservation>();
+    public DbSet<FacilityInspection> FacilityInspections => Set<FacilityInspection>();
+    public DbSet<FacilityInventoryItem> FacilityInventoryItems => Set<FacilityInventoryItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -233,6 +232,11 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(e => e.LeaseId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.FacilityReservation)
+                .WithMany()
+                .HasForeignKey(e => e.FacilityReservationId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(e => e.FacilityReservationId);
         });
 
         builder.Entity<LedgerEntry>(entity =>
@@ -246,10 +250,22 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(e => new { e.TenantId, e.IsDeleted, e.DateUtc });
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.DateUtc });
             entity.HasIndex(e => e.LeaseId);
+            entity.HasIndex(e => e.FacilityRenterId);
+            entity.HasIndex(e => e.FacilityReservationId);
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne(e => e.FacilityRenter)
+                .WithMany()
+                .HasForeignKey(e => e.FacilityRenterId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+            entity.HasOne(e => e.FacilityReservation)
+                .WithMany()
+                .HasForeignKey(e => e.FacilityReservationId)
+                .OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
@@ -292,9 +308,12 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.Priority).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.Cost).HasPrecision(18, 2);
             entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.CompletedByUserId).HasMaxLength(256);
+            entity.Property(e => e.CompletedByDisplay).HasMaxLength(256);
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.Status });
             entity.HasIndex(e => new { e.AssetId, e.IsDeleted });
             entity.HasIndex(e => e.OperatingCostId);
+            entity.HasIndex(e => e.FacilityReservationId);
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
@@ -303,8 +322,87 @@ public class ApartmentsDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(e => e.AssetId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.FacilityReservation)
+                .WithMany()
+                .HasForeignKey(e => e.FacilityReservationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
+        builder.Entity<FacilityRenter>(entity =>
+        {
+            entity.ToTable("FacilityRenters");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FirstName).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.LastName).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Organization).HasMaxLength(256);
+            entity.Property(e => e.MailingAddress).HasMaxLength(512);
+            entity.Property(e => e.Phone).HasMaxLength(64);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.AlternateContact).HasMaxLength(512);
+            entity.Property(e => e.IdType).HasMaxLength(64);
+            entity.Property(e => e.IdReference).HasMaxLength(64);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.RowVersion).IsConcurrencyToken();
+            entity.HasIndex(e => new { e.LastName, e.IsDeleted });
+        });
+
+        builder.Entity<FacilityReservation>(entity =>
+        {
+            entity.ToTable("FacilityReservations");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.RentalFee).HasPrecision(18, 2);
+            entity.Property(e => e.DepositAmount).HasPrecision(18, 2);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.GeneratedPdfRelativePath).HasMaxLength(512);
+            entity.Property(e => e.RowVersion).IsConcurrencyToken();
+            entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.Status });
+            entity.HasIndex(e => new { e.FacilityRenterId, e.IsDeleted });
+            entity.HasIndex(e => new { e.StartUtc, e.EndUtc });
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.FacilityRenter)
+                .WithMany()
+                .HasForeignKey(e => e.FacilityRenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<FacilityInspection>(entity =>
+        {
+            entity.ToTable("FacilityInspections");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.ChecklistNotes).HasMaxLength(4000);
+            entity.Property(e => e.DamageNotes).HasMaxLength(4000);
+            entity.Property(e => e.InspectorUserId).HasMaxLength(256);
+            entity.Property(e => e.InspectorDisplay).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.RowVersion).IsConcurrencyToken();
+            entity.HasIndex(e => new { e.FacilityReservationId, e.Type });
+            entity.HasOne(e => e.FacilityReservation)
+                .WithMany()
+                .HasForeignKey(e => e.FacilityReservationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FacilityInventoryItem>(entity =>
+        {
+            entity.ToTable("FacilityInventoryItems");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Category).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.Condition).HasMaxLength(64);
+            entity.Property(e => e.Location).HasMaxLength(128);
+            entity.Property(e => e.Serial).HasMaxLength(128);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.RowVersion).IsConcurrencyToken();
+            entity.HasIndex(e => new { e.UnitId, e.Category, e.IsDeleted });
+            entity.HasOne(e => e.Unit)
+                .WithMany()
+                .HasForeignKey(e => e.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         builder.Entity<AppSetting>(entity =>
         {

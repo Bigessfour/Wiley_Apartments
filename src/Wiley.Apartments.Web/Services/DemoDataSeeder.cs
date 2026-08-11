@@ -11,31 +11,22 @@ namespace Wiley.Apartments.Web.Services;
 /// Seeds a full pseudo-resident (24 months of occupancy/ledger) plus Community Center event renters
 /// so clerks can exercise every surface. Marked with [DEMO] notes for safe identification.
 /// </summary>
-public sealed class DemoDataSeeder : IDemoDataSeeder
+public sealed class DemoDataSeeder(
+    ApartmentsDbContext db,
+    IDocumentPathResolver paths,
+    IDateTimeService clock,
+    IUnitSeeder unitSeeder,
+    ILogger<DemoDataSeeder> logger) : IDemoDataSeeder
 {
     public const string DemoTag = "[DEMO]";
     public const string DemoCcTag = "[DEMO-CC]";
     public const string PrimaryEmail = "jordan.reyes@wiley-demo.local";
 
-    private readonly ApartmentsDbContext _db;
-    private readonly IDocumentPathResolver _paths;
-    private readonly IDateTimeService _clock;
-    private readonly IUnitSeeder _unitSeeder;
-    private readonly ILogger<DemoDataSeeder> _logger;
-
-    public DemoDataSeeder(
-        ApartmentsDbContext db,
-        IDocumentPathResolver paths,
-        IDateTimeService clock,
-        IUnitSeeder unitSeeder,
-        ILogger<DemoDataSeeder> logger)
-    {
-        _db = db;
-        _paths = paths;
-        _clock = clock;
-        _unitSeeder = unitSeeder;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IDocumentPathResolver _paths = paths;
+    private readonly IDateTimeService _clock = clock;
+    private readonly IUnitSeeder _unitSeeder = unitSeeder;
+    private readonly ILogger<DemoDataSeeder> _logger = logger;
 
     public Task<bool> IsDemoLoadedAsync(CancellationToken cancellationToken = default) =>
         _db.Tenants.AnyAsync(t => !t.IsDeleted && t.Email == PrimaryEmail, cancellationToken);
@@ -465,122 +456,195 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
         var schedCount = 2; // already added residential
         var maintCount = 2;
 
-        foreach (var r in renterSpecs)
+        foreach (var (First, Last, Phone, Email, DaysAgo, DurationDays, Fee, Dep) in renterSpecs)
         {
-            var tenant = new Tenant
+            var renter = new FacilityRenter
             {
                 Id = Guid.NewGuid(),
-                FirstName = r.First,
-                LastName = r.Last,
-                Phone = r.Phone,
-                Email = r.Email,
-                EmergencyContact = $"{r.First} emergency — (719) 555-0299",
-                Notes = $"{DemoCcTag} {DemoTag} Community Center event renter. Address on agreement: 100 Demo St, Wiley CO 81092.",
+                FirstName = First,
+                LastName = Last,
+                Organization = $"{Last} event",
+                Phone = Phone,
+                Email = Email,
+                MailingAddress = "100 Demo St, Wiley CO 81092",
+                AlternateContact = $"{First} emergency — (719) 555-0299",
+                Notes = $"{DemoCcTag} {DemoTag} Community Center event renter.",
                 RowVersion = Guid.NewGuid()
             };
-            _db.Tenants.Add(tenant);
+            _db.FacilityRenters.Add(renter);
             ccRenterCount++;
 
-            var start = DateTime.SpecifyKind(now.Date.AddDays(-r.DaysAgo), DateTimeKind.Utc);
+            var start = DateTime.SpecifyKind(now.Date.AddDays(-DaysAgo), DateTimeKind.Utc);
+            var end = start.AddDays(Math.Max(DurationDays, 1)).AddHours(4);
+            var status = DaysAgo < 0
+                ? FacilityReservationStatus.Draft
+                : end < now
+                    ? FacilityReservationStatus.Completed
+                    : FacilityReservationStatus.Confirmed;
 
-            var end = start.AddDays(r.DurationDays);
-            var status = r.DaysAgo < 0 ? LeaseStatus.Draft
-                : end < now ? LeaseStatus.Expired
-                : LeaseStatus.Active;
-
-            var ccLease = new Lease
+            var reservation = new FacilityReservation
             {
                 Id = Guid.NewGuid(),
                 UnitId = cc.Id,
-                TenantId = tenant.Id,
+                FacilityRenterId = renter.Id,
                 StartUtc = start,
                 EndUtc = end,
-                Rent = r.Fee,
-                Deposit = r.Dep,
                 Status = status,
-                TemplateUsed = "demo-cc-rental-agreement.pdf",
-                CustomClauses = $"{DemoCcTag} No alcohol without permit. Clean-up by 10 PM.",
-                LifecycleNote = $"{DemoTag} Community Center rental agreement (seeded).",
-                GeneratedPdfRelativePath = $"community-center/rentals/{tenant.Id:N}/agreement.pdf",
+                RentalFee = Fee,
+                DepositAmount = Dep,
+                Notes = $"{DemoCcTag} No alcohol without permit. Clean-up by 10 PM.",
+                GeneratedPdfRelativePath = $"community-center/reservations/{Guid.NewGuid():N}/agreement.pdf",
                 RowVersion = Guid.NewGuid()
             };
-            _db.Leases.Add(ccLease);
+            _db.FacilityReservations.Add(reservation);
 
-            // Occupancy-style history: short window (ended if past)
-            _db.Occupancies.Add(new Occupancy
+            _db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
+                EntryType = LedgerEntryType.Charge,
+                FacilityRenterId = renter.Id,
+                FacilityReservationId = reservation.Id,
                 UnitId = cc.Id,
-                TenantId = tenant.Id,
-                StartUtc = start,
-                EndUtc = r.DaysAgo < 0 ? null : end
+                Amount = Dep,
+                DateUtc = start.AddDays(-7),
+                Notes = $"{DemoCcTag} {DemoTag} CC deposit — {First} {Last}",
+                IsDeposit = true
             });
-
-            // Deposit + rental fee + PayStar payment
-            _db.LedgerEntries.Add(MakeCharge(tenant.Id, cc.Id, ccLease.Id, r.Dep, start.AddDays(-7),
-                $"{DemoCcTag} {DemoTag} CC deposit — {r.First} {r.Last}"));
             ledgerCount++;
-            _db.LedgerEntries.Add(MakeCharge(tenant.Id, cc.Id, ccLease.Id, r.Fee, start.AddDays(-7),
-                $"{DemoCcTag} {DemoTag} CC rental fee {start:yyyy-MM-dd}"));
-            ledgerCount++;
-            if (r.DaysAgo >= 0)
+            _db.LedgerEntries.Add(new LedgerEntry
             {
-                _db.LedgerEntries.Add(MakePayment(tenant.Id, cc.Id, ccLease.Id, r.Dep + r.Fee, start.AddDays(-5),
-                    PaymentMethod.OnlineReference,
-                    $"{DemoCcTag} {DemoTag} PayStar conf PS-CC-{start:yyyyMMdd}-{r.Last.ToUpperInvariant()}"));
+                Id = Guid.NewGuid(),
+                EntryType = LedgerEntryType.Charge,
+                FacilityRenterId = renter.Id,
+                FacilityReservationId = reservation.Id,
+                UnitId = cc.Id,
+                Amount = Fee,
+                DateUtc = start.AddDays(-7),
+                Notes = $"{DemoCcTag} {DemoTag} CC rental fee {start:yyyy-MM-dd}"
+            });
+            ledgerCount++;
+            if (DaysAgo >= 0)
+            {
+                _db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    EntryType = LedgerEntryType.Payment,
+                    FacilityRenterId = renter.Id,
+                    FacilityReservationId = reservation.Id,
+                    UnitId = cc.Id,
+                    Amount = Dep + Fee,
+                    DateUtc = start.AddDays(-5),
+                    Method = PaymentMethod.OnlineReference,
+                    Notes = $"{DemoCcTag} {DemoTag} PayStar conf PS-CC-{start:yyyyMMdd}-{Last.ToUpperInvariant()}"
+                });
                 ledgerCount++;
             }
 
-            // Prep/clean schedule
+            var calId = Guid.NewGuid();
+            if (status == FacilityReservationStatus.Confirmed || status == FacilityReservationStatus.Completed)
+            {
+                _db.ScheduledItems.Add(new ScheduledItem
+                {
+                    Id = calId,
+                    Title = $"CC rental — {First} {Last}",
+                    Category = ScheduledItemCategory.FacilityRental,
+                    UnitId = cc.Id,
+                    FacilityReservationId = reservation.Id,
+                    StartUtc = start,
+                    EndUtc = end,
+                    DueUtc = start,
+                    IsCompleted = status == FacilityReservationStatus.Completed,
+                    CompletedUtc = status == FacilityReservationStatus.Completed ? end : null,
+                    Notes = $"{DemoTag} {DemoCcTag}"
+                });
+                reservation.ScheduledItemId = calId;
+                schedCount++;
+            }
+
             _db.ScheduledItems.Add(new ScheduledItem
             {
                 Id = Guid.NewGuid(),
-                Title = $"CC setup — {r.First} {r.Last}",
+                Title = $"CC setup — {First} {Last}",
                 Category = ScheduledItemCategory.Cleaning,
                 UnitId = cc.Id,
-                TenantId = tenant.Id,
-                LeaseId = ccLease.Id,
+                FacilityReservationId = reservation.Id,
                 StartUtc = start.AddHours(-2),
                 EndUtc = start.AddHours(-1),
                 DueUtc = start.AddHours(-2),
                 ReminderOffset = TimeSpan.FromHours(24),
-                IsCompleted = r.DaysAgo >= 0,
-                CompletedUtc = r.DaysAgo >= 0 ? start.AddHours(-1) : null,
+                IsCompleted = DaysAgo >= 0,
+                CompletedUtc = DaysAgo >= 0 ? start.AddHours(-1) : null,
                 Notes = $"{DemoTag} {DemoCcTag} Event setup"
             });
             schedCount++;
-            _db.ScheduledItems.Add(new ScheduledItem
+
+            if (DaysAgo >= 0)
             {
-                Id = Guid.NewGuid(),
-                Title = $"CC turnover clean — {r.Last}",
-                Category = ScheduledItemCategory.Cleaning,
-                UnitId = cc.Id,
-                TenantId = tenant.Id,
-                StartUtc = end.AddHours(1),
-                EndUtc = end.AddHours(3),
-                DueUtc = end.AddHours(1),
-                IsCompleted = end < now,
-                CompletedUtc = end < now ? end.AddHours(3) : null,
-                Notes = $"{DemoTag} {DemoCcTag} Post-event clean"
-            });
-            schedCount++;
+                _db.FacilityInspections.Add(new FacilityInspection
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityReservationId = reservation.Id,
+                    Type = FacilityInspectionType.PostRental,
+                    IsSatisfactory = true,
+                    ChecklistNotes = $"{DemoTag} Floors swept; kitchen OK.",
+                    InspectorDisplay = "Demo Clerk",
+                    InspectedUtc = end.AddHours(1),
+                    RowVersion = Guid.NewGuid()
+                });
+            }
 
-            var signedId = Guid.NewGuid();
             docCount += await WriteStubDocumentAsync(
-                root, DocumentEntityType.Lease, ccLease.Id, DocumentCategory.SignedLease,
-                $"community-center/rentals/{tenant.Id:N}", "demo-cc-signed-agreement.pdf",
-                $"CC rental agreement signed — {r.First} {r.Last}", "seed@clerksuite", cancellationToken,
-                forcedId: signedId);
-            ccLease.SignedDocumentId = signedId;
-            docCount += await WriteStubDocumentAsync(
-                root, DocumentEntityType.Tenant, tenant.Id, DocumentCategory.Correspondence,
-                $"community-center/renters/{tenant.Id:N}", "demo-cc-renter-info.pdf",
-                $"Renter info sheet — {r.First} {r.Last}", "seed@clerksuite", cancellationToken);
+                root, DocumentEntityType.FacilityReservation, reservation.Id, DocumentCategory.FacilityAgreement,
+                $"community-center/reservations/{reservation.Id:N}", "demo-cc-signed-agreement.pdf",
+                $"CC rental agreement signed — {First} {Last}", "seed@clerksuite", cancellationToken);
 
-            var gen = Path.Combine(root, ccLease.GeneratedPdfRelativePath!.Replace('/', Path.DirectorySeparatorChar));
+            docCount += await WriteStubDocumentAsync(
+                root, DocumentEntityType.FacilityRenter, renter.Id, DocumentCategory.Correspondence,
+                $"community-center/renters/{renter.Id:N}", "demo-cc-renter-info.pdf",
+                $"Renter info sheet — {First} {Last}", "seed@clerksuite", cancellationToken);
+
+            var gen = Path.Combine(root, reservation.GeneratedPdfRelativePath!.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(gen)!);
-            await File.WriteAllBytesAsync(gen, MinimalPdfBytes($"CC agreement {r.First} {r.Last}"), cancellationToken);
+            await File.WriteAllBytesAsync(gen, MinimalPdfBytes($"CC agreement {First} {Last}"), cancellationToken);
         }
+
+        _db.FacilityInventoryItems.AddRange(
+            new FacilityInventoryItem
+            {
+                Id = Guid.NewGuid(), UnitId = cc.Id, Category = FacilityInventoryCategory.Chair,
+                Name = "Folding chairs", Quantity = 50, Condition = "Good", Location = "Hall",
+                Notes = DemoTag, RowVersion = Guid.NewGuid()
+            },
+            new FacilityInventoryItem
+            {
+                Id = Guid.NewGuid(), UnitId = cc.Id, Category = FacilityInventoryCategory.Table,
+                Name = "Banquet tables", Quantity = 12, Condition = "Good", Location = "Hall",
+                Notes = DemoTag, RowVersion = Guid.NewGuid()
+            },
+            new FacilityInventoryItem
+            {
+                Id = Guid.NewGuid(), UnitId = cc.Id, Category = FacilityInventoryCategory.Refrigerator,
+                Name = "Kitchen refrigerator", Quantity = 1, Condition = "Good", Location = "Kitchen",
+                Serial = "DEMO-CC-FRIDGE-1", Notes = DemoTag, RowVersion = Guid.NewGuid()
+            },
+            new FacilityInventoryItem
+            {
+                Id = Guid.NewGuid(), UnitId = cc.Id, Category = FacilityInventoryCategory.Oven,
+                Name = "Kitchen oven", Quantity = 1, Condition = "Fair", Location = "Kitchen",
+                Serial = "DEMO-CC-OVEN-1", Notes = DemoTag, RowVersion = Guid.NewGuid()
+            },
+            new FacilityInventoryItem
+            {
+                Id = Guid.NewGuid(), UnitId = cc.Id, Category = FacilityInventoryCategory.Kitchen,
+                Name = "Utensil set", Quantity = 4, Condition = "Good", Location = "Kitchen",
+                Notes = DemoTag, RowVersion = Guid.NewGuid()
+            },
+            new FacilityInventoryItem
+            {
+                Id = Guid.NewGuid(), UnitId = cc.Id, Category = FacilityInventoryCategory.Fixture,
+                Name = "Ceiling fans", Quantity = 6, Condition = "Good", Location = "Hall",
+                Notes = DemoTag, RowVersion = Guid.NewGuid()
+            });
 
         // CC maintenance + ops
         _db.MaintenanceRequests.Add(new MaintenanceRequest
@@ -654,7 +718,7 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
             Documents: docCount,
             Maintenance: maintCount,
             ScheduleItems: schedCount,
-            Message: "Demo portfolio loaded: 24-month resident + Community Center renters with PayStar-style payments.");
+            Message: "Demo portfolio loaded: 24-month resident + Community Center FacilityRenters with PayStar-style payments.");
     }
 
     public async Task<DemoValidationReport> ValidateAsync(CancellationToken cancellationToken = default)
@@ -776,13 +840,14 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
                 return (false, "No facility unit", 0);
             }
 
-            var renters = await _db.Tenants.CountAsync(
+            var renters = await _db.FacilityRenters.CountAsync(
                 t => !t.IsDeleted && t.Notes != null && t.Notes.Contains(DemoCcTag), cancellationToken);
-            var leases = await _db.Leases.CountAsync(l => !l.IsDeleted && l.UnitId == cc.Id, cancellationToken);
+            var reservations = await _db.FacilityReservations.CountAsync(
+                l => !l.IsDeleted && l.UnitId == cc.Id, cancellationToken);
             var paystar = await _db.LedgerEntries.CountAsync(
                 e => !e.IsDeleted && e.UnitId == cc.Id && e.Method == PaymentMethod.OnlineReference, cancellationToken);
-            var ok = renters >= 4 && leases >= 4 && paystar >= 3;
-            return (ok, $"CC renters={renters} leases={leases} PayStar payments={paystar}", renters);
+            var ok = renters >= 4 && reservations >= 4 && paystar >= 3;
+            return (ok, $"CC FacilityRenters={renters} reservations={reservations} PayStar payments={paystar}", renters);
         });
 
         await Check("Documents on disk", async () =>
@@ -823,6 +888,35 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
 
     private async Task WipeDemoAsync(CancellationToken cancellationToken)
     {
+        // Facility demo (002) — clear even when residential demo tenants are absent.
+        var demoFacilityRenterIds = await _db.FacilityRenters
+            .Where(r => r.Notes != null && (r.Notes.Contains(DemoTag) || r.Notes.Contains(DemoCcTag)))
+            .Select(r => r.Id)
+            .ToListAsync(cancellationToken);
+        if (demoFacilityRenterIds.Count > 0)
+        {
+            var reservationIds = await _db.FacilityReservations
+                .Where(r => demoFacilityRenterIds.Contains(r.FacilityRenterId))
+                .Select(r => r.Id)
+                .ToListAsync(cancellationToken);
+            _db.FacilityInspections.RemoveRange(
+                _db.FacilityInspections.Where(i => reservationIds.Contains(i.FacilityReservationId)));
+            _db.LedgerEntries.RemoveRange(_db.LedgerEntries.Where(e =>
+                e.FacilityRenterId != null && demoFacilityRenterIds.Contains(e.FacilityRenterId.Value)));
+            _db.ScheduledItems.RemoveRange(_db.ScheduledItems.Where(s =>
+                s.FacilityReservationId != null && reservationIds.Contains(s.FacilityReservationId.Value)));
+            _db.Documents.RemoveRange(_db.Documents.Where(d =>
+                (d.EntityType == DocumentEntityType.FacilityRenter && demoFacilityRenterIds.Contains(d.EntityId))
+                || (d.EntityType == DocumentEntityType.FacilityReservation && reservationIds.Contains(d.EntityId))));
+            _db.FacilityReservations.RemoveRange(
+                _db.FacilityReservations.Where(r => demoFacilityRenterIds.Contains(r.FacilityRenterId)));
+            _db.FacilityRenters.RemoveRange(
+                _db.FacilityRenters.Where(r => demoFacilityRenterIds.Contains(r.Id)));
+        }
+
+        _db.FacilityInventoryItems.RemoveRange(_db.FacilityInventoryItems.Where(i =>
+            i.Notes != null && i.Notes.Contains(DemoTag)));
+
         var demoTenantIds = await _db.Tenants
             .Where(t => t.Email == PrimaryEmail
                         || (t.Notes != null && (t.Notes.Contains(DemoTag) || t.Notes.Contains(DemoCcTag))))
@@ -831,12 +925,14 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
 
         if (demoTenantIds.Count == 0)
         {
+            await _db.SaveChangesAsync(cancellationToken);
             return;
         }
 
         var leaseIds = await _db.Leases.Where(l => demoTenantIds.Contains(l.TenantId)).Select(l => l.Id).ToListAsync(cancellationToken);
 
-        _db.LedgerEntries.RemoveRange(_db.LedgerEntries.Where(e => demoTenantIds.Contains(e.TenantId)));
+        _db.LedgerEntries.RemoveRange(_db.LedgerEntries.Where(e =>
+            e.TenantId != null && demoTenantIds.Contains(e.TenantId.Value)));
         _db.ScheduledItems.RemoveRange(_db.ScheduledItems.Where(s =>
             (s.TenantId != null && demoTenantIds.Contains(s.TenantId.Value))
             || (s.Notes != null && s.Notes.Contains(DemoTag))));
@@ -972,7 +1068,7 @@ public sealed class DemoDataSeeder : IDemoDataSeeder
     /// <summary>Tiny valid-enough PDF for vault viewer smoke (not a real legal form).</summary>
     private static byte[] MinimalPdfBytes(string title)
     {
-        var safe = new string(title.Where(c => c >= 32 && c < 127).ToArray());
+        var safe = new string([.. title.Where(c => c >= 32 && c < 127)]);
         if (string.IsNullOrWhiteSpace(safe))
         {
             safe = "ClerkSuite demo document";

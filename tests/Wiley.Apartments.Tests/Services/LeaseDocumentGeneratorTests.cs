@@ -95,7 +95,7 @@ public class LeaseDocumentGeneratorTests
 
         using var loaded = new PdfLoadedDocument(pdf);
         loaded.Pages.Count.Should().BeGreaterThan(4);
-        var lastText = loaded.Pages[loaded.Pages.Count - 1].ExtractText();
+        var lastText = loaded.Pages[^1].ExtractText();
         lastText.Should().Contain("Additional Clauses");
         lastText.Should().Contain("Pets require prior written approval");
     }

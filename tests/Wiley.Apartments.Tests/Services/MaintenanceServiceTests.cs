@@ -74,7 +74,7 @@ public class MaintenanceServiceTests
         {
             var (unit, _) = await SeedAsync(db);
             var wo = await service.CreateAsync(unit.Id, "Fix sink", MaintenancePriority.Normal);
-            var done = await service.CompleteAsync(wo.Id, cost: 85.50m);
+            var done = await service.CompleteAsync(wo.Id, cost: 85.50m, completedByDisplay: "Test Clerk");
 
             done.Status.Should().Be(MaintenanceStatus.Completed);
             done.Cost.Should().Be(85.50m);
@@ -97,7 +97,7 @@ public class MaintenanceServiceTests
         {
             var (unit, _) = await SeedAsync(db);
             var wo = await service.CreateAsync(unit.Id, "Tighten screw");
-            var done = await service.CompleteAsync(wo.Id, cost: 0m);
+            var done = await service.CompleteAsync(wo.Id, cost: 0m, completedByDisplay: "Test Clerk");
             done.OperatingCostId.Should().BeNull();
             (await db.UnitOperatingCosts.CountAsync()).Should().Be(0);
         }

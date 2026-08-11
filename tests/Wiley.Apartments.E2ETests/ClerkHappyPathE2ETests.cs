@@ -7,19 +7,23 @@ namespace Wiley.Apartments.E2ETests;
 /// Development host seeds <c>clerk@dev.local</c> / <c>Password1!</c> via IdentitySeeder.
 /// </summary>
 [Collection("E2E")]
-public class ClerkHappyPathE2ETests : IAsyncLifetime
+public class ClerkHappyPathE2ETests(E2EWebApplicationFactory factory) : IAsyncLifetime
 {
     public const string DevClerkEmail = "clerk@dev.local";
     public const string DevClerkPassword = "Password1!";
 
-    private readonly E2EWebApplicationFactory _factory;
+    private static readonly string[] HomeMarkers = ["Occupancy", "ClerkSuite", "Dashboard", "Collected"];
+    private static readonly string[] UnitsMarkers = ["Units", "Town of Wiley", "Unit #"];
+    private static readonly string[] PaymentsMarkers = ["ledger", "Record payment", "Post charge", "Tenant ledger"];
+    private static readonly string[] MaintenanceMarkers = ["Maintenance", "work order", "New work order"];
+    private static readonly string[] ScheduleMarkers = ["calendar", "Operations", "Schedule"];
+    private static readonly string[] ReportsMarkers = ["Rent roll", "Reports", "Delinquency"];
+    private static readonly string[] RentRollMarkers = ["Rent roll", "Print"];
+    private static readonly string[] DocumentsMarkers = ["Document", "vault", "File"];
+
+    private readonly E2EWebApplicationFactory _factory = factory;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
-
-    public ClerkHappyPathE2ETests(E2EWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
 
     public async Task InitializeAsync()
     {
@@ -45,14 +49,14 @@ public class ClerkHappyPathE2ETests : IAsyncLifetime
 
         await SignInAsDevClerkAsync(page);
 
-        await GotoAuthenticatedAsync(page, "/", new[] { "Occupancy", "ClerkSuite", "Dashboard", "Collected" });
-        await GotoAuthenticatedAsync(page, "/units", new[] { "Units", "Town of Wiley", "Unit #" });
-        await GotoAuthenticatedAsync(page, "/payments", new[] { "ledger", "Record payment", "Post charge", "Tenant ledger" });
-        await GotoAuthenticatedAsync(page, "/maintenance", new[] { "Maintenance", "work order", "New work order" });
-        await GotoAuthenticatedAsync(page, "/schedule", new[] { "calendar", "Operations", "Schedule" });
-        await GotoAuthenticatedAsync(page, "/reports", new[] { "Rent roll", "Reports", "Delinquency" });
-        await GotoAuthenticatedAsync(page, "/reports/rent-roll", new[] { "Rent roll", "Print" });
-        await GotoAuthenticatedAsync(page, "/documents", new[] { "Document", "vault", "File" });
+        await GotoAuthenticatedAsync(page, "/", HomeMarkers);
+        await GotoAuthenticatedAsync(page, "/units", UnitsMarkers);
+        await GotoAuthenticatedAsync(page, "/payments", PaymentsMarkers);
+        await GotoAuthenticatedAsync(page, "/maintenance", MaintenanceMarkers);
+        await GotoAuthenticatedAsync(page, "/schedule", ScheduleMarkers);
+        await GotoAuthenticatedAsync(page, "/reports", ReportsMarkers);
+        await GotoAuthenticatedAsync(page, "/reports/rent-roll", RentRollMarkers);
+        await GotoAuthenticatedAsync(page, "/documents", DocumentsMarkers);
     }
 
     [Fact]

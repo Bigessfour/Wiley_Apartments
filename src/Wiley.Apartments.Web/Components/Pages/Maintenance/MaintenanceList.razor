@@ -1,6 +1,7 @@
 @page "/maintenance"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
@@ -115,7 +116,9 @@
 {
     <div class="border rounded p-3 mt-3" style="max-width: 480px;">
         <h2 class="h6">Complete work order</h2>
-        <label class="form-label">Cost (posts Repair ops cost when &gt; 0)</label>
+        <label class="form-label">Completed by</label>
+        <SfTextBox @bind-Value="CompleteBy" Placeholder="Clerk name" />
+        <label class="form-label mt-2">Cost (posts Repair ops cost when &gt; 0)</label>
         <SfNumericTextBox TValue="decimal?" @bind-Value="CompleteCost" Format="C2" Min="0" />
         <div class="d-flex gap-2 mt-2">
             <SfButton CssClass="e-primary e-small" Content="Confirm complete" Disabled="@Busy" OnClick="ConfirmCompleteAsync" />
@@ -148,6 +151,7 @@
     private string FormDescription { get; set; } = "";
     private Guid? CompletingId { get; set; }
     private decimal? CompleteCost { get; set; }
+    private string CompleteBy { get; set; } = "Clerk";
 
     private static readonly List<PriorityOption> PriorityOptions =
     [
@@ -309,6 +313,7 @@
     {
         CompletingId = row.Id;
         CompleteCost = row.Cost;
+        CompleteBy = "Clerk";
     }
 
     private async Task ConfirmCompleteAsync()
@@ -318,11 +323,27 @@
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(CompleteBy))
+        {
+            Logger.LogWarning("MaintenanceList complete blocked: CompletedBy empty for WO {WorkOrderId}.", id);
+            ErrorMessage = "Completed by is required.";
+            return;
+        }
+
         Busy = true;
         ErrorMessage = null;
         try
         {
-            var done = await MaintenanceService.CompleteAsync(id, CompleteCost);
+            Logger.LogInformation(
+                "MaintenanceList completing WO {WorkOrderId} by={Completer} cost={Cost}.",
+                id, CompleteBy, CompleteCost);
+            var done = await MaintenanceService.CompleteAsync(
+                id,
+                CompleteCost,
+                completedByDisplay: CompleteBy.Trim());
+            Logger.LogInformation(
+                "MaintenanceList completed WO {WorkOrderId} completer={Completer} opsCost={OpsCostId}.",
+                done.Id, done.CompletedByDisplay, done.OperatingCostId);
             await Toast.ShowSuccessAsync(done.OperatingCostId is null
                 ? "Work order completed."
                 : "Work order completed; Repair ops cost recorded.");
@@ -331,7 +352,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "MaintenanceList operation failed.");
+            Logger.LogError(ex, "MaintenanceList complete failed for WO {WorkOrderId}.", id);
             ErrorMessage = ex.Message;
         }
         finally

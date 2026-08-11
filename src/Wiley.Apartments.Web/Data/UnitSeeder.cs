@@ -8,21 +8,14 @@ using Wiley.Apartments.Web.Services;
 
 namespace Wiley.Apartments.Web.Data;
 
-public sealed class UnitSeeder : IUnitSeeder
+public sealed class UnitSeeder(
+    ApartmentsDbContext db,
+    IOptions<ClerkSuiteOptions> options,
+    ILogger<UnitSeeder> logger) : IUnitSeeder
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ClerkSuiteOptions _options;
-    private readonly ILogger<UnitSeeder> _logger;
-
-    public UnitSeeder(
-        ApartmentsDbContext db,
-        IOptions<ClerkSuiteOptions> options,
-        ILogger<UnitSeeder> logger)
-    {
-        _db = db;
-        _options = options.Value;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ClerkSuiteOptions _options = options.Value;
+    private readonly ILogger<UnitSeeder> _logger = logger;
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {

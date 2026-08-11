@@ -5,14 +5,9 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.IntegrationTests.Web;
 
-public class DatabaseIntegrationTests : IClassFixture<ClerkSuiteWebApplicationFactory>
+public class DatabaseIntegrationTests(ClerkSuiteWebApplicationFactory factory) : IClassFixture<ClerkSuiteWebApplicationFactory>
 {
-    private readonly ClerkSuiteWebApplicationFactory _factory;
-
-    public DatabaseIntegrationTests(ClerkSuiteWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
+    private readonly ClerkSuiteWebApplicationFactory _factory = factory;
 
     [Fact]
     public async Task Database_CreatesIdentityAndAuditTables()

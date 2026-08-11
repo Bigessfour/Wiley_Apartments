@@ -29,12 +29,10 @@ public sealed class CircuitAuthCookieStore
 }
 
 /// <summary>Scoped lookup of the current circuit's captured auth cookies.</summary>
-public sealed class CircuitAuthCookieAccessor
+public sealed class CircuitAuthCookieAccessor(CircuitAuthCookieStore store)
 {
-    private readonly CircuitAuthCookieStore _store;
+    private readonly CircuitAuthCookieStore _store = store;
     private string? _circuitId;
-
-    public CircuitAuthCookieAccessor(CircuitAuthCookieStore store) => _store = store;
 
     public void Bind(string circuitId) => _circuitId = circuitId;
 
@@ -44,25 +42,17 @@ public sealed class CircuitAuthCookieAccessor
             : null;
 }
 
-public sealed class CircuitAuthCookieHandler : CircuitHandler
+public sealed class CircuitAuthCookieHandler(
+    IHttpContextAccessor httpContextAccessor,
+    CircuitAuthCookieStore store,
+    CircuitAuthCookieAccessor accessor,
+    ILogger<CircuitAuthCookieHandler> logger) : CircuitHandler
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly CircuitAuthCookieStore _store;
-    private readonly CircuitAuthCookieAccessor _accessor;
-    private readonly ILogger<CircuitAuthCookieHandler> _logger;
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+    private readonly CircuitAuthCookieStore _store = store;
+    private readonly CircuitAuthCookieAccessor _accessor = accessor;
+    private readonly ILogger<CircuitAuthCookieHandler> _logger = logger;
     private string? _circuitId;
-
-    public CircuitAuthCookieHandler(
-        IHttpContextAccessor httpContextAccessor,
-        CircuitAuthCookieStore store,
-        CircuitAuthCookieAccessor accessor,
-        ILogger<CircuitAuthCookieHandler> logger)
-    {
-        _httpContextAccessor = httpContextAccessor;
-        _store = store;
-        _accessor = accessor;
-        _logger = logger;
-    }
 
     public override Task OnCircuitOpenedAsync(Circuit circuit, CancellationToken cancellationToken)
     {

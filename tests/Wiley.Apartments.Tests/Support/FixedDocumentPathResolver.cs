@@ -2,17 +2,11 @@ using Wiley.Apartments.Contracts;
 
 namespace Wiley.Apartments.Tests.Support;
 
-internal sealed class FixedDocumentPathResolver : IDocumentPathResolver
+internal sealed class FixedDocumentPathResolver(string root) : IDocumentPathResolver
 {
-    public FixedDocumentPathResolver(string root)
-    {
-        ConfiguredDefaultRoot = root;
-        _root = root;
-    }
+    private string _root = root;
 
-    private string _root;
-
-    public string ConfiguredDefaultRoot { get; }
+    public string ConfiguredDefaultRoot { get; } = root;
 
     public string GetDocumentRoot() => _root;
 

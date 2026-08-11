@@ -5,16 +5,10 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class AuditQueryService : IAuditQueryService
+public sealed class AuditQueryService(ApartmentsDbContext db, ILogger<AuditQueryService> logger) : IAuditQueryService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILogger<AuditQueryService> _logger;
-
-    public AuditQueryService(ApartmentsDbContext db, ILogger<AuditQueryService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILogger<AuditQueryService> _logger = logger;
 
     public async Task<IReadOnlyList<AuditLog>> QueryAsync(
         string? entityType = null,

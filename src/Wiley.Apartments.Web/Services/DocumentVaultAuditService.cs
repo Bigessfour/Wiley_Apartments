@@ -17,21 +17,14 @@ public interface IDocumentVaultAuditService
         CancellationToken cancellationToken = default);
 }
 
-public sealed class DocumentVaultAuditService : IDocumentVaultAuditService
+public sealed class DocumentVaultAuditService(
+    ApartmentsDbContext db,
+    IHttpContextAccessor httpContextAccessor,
+    ILogger<DocumentVaultAuditService> logger) : IDocumentVaultAuditService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<DocumentVaultAuditService> _logger;
-
-    public DocumentVaultAuditService(
-        ApartmentsDbContext db,
-        IHttpContextAccessor httpContextAccessor,
-        ILogger<DocumentVaultAuditService> logger)
-    {
-        _db = db;
-        _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+    private readonly ILogger<DocumentVaultAuditService> _logger = logger;
 
     public async Task LogAsync(
         string action,

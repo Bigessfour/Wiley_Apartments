@@ -52,6 +52,12 @@
                 <NavLink class="nav-link" href="community-center" @onclick="CloseOnNavigate">
                     <span class="e-icons e-home" aria-hidden="true"></span><span>CC hub</span>
                 </NavLink>
+                <NavLink class="nav-link" href="community-center/renters" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-user" aria-hidden="true"></span><span>CC renters</span>
+                </NavLink>
+                <NavLink class="nav-link" href="community-center/reservations" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-bookmark" aria-hidden="true"></span><span>CC reservations</span>
+                </NavLink>
                 @if (CommunityCenterId is Guid ccId)
                 {
                     <NavLink class="nav-link" href="@($"schedule?unitId={ccId}")" @onclick="CloseOnNavigate">
@@ -63,10 +69,13 @@
                     <NavLink class="nav-link" href="@($"maintenance?unitId={ccId}")" @onclick="CloseOnNavigate">
                         <span class="e-icons e-edit" aria-hidden="true"></span><span>CC maintenance</span>
                     </NavLink>
-                    <NavLink class="nav-link" href="@($"units/{ccId}")" @onclick="CloseOnNavigate">
-                        <span class="e-icons e-grid-view" aria-hidden="true"></span><span>CC unit record</span>
-                    </NavLink>
                 }
+                <NavLink class="nav-link" href="community-center/inspections" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-check" aria-hidden="true"></span><span>CC inspections</span>
+                </NavLink>
+                <NavLink class="nav-link" href="community-center/inventory" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-grid-view" aria-hidden="true"></span><span>CC inventory</span>
+                </NavLink>
                 <NavLink class="nav-link" href="documents" @onclick="CloseOnNavigate">
                     <span class="e-icons e-folder" aria-hidden="true"></span><span>CC documents</span>
                 </NavLink>

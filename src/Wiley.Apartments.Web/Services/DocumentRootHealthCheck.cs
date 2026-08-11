@@ -1,21 +1,15 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Wiley.Apartments.Contracts;
 using Microsoft.Extensions.Options;
+using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Web.Configuration;
 
 namespace Wiley.Apartments.Web.Services;
 
 /// <summary>Verifies NAS DocumentRoot exists and is writable (spec edge case 2).</summary>
-public sealed class DocumentRootHealthCheck : IHealthCheck
+public sealed class DocumentRootHealthCheck(IDocumentPathResolver paths, ILogger<DocumentRootHealthCheck> logger) : IHealthCheck
 {
-    private readonly IDocumentPathResolver _paths;
-    private readonly ILogger<DocumentRootHealthCheck> _logger;
-
-    public DocumentRootHealthCheck(IDocumentPathResolver paths, ILogger<DocumentRootHealthCheck> logger)
-    {
-        _paths = paths;
-        _logger = logger;
-    }
+    private readonly IDocumentPathResolver _paths = paths;
+    private readonly ILogger<DocumentRootHealthCheck> _logger = logger;
 
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,

@@ -1,0 +1,126 @@
+@page "/community-center/renters"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject IFacilityRenterService RenterService
+@inject NavigationManager Navigation
+@inject ILogger<FacilityRenterList> Logger
+
+<PageTitle>CC Renters</PageTitle>
+
+<PageHeader Title="Community Center renters"
+            Subtitle="Event / hall hirers — separate from residential tenants.">
+    <SfButton CssClass="e-outline e-small" Content="CC hub"
+              OnClick="@(() => Navigation.NavigateTo("/community-center"))" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<SfGrid TValue="FacilityRenter"
+        DataSource="@Rows"
+        Toolbar="@(new List<string> { "Add", "Edit", "Delete", "Update", "Cancel", "Search" })"
+        AllowPaging="true"
+        AllowSorting="true"
+        AllowFiltering="true"
+        Height="420">
+    <GridEvents TValue="FacilityRenter" OnActionBegin="OnActionBeginAsync" OnRecordDoubleClick="OnDoubleClick" />
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+    <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true"
+                      Mode="EditMode.Dialog" ShowDeleteConfirmDialog="true" />
+    <GridColumns>
+        <GridColumn Field="@nameof(FacilityRenter.Id)" IsPrimaryKey="true" Visible="false" />
+        <GridColumn Field="@nameof(FacilityRenter.LastName)" HeaderText="Last" Width="120"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(FacilityRenter.FirstName)" HeaderText="First" Width="120"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(FacilityRenter.Organization)" HeaderText="Organization" Width="140" />
+        <GridColumn Field="@nameof(FacilityRenter.Phone)" HeaderText="Phone" Width="120"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(FacilityRenter.Email)" HeaderText="Email" Width="180"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(FacilityRenter.MailingAddress)" HeaderText="Address" Width="200"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(FacilityRenter.AlternateContact)" HeaderText="Alternate" Width="140" />
+        <GridColumn Field="@nameof(FacilityRenter.IdType)" HeaderText="ID type" Width="100" />
+        <GridColumn Field="@nameof(FacilityRenter.IdReference)" HeaderText="ID ref" Width="100" />
+        <GridColumn Field="@nameof(FacilityRenter.Notes)" HeaderText="Notes" Width="160" />
+        <GridColumn Field="@nameof(FacilityRenter.RowVersion)" Visible="false" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<FacilityRenter> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            Rows = [.. await RenterService.SearchAsync()];
+            Logger.LogInformation("FacilityRenterList loaded {Count} renters.", Rows.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityRenterList load failed.");
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task OnActionBeginAsync(ActionEventArgs<FacilityRenter> args)
+    {
+        try
+        {
+            if (args.RequestType == Syncfusion.Blazor.Grids.Action.Save && args.Data is not null)
+            {
+                if (args.Action == "Add")
+                {
+                    Logger.LogInformation(
+                        "FacilityRenterList creating renter {LastName}, {FirstName}.",
+                        args.Data.LastName, args.Data.FirstName);
+                    await RenterService.CreateAsync(args.Data);
+                    Logger.LogInformation("FacilityRenterList created renter {RenterId}.", args.Data.Id);
+                }
+                else
+                {
+                    Logger.LogInformation("FacilityRenterList updating renter {RenterId}.", args.Data.Id);
+                    await RenterService.UpdateAsync(args.Data);
+                    Logger.LogInformation("FacilityRenterList updated renter {RenterId}.", args.Data.Id);
+                }
+
+                await LoadAsync();
+            }
+            else if (args.RequestType == Syncfusion.Blazor.Grids.Action.Delete && args.Data is not null)
+            {
+                Logger.LogInformation("FacilityRenterList soft-deleting renter {RenterId}.", args.Data.Id);
+                await RenterService.SoftDeleteAsync(args.Data.Id);
+                Logger.LogInformation("FacilityRenterList soft-deleted renter {RenterId}.", args.Data.Id);
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            args.Cancel = true;
+            Logger.LogError(ex, "FacilityRenterList mutation failed action={Action} request={RequestType}.",
+                args.Action, args.RequestType);
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private void OnDoubleClick(RecordDoubleClickEventArgs<FacilityRenter> args)
+    {
+        if (args.RowData is not null)
+        {
+            Logger.LogInformation("FacilityRenterList open detail {RenterId}.", args.RowData.Id);
+            Navigation.NavigateTo($"/community-center/renters/{args.RowData.Id}");
+        }
+    }
+}

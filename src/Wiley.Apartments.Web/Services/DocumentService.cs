@@ -5,7 +5,11 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class DocumentService : IDocumentService
+public sealed class DocumentService(
+    ApartmentsDbContext db,
+    IDocumentPathResolver paths,
+    IDateTimeService clock,
+    ILogger<DocumentService> logger) : IDocumentService
 {
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -14,22 +18,10 @@ public sealed class DocumentService : IDocumentService
 
     private const long MaxUploadBytes = 25 * 1024 * 1024;
 
-    private readonly ApartmentsDbContext _db;
-    private readonly IDocumentPathResolver _paths;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<DocumentService> _logger;
-
-    public DocumentService(
-        ApartmentsDbContext db,
-        IDocumentPathResolver paths,
-        IDateTimeService clock,
-        ILogger<DocumentService> logger)
-    {
-        _db = db;
-        _paths = paths;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IDocumentPathResolver _paths = paths;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<DocumentService> _logger = logger;
 
     public async Task<IReadOnlyList<DocumentInfo>> ListForEntityAsync(
         DocumentEntityType entityType,
@@ -41,7 +33,7 @@ public sealed class DocumentService : IDocumentService
             .Where(d => !d.IsDeleted && d.EntityType == entityType && d.EntityId == entityId)
             .OrderByDescending(d => d.UploadedAtUtc)
             .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
+        return [.. rows.Select(Map)];
     }
 
     public async Task<IReadOnlyList<DocumentInfo>> QueryAsync(
@@ -66,7 +58,7 @@ public sealed class DocumentService : IDocumentService
             .OrderByDescending(d => d.UploadedAtUtc)
             .Take(take)
             .ToListAsync(cancellationToken);
-        return rows.Select(Map).ToList();
+        return [.. rows.Select(Map)];
     }
 
     public async Task<DocumentInfo?> GetByIdAsync(

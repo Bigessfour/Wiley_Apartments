@@ -22,16 +22,10 @@ public interface IDocumentVaultMetadataSync
         CancellationToken cancellationToken = default);
 }
 
-public sealed class DocumentVaultMetadataSync : IDocumentVaultMetadataSync
+public sealed class DocumentVaultMetadataSync(ApartmentsDbContext db, ILogger<DocumentVaultMetadataSync> logger) : IDocumentVaultMetadataSync
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILogger<DocumentVaultMetadataSync> _logger;
-
-    public DocumentVaultMetadataSync(ApartmentsDbContext db, ILogger<DocumentVaultMetadataSync> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILogger<DocumentVaultMetadataSync> _logger = logger;
 
     public async Task SoftDeleteMatchingAsync(
         string folderPath,

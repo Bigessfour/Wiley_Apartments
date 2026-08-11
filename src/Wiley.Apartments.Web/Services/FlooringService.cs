@@ -5,16 +5,10 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class FlooringService : IFlooringService
+public sealed class FlooringService(ApartmentsDbContext db, ILogger<FlooringService> logger) : IFlooringService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILogger<FlooringService> _logger;
-
-    public FlooringService(ApartmentsDbContext db, ILogger<FlooringService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILogger<FlooringService> _logger = logger;
 
     public async Task<IReadOnlyList<Flooring>> GetByUnitIdAsync(
         Guid unitId,

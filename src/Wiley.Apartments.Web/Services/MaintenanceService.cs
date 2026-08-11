@@ -5,24 +5,16 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class MaintenanceService : IMaintenanceService
+public sealed class MaintenanceService(
+    ApartmentsDbContext db,
+    IUnitOperatingCostService opsCosts,
+    IDateTimeService clock,
+    ILogger<MaintenanceService> logger) : IMaintenanceService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly IUnitOperatingCostService _opsCosts;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<MaintenanceService> _logger;
-
-    public MaintenanceService(
-        ApartmentsDbContext db,
-        IUnitOperatingCostService opsCosts,
-        IDateTimeService clock,
-        ILogger<MaintenanceService> logger)
-    {
-        _db = db;
-        _opsCosts = opsCosts;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IUnitOperatingCostService _opsCosts = opsCosts;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<MaintenanceService> _logger = logger;
 
     public async Task<MaintenanceRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await BaseQuery()
@@ -67,6 +59,7 @@ public sealed class MaintenanceService : IMaintenanceService
         MaintenancePriority priority = MaintenancePriority.Normal,
         Guid? assetId = null,
         string? notes = null,
+        Guid? facilityReservationId = null,
         CancellationToken cancellationToken = default)
     {
         await EnsureUnitAsync(unitId, cancellationToken);
@@ -77,6 +70,7 @@ public sealed class MaintenanceService : IMaintenanceService
             Id = Guid.NewGuid(),
             UnitId = unitId,
             AssetId = assetId,
+            FacilityReservationId = facilityReservationId,
             Description = RequireDescription(description),
             Priority = priority,
             Status = MaintenanceStatus.Open,
@@ -109,6 +103,7 @@ public sealed class MaintenanceService : IMaintenanceService
                 id,
                 cost ?? request.Cost,
                 notes: notes ?? request.Notes,
+                completedByDisplay: "Clerk",
                 cancellationToken: cancellationToken);
         }
 
@@ -133,6 +128,9 @@ public sealed class MaintenanceService : IMaintenanceService
         DateTime? completedUtc = null,
         string? notes = null,
         bool postOperatingCost = true,
+        string? completedByDisplay = null,
+        string? completedByUserId = null,
+        Guid? facilityReservationId = null,
         CancellationToken cancellationToken = default)
     {
         var request = await RequireAsync(id, cancellationToken);
@@ -141,8 +139,22 @@ public sealed class MaintenanceService : IMaintenanceService
             return (await GetByIdAsync(request.Id, cancellationToken))!;
         }
 
+        if (string.IsNullOrWhiteSpace(completedByDisplay))
+        {
+            throw new ArgumentException("Completed by (name) is required.", nameof(completedByDisplay));
+        }
+
         request.Status = MaintenanceStatus.Completed;
         request.CompletedUtc = EnsureUtc(completedUtc ?? _clock.UtcNow);
+        request.CompletedByDisplay = completedByDisplay.Trim();
+        request.CompletedByUserId = string.IsNullOrWhiteSpace(completedByUserId)
+            ? null
+            : completedByUserId.Trim();
+        if (facilityReservationId is Guid rid)
+        {
+            request.FacilityReservationId = rid;
+        }
+
         request.Cost = NormalizeCost(cost) ?? request.Cost;
         if (notes is not null)
         {
@@ -166,8 +178,8 @@ public sealed class MaintenanceService : IMaintenanceService
 
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Completed maintenance {Id}; ops cost {OpsCostId}.",
-            request.Id, request.OperatingCostId);
+            "Completed maintenance {Id} by {Completer}; ops cost {OpsCostId}.",
+            request.Id, request.CompletedByDisplay, request.OperatingCostId);
         return (await GetByIdAsync(request.Id, cancellationToken))!;
     }
 

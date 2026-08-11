@@ -5,16 +5,10 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class UnitOperatingCostService : IUnitOperatingCostService
+public sealed class UnitOperatingCostService(ApartmentsDbContext db, ILogger<UnitOperatingCostService> logger) : IUnitOperatingCostService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILogger<UnitOperatingCostService> _logger;
-
-    public UnitOperatingCostService(ApartmentsDbContext db, ILogger<UnitOperatingCostService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILogger<UnitOperatingCostService> _logger = logger;
 
     public async Task<UnitOperatingCost?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _db.UnitOperatingCosts
@@ -69,12 +63,11 @@ public sealed class UnitOperatingCostService : IUnitOperatingCostService
             rangeStartUtc: rangeStartUtc,
             rangeEndUtc: rangeEndUtc,
             cancellationToken: cancellationToken);
-        return costs
+        return [.. costs
             .GroupBy(c => c.UnitId)
             .Select(g => new UnitOperatingCostSum(g.Key, g.Sum(c => c.Amount)))
             .OrderBy(s => s.UnitId.HasValue ? 0 : 1)
-            .ThenBy(s => s.UnitId)
-            .ToList();
+            .ThenBy(s => s.UnitId)];
     }
 
     public async Task<UnitOperatingCost> CreateAsync(

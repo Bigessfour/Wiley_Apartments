@@ -1,5 +1,9 @@
 # ClerkSuite (Wiley Apartments) surface inventory
 
+> **EXAMPLE inventory** for this skill package. For other apps, copy
+> `surface-inventory.TEMPLATE.md` → `<app>-surfaces.md` and fill from routes/nav.
+> Do not treat this file as required outside ClerkSuite / Wiley Apartments.
+
 **App:** ClerkSuite · repo `Bigessfour/Wiley_Apartments`  
 **Stack:** Blazor Server + Syncfusion Blazor 34.x · self-hosted NAS  
 **Repo playbook:** `docs/CLERK-SURFACE-COMPLETION.md`  

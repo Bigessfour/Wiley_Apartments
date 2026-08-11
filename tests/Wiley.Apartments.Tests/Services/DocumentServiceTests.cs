@@ -1,9 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Wiley.Apartments.Domain;
-using Wiley.Apartments.Web.Configuration;
 using Wiley.Apartments.Web.Data;
 using Wiley.Apartments.Web.Services;
 
@@ -18,15 +15,6 @@ public class DocumentServiceTests
         public DateTime ToUtc(DateTime local) => DateTime.SpecifyKind(local, DateTimeKind.Utc);
     }
 
-    private sealed class TestHostEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = Environments.Development;
-        public string ApplicationName { get; set; } = "tests";
-        public string ContentRootPath { get; set; } = Directory.GetCurrentDirectory();
-        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; }
-            = new Microsoft.Extensions.FileProviders.NullFileProvider();
-    }
-
     private static (ApartmentsDbContext Db, DocumentService Service, string Root) Create()
     {
         var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
@@ -38,7 +26,6 @@ public class DocumentServiceTests
         db.Database.EnsureCreated();
         var root = Path.Combine(Path.GetTempPath(), "clerksuite-docs-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        var env = new TestHostEnvironment();
         var service = new DocumentService(
             db,
             new Wiley.Apartments.Tests.Support.FixedDocumentPathResolver(root),

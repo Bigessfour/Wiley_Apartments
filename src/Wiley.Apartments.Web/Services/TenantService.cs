@@ -5,16 +5,10 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class TenantService : ITenantService
+public sealed class TenantService(ApartmentsDbContext db, ILogger<TenantService> logger) : ITenantService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILogger<TenantService> _logger;
-
-    public TenantService(ApartmentsDbContext db, ILogger<TenantService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILogger<TenantService> _logger = logger;
 
     public async Task<IReadOnlyList<Tenant>> SearchAsync(
         string? query = null,

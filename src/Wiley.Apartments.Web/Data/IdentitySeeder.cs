@@ -3,24 +3,16 @@ using Microsoft.Extensions.Options;
 
 namespace Wiley.Apartments.Web.Data;
 
-public sealed class IdentitySeeder : IIdentitySeeder
+public sealed class IdentitySeeder(
+    UserManager<ApplicationUser> userManager,
+    IOptions<SeedUserOptions> seedOptions,
+    IHostEnvironment environment,
+    ILogger<IdentitySeeder> logger) : IIdentitySeeder
 {
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SeedUserOptions _seedOptions;
-    private readonly IHostEnvironment _environment;
-    private readonly ILogger<IdentitySeeder> _logger;
-
-    public IdentitySeeder(
-        UserManager<ApplicationUser> userManager,
-        IOptions<SeedUserOptions> seedOptions,
-        IHostEnvironment environment,
-        ILogger<IdentitySeeder> logger)
-    {
-        _userManager = userManager;
-        _seedOptions = seedOptions.Value;
-        _environment = environment;
-        _logger = logger;
-    }
+    private readonly UserManager<ApplicationUser> _userManager = userManager;
+    private readonly SeedUserOptions _seedOptions = seedOptions.Value;
+    private readonly IHostEnvironment _environment = environment;
+    private readonly ILogger<IdentitySeeder> _logger = logger;
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
@@ -30,6 +22,7 @@ public sealed class IdentitySeeder : IIdentitySeeder
 
     private async Task SeedConfiguredUsersAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         foreach (var seedUser in _seedOptions.Users)
         {
             if (string.IsNullOrWhiteSpace(seedUser.Email) || string.IsNullOrWhiteSpace(seedUser.Password))
@@ -68,6 +61,7 @@ public sealed class IdentitySeeder : IIdentitySeeder
 
     private async Task SeedDevelopmentUserAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_environment.IsDevelopment())
         {
             return;

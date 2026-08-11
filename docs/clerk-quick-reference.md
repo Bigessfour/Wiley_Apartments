@@ -54,10 +54,14 @@ Captured from Development Mac smoke (2026-08-10). Live NAS uses the same layout 
 
 ## Community Center (facility)
 
-1. Sidebar → **Community Center** → **CC hub** (or open unit **CC** from Units).
-2. Use **CC schedule / payments / maintenance** links — they open the same clerk tools pre-filtered to the facility unit.
-3. Do **not** delete unit CC (facility guard). Edit layout notes / sq ft on the unit record as needed.
-4. Documents vault is shared NAS-wide; upload under Documents and associate with the CC unit when linking metadata.
+1. Sidebar → **Community Center** → **CC hub**.
+2. **CC renters** — add/search hall hirers (not residential tenants).
+3. **CC reservations** — book dates, Confirm (appears on shared schedule), generate agreement PDF, post deposit/fee, record payment, receipt from CC payments.
+4. **CC inspections** — post-rental satisfactory (or damage notes).
+5. **CC inventory** — chairs, tables, kitchen, appliances, fixtures.
+6. **CC maintenance** — work orders; complete with **Completed by** name.
+7. Shared **Schedule** / **CC schedule** shows FacilityRental + prep/maintenance for unit CC.
+8. Do **not** delete unit CC (facility guard). Documents vault is NAS-wide; link uploads to CC entities when metadata allows.
 
 ---
 
@@ -110,9 +114,9 @@ Settings → **Appearance** → Light / Dark. Preference is stored in this brows
 
 ## Clerk review (T7.3)
 
-| Clerk   | Date reviewed | OK? | Notes                                              |
-| ------- | ------------- | --- | -------------------------------------------------- |
-| Clerk A | 2026-08-10    | Yes | Live review with Stephen; guide + screenshots OK   |
+| Clerk   | Date reviewed | OK? | Notes                                             |
+| ------- | ------------- | --- | ------------------------------------------------- |
+| Clerk A | 2026-08-10    | Yes | Live review with Stephen; guide + screenshots OK  |
 | Clerk B | 2026-08-10    | Yes | Same session; daily path and receipts/deposits OK |
 
 **Done when:** this one-pager exists and at least one clerk has signed the table above. **Met 2026-08-10.**

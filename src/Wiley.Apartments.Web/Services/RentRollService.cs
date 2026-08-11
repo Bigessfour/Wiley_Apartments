@@ -5,16 +5,10 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class RentRollService : IRentRollService
+public sealed class RentRollService(ApartmentsDbContext db, ILogger<RentRollService> logger) : IRentRollService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly ILogger<RentRollService> _logger;
-
-    public RentRollService(ApartmentsDbContext db, ILogger<RentRollService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly ILogger<RentRollService> _logger = logger;
 
     public async Task<IReadOnlyList<RentRollRow>> GetRentRollAsync(CancellationToken cancellationToken = default)
     {
@@ -48,12 +42,12 @@ public sealed class RentRollService : IRentRollService
             .ToList();
 
         var orphanTenants = orphanTenantIds.Count == 0
-            ? new Dictionary<Guid, Tenant>()
+            ? []
             : await _db.Tenants.AsNoTracking()
                 .Where(t => orphanTenantIds.Contains(t.Id))
                 .ToDictionaryAsync(t => t.Id, cancellationToken);
 
-        var rows = new List<RentRollRow>(units.Count);
+        List<RentRollRow> rows = new(units.Count);
         var rentFromLease = 0;
         var rentFromRoster = 0;
         var rentMissing = 0;
@@ -120,12 +114,12 @@ public sealed class RentRollService : IRentRollService
         var entries = await _db.LedgerEntries.AsNoTracking()
             .Include(e => e.Tenant)
             .Include(e => e.Unit)
-            .Where(e => !e.IsDeleted)
+            .Where(e => !e.IsDeleted && e.TenantId != null)
             .OrderBy(e => e.DateUtc)
             .ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
 
-        var groups = entries.GroupBy(e => new { e.TenantId, e.UnitId });
+        var groups = entries.GroupBy(e => new { TenantId = e.TenantId!.Value, e.UnitId });
         var rows = new List<DelinquencyRow>();
         foreach (var g in groups)
         {
@@ -169,8 +163,8 @@ public sealed class RentRollService : IRentRollService
         CancellationToken cancellationToken)
     {
         var entries = await _db.LedgerEntries.AsNoTracking()
-            .Where(e => !e.IsDeleted)
-            .Select(e => new { e.TenantId, e.UnitId, e.EntryType, e.Amount })
+            .Where(e => !e.IsDeleted && e.TenantId != null)
+            .Select(e => new { TenantId = e.TenantId!.Value, e.UnitId, e.EntryType, e.Amount })
             .ToListAsync(cancellationToken);
 
         var map = new Dictionary<(Guid, Guid), decimal>();

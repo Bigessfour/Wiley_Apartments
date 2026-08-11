@@ -24,6 +24,7 @@ public interface IMaintenanceService
         MaintenancePriority priority = MaintenancePriority.Normal,
         Guid? assetId = null,
         string? notes = null,
+        Guid? facilityReservationId = null,
         CancellationToken cancellationToken = default);
 
     Task<MaintenanceRequest> UpdateAsync(
@@ -45,6 +46,9 @@ public interface IMaintenanceService
         DateTime? completedUtc = null,
         string? notes = null,
         bool postOperatingCost = true,
+        string? completedByDisplay = null,
+        string? completedByUserId = null,
+        Guid? facilityReservationId = null,
         CancellationToken cancellationToken = default);
 
     Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);

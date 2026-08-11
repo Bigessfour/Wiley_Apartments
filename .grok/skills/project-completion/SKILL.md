@@ -26,8 +26,9 @@ This skill is for **finishers’ block**: planning and implementation are strong
 **Read on demand (don’t dump all into context):**
 - `references/done-levels.md` — D1 / D2 / D3 and honest market comparison
 - `references/session-template.md` — copy-paste log for every surface
-- `references/clerk-suite-surfaces.md` — ClerkSuite / Wiley inventory + order
-  (adapt the same pattern for other multi-page apps)
+- `references/surface-inventory.TEMPLATE.md` — blank inventory for any app
+- `references/clerk-suite-surfaces.md` — **example** inventory (ClerkSuite /
+  Wiley); replace with an app-specific file for other products
 
 For UI polish tokens use **`design-ui`**. For games use **`building-games`**.
 This skill owns **completion workflow**, not visual design systems.
@@ -74,10 +75,13 @@ Details and market honesty: `references/done-levels.md`.
 4. Explicitly list **out of scope** for this pass (deferred e-sign, multi-tenant
    SaaS, etc.) so they don’t re-open as “almost done.”
 
-For ClerkSuite, start from `references/clerk-suite-surfaces.md` (keep it in
-sync with nav if the app changes).
+For **ClerkSuite / Wiley**, start from `references/clerk-suite-surfaces.md`
+(example inventory — keep it in sync with nav if that app changes).
 
-For a generic app: same structure, replace route table.
+For **other apps**, copy `references/surface-inventory.TEMPLATE.md` →
+`references/<app>-surfaces.md` and fill from routes/nav (same section
+structure and status values). Do not treat the ClerkSuite file as the only
+inventory path.
 
 **Persist the inventory** in the repo (`docs/…-COMPLETION.md` or
 `docs/handover/surface-logs/`) so finishing survives chat sessions.

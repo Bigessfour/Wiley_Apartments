@@ -1,0 +1,218 @@
+@page "/community-center/reservations"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject IFacilityReservationService ReservationService
+@inject IFacilityRenterService RenterService
+@inject IUnitService UnitService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject ILogger<FacilityReservationList> Logger
+
+<PageTitle>CC Reservations</PageTitle>
+
+<PageHeader Title="Community Center reservations"
+            Subtitle="Hall bookings appear on the shared schedule when Confirmed.">
+    <SfButton CssClass="e-outline e-small" Content="CC schedule"
+              OnClick="GoSchedule" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<div class="card mb-3 p-3">
+    <h2 class="h6">New reservation</h2>
+    <div class="row g-2">
+        <div class="col-md-4">
+            <label class="form-label">Renter</label>
+            <SfDropDownList TValue="Guid?" TItem="RenterOption" DataSource="@RenterOptions"
+                            @bind-Value="FormRenterId" Placeholder="Select renter">
+                <DropDownListFieldSettings Text="Label" Value="Id" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Start (local)</label>
+            <SfDateTimePicker TValue="DateTime?" @bind-Value="FormStartLocal" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">End (local)</label>
+            <SfDateTimePicker TValue="DateTime?" @bind-Value="FormEndLocal" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Fee</label>
+            <SfNumericTextBox TValue="decimal?" @bind-Value="FormFee" Format="C2" Min="0" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Deposit</label>
+            <SfNumericTextBox TValue="decimal?" @bind-Value="FormDeposit" Format="C2" Min="0" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Notes</label>
+            <SfTextBox @bind-Value="FormNotes" />
+        </div>
+        <div class="col-12">
+            <SfButton CssClass="e-primary e-small" Content="Save as Draft" Disabled="@Busy" OnClick="@(() => SaveAsync(FacilityReservationStatus.Draft))" />
+            <SfButton CssClass="e-success e-small" Content="Save & Confirm" Disabled="@Busy" OnClick="@(() => SaveAsync(FacilityReservationStatus.Confirmed))" />
+        </div>
+    </div>
+</div>
+
+<SfGrid TValue="Row" DataSource="@Rows" AllowPaging="true" AllowSorting="true" Height="360">
+    <GridColumns>
+        <GridColumn Field="@nameof(Row.RenterName)" HeaderText="Renter" Width="160" />
+        <GridColumn Field="@nameof(Row.StartDisplay)" HeaderText="Start" Width="140" />
+        <GridColumn Field="@nameof(Row.EndDisplay)" HeaderText="End" Width="140" />
+        <GridColumn Field="@nameof(Row.Status)" HeaderText="Status" Width="100" />
+        <GridColumn Field="@nameof(Row.Fee)" HeaderText="Fee" Format="C2" Width="90" />
+        <GridColumn Field="@nameof(Row.Deposit)" HeaderText="Deposit" Format="C2" Width="90" />
+        <GridColumn HeaderText="" Width="90">
+            <Template>
+                @{
+                    var row = (Row)context;
+                }
+                <SfButton CssClass="e-small e-link" Content="Open"
+                          OnClick="@(() => Navigation.NavigateTo($"/community-center/reservations/{row.Id}"))" />
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    [SupplyParameterFromQuery(Name = "renterId")] public Guid? QueryRenterId { get; set; }
+
+    private List<Row> Rows { get; set; } = [];
+    private List<RenterOption> RenterOptions { get; set; } = [];
+    private Guid? FacilityUnitId { get; set; }
+    private Guid? FormRenterId { get; set; }
+    private DateTime? FormStartLocal { get; set; }
+    private DateTime? FormEndLocal { get; set; }
+    private decimal? FormFee { get; set; } = 150m;
+    private decimal? FormDeposit { get; set; } = 100m;
+    private string? FormNotes { get; set; }
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var facility = await UnitService.GetFacilityAsync();
+        FacilityUnitId = facility?.Id;
+        var renters = await RenterService.SearchAsync();
+        RenterOptions = renters
+            .Select(r => new RenterOption(r.Id, $"{r.LastName}, {r.FirstName}"))
+            .ToList();
+
+        FormRenterId = QueryRenterId;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var list = await ReservationService.ListAsync(FacilityUnitId);
+            Rows = list.Select(r => new Row
+            {
+                Id = r.Id,
+                RenterName = r.FacilityRenter is null
+                    ? ""
+                    : $"{r.FacilityRenter.LastName}, {r.FacilityRenter.FirstName}",
+                StartDisplay = Clock.ToDisplayTime(r.StartUtc).ToString("g"),
+                EndDisplay = Clock.ToDisplayTime(r.EndUtc).ToString("g"),
+                Status = r.Status.ToString(),
+                Fee = r.RentalFee,
+                Deposit = r.DepositAmount
+            }).ToList();
+            Logger.LogInformation(
+                "FacilityReservationList loaded {Count} reservations for unit {UnitId}.",
+                Rows.Count, FacilityUnitId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationList load failed unit={UnitId}.", FacilityUnitId);
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync(FacilityReservationStatus status)
+    {
+        if (FacilityUnitId is null || FormRenterId is null || FormStartLocal is null || FormEndLocal is null
+            || FormFee is null || FormDeposit is null)
+        {
+            Logger.LogWarning(
+                "FacilityReservationList save blocked: missing required fields status={Status}.", status);
+            ErrorMessage = "Renter, start, end, fee, and deposit are required.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var startUtc = Clock.ToUtc(FormStartLocal.Value);
+            var endUtc = Clock.ToUtc(FormEndLocal.Value);
+            Logger.LogInformation(
+                "FacilityReservationList creating reservation renter={RenterId} unit={UnitId} status={Status} start={Start} end={End}.",
+                FormRenterId, FacilityUnitId, status, startUtc, endUtc);
+            var created = await ReservationService.CreateAsync(new FacilityReservation
+            {
+                UnitId = FacilityUnitId.Value,
+                FacilityRenterId = FormRenterId.Value,
+                StartUtc = startUtc,
+                EndUtc = endUtc,
+                Status = status,
+                RentalFee = FormFee.Value,
+                DepositAmount = FormDeposit.Value,
+                Notes = FormNotes
+            });
+            Logger.LogInformation(
+                "FacilityReservationList created reservation {ReservationId} status={Status}.",
+                created.Id, created.Status);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationList save failed status={Status} renter={RenterId}.",
+                status, FormRenterId);
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void GoSchedule()
+    {
+        if (FacilityUnitId is Guid id)
+        {
+            Logger.LogInformation("FacilityReservationList navigate to schedule unit={UnitId}.", id);
+            Navigation.NavigateTo($"/schedule?unitId={id}");
+        }
+        else
+        {
+            Logger.LogWarning("FacilityReservationList schedule navigation skipped: no facility unit.");
+        }
+    }
+
+    public sealed class Row
+    {
+        public Guid Id { get; set; }
+        public string RenterName { get; set; } = "";
+        public string StartDisplay { get; set; } = "";
+        public string EndDisplay { get; set; } = "";
+        public string Status { get; set; } = "";
+        public decimal Fee { get; set; }
+        public decimal Deposit { get; set; }
+    }
+
+    private sealed record RenterOption(Guid Id, string Label);
+}

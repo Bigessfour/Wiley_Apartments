@@ -5,21 +5,14 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class PortfolioProfitLossService : IPortfolioProfitLossService
+public sealed class PortfolioProfitLossService(
+    ApartmentsDbContext db,
+    IDateTimeService clock,
+    ILogger<PortfolioProfitLossService> logger) : IPortfolioProfitLossService
 {
-    private readonly ApartmentsDbContext _db;
-    private readonly IDateTimeService _clock;
-    private readonly ILogger<PortfolioProfitLossService> _logger;
-
-    public PortfolioProfitLossService(
-        ApartmentsDbContext db,
-        IDateTimeService clock,
-        ILogger<PortfolioProfitLossService> logger)
-    {
-        _db = db;
-        _clock = clock;
-        _logger = logger;
-    }
+    private readonly ApartmentsDbContext _db = db;
+    private readonly IDateTimeService _clock = clock;
+    private readonly ILogger<PortfolioProfitLossService> _logger = logger;
 
     public async Task<PortfolioProfitLossReport> GetAsync(
         ProfitLossPeriod period,
@@ -106,7 +99,7 @@ public sealed class PortfolioProfitLossService : IPortfolioProfitLossService
             series);
     }
 
-    private static IReadOnlyList<PeriodProfitLossPoint> BuildSeries(
+    private static List<PeriodProfitLossPoint> BuildSeries(
         ProfitLossPeriod period,
         DateTime start,
         DateTime end,

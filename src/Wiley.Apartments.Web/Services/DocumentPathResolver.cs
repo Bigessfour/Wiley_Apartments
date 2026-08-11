@@ -7,28 +7,20 @@ using Wiley.Apartments.Web.Data;
 
 namespace Wiley.Apartments.Web.Services;
 
-public sealed class DocumentPathResolver : IDocumentPathResolver
+public sealed class DocumentPathResolver(
+    IServiceScopeFactory scopeFactory,
+    IOptions<ClerkSuiteOptions> options,
+    IHostEnvironment environment,
+    ILogger<DocumentPathResolver> logger) : IDocumentPathResolver
 {
     public const string DocumentRootKey = "DocumentRoot";
 
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ClerkSuiteOptions _options;
-    private readonly IHostEnvironment _environment;
-    private readonly ILogger<DocumentPathResolver> _logger;
-    private readonly object _gate = new();
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly ClerkSuiteOptions _options = options.Value;
+    private readonly IHostEnvironment _environment = environment;
+    private readonly ILogger<DocumentPathResolver> _logger = logger;
+    private readonly Lock _gate = new();
     private string? _cachedRoot;
-
-    public DocumentPathResolver(
-        IServiceScopeFactory scopeFactory,
-        IOptions<ClerkSuiteOptions> options,
-        IHostEnvironment environment,
-        ILogger<DocumentPathResolver> logger)
-    {
-        _scopeFactory = scopeFactory;
-        _options = options.Value;
-        _environment = environment;
-        _logger = logger;
-    }
 
     public string ConfiguredDefaultRoot => Normalize(_options.DocumentRoot);
 

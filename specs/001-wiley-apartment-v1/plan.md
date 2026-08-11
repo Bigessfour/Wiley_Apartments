@@ -408,12 +408,12 @@ tests/Wiley.Apartments.Tests/
 
 Deferred from v1 pilot after clerk feedback. Do **not** implement under 001 tasks; open `specs/002-*` (or append a Phase 9 backlog once T7 sign-off closes) before coding.
 
-| ID | Item | Clerk need | Notes |
-| -- | ---- | ---------- | ----- |
-| **NV-1** | **Payment receipt PDF** | After Paige (or Deb) records/accepts a payment on the ledger, generate a **PDF receipt** the clerk can **print** or **email** to the tenant. | **Implemented 2026-08-10** — `/payments/receipt/{id}`, ledger Receipt button, vault Receipt category. |
-| **NV-4** | **Tenant security deposit panel** | See required/paid/held deposit on Tenant page; record deposit payment. | **Implemented 2026-08-10** — Tenant detail card + `IsDeposit` ledger flag + `PostDepositPaymentAsync`. |
-| NV-2 | DocuSign / e-sign integration | Beyond export-ready PDF | Spec assumption already post-v1. |
-| NV-3 | Facility reservation entity / CC rental agreement PDF | Community Center bookings | Explicitly deferred from CC hub note in tasks.md. |
+| ID       | Item                                                  | Clerk need                                                                                                                                   | Notes                                                                                                  |
+| -------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **NV-1** | **Payment receipt PDF**                               | After Paige (or Deb) records/accepts a payment on the ledger, generate a **PDF receipt** the clerk can **print** or **email** to the tenant. | **Implemented 2026-08-10** — `/payments/receipt/{id}`, ledger Receipt button, vault Receipt category.  |
+| **NV-4** | **Tenant security deposit panel**                     | See required/paid/held deposit on Tenant page; record deposit payment.                                                                       | **Implemented 2026-08-10** — Tenant detail card + `IsDeposit` ledger flag + `PostDepositPaymentAsync`. |
+| NV-2     | DocuSign / e-sign integration                         | Beyond export-ready PDF                                                                                                                      | Spec assumption already post-v1.                                                                       |
+| NV-3     | Facility reservation entity / CC rental agreement PDF | Community Center bookings                                                                                                                    | **Moved 2026-08-11** to [`specs/002-community-center-facility/`](../002-community-center-facility/).   |
 
 **NV-1 acceptance sketch (for 002 specify):**
 

@@ -8,23 +8,16 @@ namespace Wiley.Apartments.Web.Infrastructure;
 /// CSRF protection for cookie-authenticated vault endpoints (T030).
 /// Accepts the standard antiforgery header from SfFileManager OnSend.
 /// </summary>
-public sealed class DocumentVaultAntiforgeryFilter : IAsyncActionFilter
+public sealed class DocumentVaultAntiforgeryFilter(
+    IAntiforgery antiforgery,
+    IHostEnvironment environment,
+    ILogger<DocumentVaultAntiforgeryFilter> logger) : IAsyncActionFilter
 {
     public const string HeaderName = "RequestVerificationToken";
 
-    private readonly IAntiforgery _antiforgery;
-    private readonly IHostEnvironment _environment;
-    private readonly ILogger<DocumentVaultAntiforgeryFilter> _logger;
-
-    public DocumentVaultAntiforgeryFilter(
-        IAntiforgery antiforgery,
-        IHostEnvironment environment,
-        ILogger<DocumentVaultAntiforgeryFilter> logger)
-    {
-        _antiforgery = antiforgery;
-        _environment = environment;
-        _logger = logger;
-    }
+    private readonly IAntiforgery _antiforgery = antiforgery;
+    private readonly IHostEnvironment _environment = environment;
+    private readonly ILogger<DocumentVaultAntiforgeryFilter> _logger = logger;
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {

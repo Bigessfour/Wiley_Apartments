@@ -22,6 +22,11 @@ public sealed class DocumentVaultFileManagerController : Controller
         "delete", "rename", "copy", "move", "create", "upload"
     };
 
+    private static readonly JsonSerializerOptions DownloadJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly string _documentRoot;
     private readonly PhysicalFileProvider _provider = new();
     private readonly IDocumentVaultAuditService _audit;
@@ -133,8 +138,7 @@ public sealed class DocumentVaultFileManagerController : Controller
     public IActionResult Download([FromForm] string downloadInput)
     {
         _provider.RootFolder(_documentRoot);
-        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-        var args = JsonSerializer.Deserialize<FileManagerDirectoryContent>(downloadInput, options)!;
+        var args = JsonSerializer.Deserialize<FileManagerDirectoryContent>(downloadInput, DownloadJsonOptions)!;
         return _provider.Download(args.Path, args.Names, args.Data);
     }
 

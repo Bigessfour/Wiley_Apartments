@@ -481,6 +481,12 @@ h1:focus {
   border-color: #198754 !important;
 }
 
+.e-schedule .e-appointment.cs-sched-facility-rental,
+.cs-sched-facility-rental.e-appointment {
+  background: #6f42c1 !important;
+  border-color: #6f42c1 !important;
+}
+
 .e-schedule .e-appointment.cs-sched-other,
 .cs-sched-other.e-appointment {
   background: #6c757d !important;

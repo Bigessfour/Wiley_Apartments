@@ -6,5 +6,9 @@ public enum DocumentEntityType
     Tenant = 1,
     Asset = 2,
     Lease = 3,
-    MaintenanceRequest = 4
+    MaintenanceRequest = 4,
+    FacilityRenter = 5,
+    FacilityReservation = 6,
+    FacilityInspection = 7,
+    FacilityInventoryItem = 8
 }

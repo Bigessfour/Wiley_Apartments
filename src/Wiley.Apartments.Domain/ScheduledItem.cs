@@ -12,6 +12,8 @@ public class ScheduledItem
     public Tenant? Tenant { get; set; }
     public Guid? LeaseId { get; set; }
     public Lease? Lease { get; set; }
+    public Guid? FacilityReservationId { get; set; }
+    public FacilityReservation? FacilityReservation { get; set; }
     public DateTime StartUtc { get; set; }
     public DateTime? EndUtc { get; set; }
     public DateTime? DueUtc { get; set; }

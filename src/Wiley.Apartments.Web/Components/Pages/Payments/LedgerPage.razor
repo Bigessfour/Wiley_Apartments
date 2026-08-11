@@ -349,11 +349,13 @@
             Rows = lines.Select(l => new LedgerRow
             {
                 EntryId = l.Entry.Id,
-                TenantId = l.Entry.TenantId,
+                TenantId = l.Entry.TenantId ?? Guid.Empty,
                 DateDisplay = Clock.ToDisplayTime(l.Entry.DateUtc).ToString("d"),
-                TenantName = l.Entry.Tenant is null
-                    ? ""
-                    : $"{l.Entry.Tenant.LastName}, {l.Entry.Tenant.FirstName}",
+                TenantName = l.Entry.FacilityRenter is not null
+                    ? $"{l.Entry.FacilityRenter.LastName}, {l.Entry.FacilityRenter.FirstName} (CC)"
+                    : l.Entry.Tenant is null
+                        ? ""
+                        : $"{l.Entry.Tenant.LastName}, {l.Entry.Tenant.FirstName}",
                 UnitNumber = l.Entry.Unit?.Number ?? "",
                 EntryType = l.Entry.IsDeposit
                     ? $"{l.Entry.EntryType} (deposit)"

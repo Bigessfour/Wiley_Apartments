@@ -51,6 +51,12 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IRentRollService, RentRollService>();
         builder.Services.AddScoped<IUnitOperatingCostService, UnitOperatingCostService>();
         builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+        builder.Services.AddScoped<IFacilityRenterService, FacilityRenterService>();
+        builder.Services.AddScoped<IFacilityReservationService, FacilityReservationService>();
+        builder.Services.AddScoped<IFacilityInspectionService, FacilityInspectionService>();
+        builder.Services.AddScoped<IFacilityInventoryService, FacilityInventoryService>();
+        builder.Services.AddSingleton<FacilityRentalAgreementGenerator>();
+        builder.Services.AddScoped<IFacilityRentalAgreementService, FacilityRentalAgreementService>();
         builder.Services.AddScoped<IDashboardService, DashboardService>();
         builder.Services.AddScoped<IPortfolioProfitLossService, PortfolioProfitLossService>();
         builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();

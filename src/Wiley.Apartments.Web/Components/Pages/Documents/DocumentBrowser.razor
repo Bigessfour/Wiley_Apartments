@@ -176,7 +176,11 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         new() { Value = DocumentEntityType.Unit, Text = "Unit" },
         new() { Value = DocumentEntityType.Tenant, Text = "Tenant" },
         new() { Value = DocumentEntityType.Lease, Text = "Lease" },
-        new() { Value = DocumentEntityType.Asset, Text = "Asset" }
+        new() { Value = DocumentEntityType.Asset, Text = "Asset" },
+        new() { Value = DocumentEntityType.FacilityRenter, Text = "CC renter" },
+        new() { Value = DocumentEntityType.FacilityReservation, Text = "CC reservation" },
+        new() { Value = DocumentEntityType.FacilityInspection, Text = "CC inspection" },
+        new() { Value = DocumentEntityType.FacilityInventoryItem, Text = "CC inventory" }
     ];
 
     private static readonly List<CatOption> CategoryOptions =
@@ -295,6 +299,10 @@ else if (!string.IsNullOrEmpty(ViewerHint))
                 DocumentEntityType.Unit => $"units/{UploadEntityId:N}",
                 DocumentEntityType.Tenant => $"tenants/{UploadEntityId:N}",
                 DocumentEntityType.Lease => $"leases/misc/{UploadEntityId:N}",
+                DocumentEntityType.FacilityRenter => $"community-center/renters/{UploadEntityId:N}",
+                DocumentEntityType.FacilityReservation => $"community-center/reservations/{UploadEntityId:N}",
+                DocumentEntityType.FacilityInspection => $"community-center/inspections/{UploadEntityId:N}",
+                DocumentEntityType.FacilityInventoryItem => $"community-center/inventory/{UploadEntityId:N}",
                 _ => $"misc/{UploadEntityId:N}"
             };
             await using var stream = new MemoryStream(_pending.Value.Bytes);

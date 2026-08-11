@@ -1,8 +1,8 @@
 # Spec Kit Done — 001-wiley-apartment-v1
 
-**Verdict:** ✅ DONE  
-**Feature dir:** `specs/001-wiley-apartment-v1`  
-**Checked:** 2026-08-10 · FR-1–FR-7 · plan stack · constitution · organic surfaces (receipts, deposits, dashboard viz, CC hub)  
+**Verdict:** ✅ DONE
+**Feature dir:** `specs/001-wiley-apartment-v1`
+**Checked:** 2026-08-10 · FR-1–FR-7 · plan stack · constitution · organic surfaces (receipts, deposits, dashboard viz, CC hub)
 **Tests:** 120 unit passed
 
 ## Summary
@@ -11,14 +11,14 @@ ClerkSuite v1 product scope is complete and live on DS225+ (`mr-storage:8082`). 
 
 ## Organic scope (added during development)
 
-| Surface | Spec’d? | Status | Evidence |
-| ------- | ------- | ------ | -------- |
-| Payment receipts (NV-1) | backlog → yes | complete | `PaymentReceiptService`, `/payments/receipt` |
-| Security deposits (NV-4) | backlog → yes | complete | `IsDeposit`, tenant deposit panel |
-| Dashboard viz (NV-5/NV-6) | backlog → yes | complete | Home gauges/heatmap/3D, `/reports/rent-pivot` |
-| Community Center hub | converge | complete | `/community-center` |
-| DocuSign (NV-2) | post-v1 | deferred | tasks.md |
-| CC reservation PDF (NV-3) | post-v1 | deferred | tasks.md |
+| Surface                   | Spec’d?       | Status           | Evidence                                                                                          |
+| ------------------------- | ------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
+| Payment receipts (NV-1)   | backlog → yes | complete         | `PaymentReceiptService`, `/payments/receipt`                                                      |
+| Security deposits (NV-4)  | backlog → yes | complete         | `IsDeposit`, tenant deposit panel                                                                 |
+| Dashboard viz (NV-5/NV-6) | backlog → yes | complete         | Home gauges/heatmap/3D, `/reports/rent-pivot`                                                     |
+| Community Center hub      | converge      | complete         | `/community-center`                                                                               |
+| DocuSign (NV-2)           | post-v1       | deferred         | tasks.md                                                                                          |
+| CC reservation PDF (NV-3) | post-v1       | **moved to 002** | [`specs/002-community-center-facility/`](../../specs/002-community-center-facility/) (2026-08-11) |
 
 ## Gaps
 
@@ -38,6 +38,7 @@ _None._
 
 1. Optional: confirm T7.2 with IT and tick the BACKUP-RESTORE table.
 2. Open / merge PR from `feature/phase2-tenants-t2.1` when ready.
+3. **Active Spec Kit development:** [`specs/002-community-center-facility/`](../../specs/002-community-center-facility/) — FacilityRenter, reservations, agreements, inspections, inventory, WO completion (`export SPECIFY_FEATURE=002-community-center-facility`).
 3. Day-to-day: clerks use `http://mr-storage:8082`.
 
 ## Post D2 surface pass (2026-08-11)

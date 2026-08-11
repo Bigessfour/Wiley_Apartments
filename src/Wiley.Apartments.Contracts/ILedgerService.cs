@@ -58,6 +58,43 @@ public interface ILedgerService
 
     Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<LedgerEntry> PostFacilityChargeAsync(
+        Guid facilityRenterId,
+        Guid unitId,
+        Guid facilityReservationId,
+        decimal amount,
+        DateTime dateUtc,
+        string? notes = null,
+        bool isDeposit = false,
+        CancellationToken cancellationToken = default);
+
+    Task<LedgerEntry> PostFacilityPaymentAsync(
+        Guid facilityRenterId,
+        Guid unitId,
+        Guid facilityReservationId,
+        decimal amount,
+        DateTime dateUtc,
+        PaymentMethod method,
+        string? notes = null,
+        bool isDeposit = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Running balance for a facility renter (optionally scoped to one reservation).</summary>
+    Task<decimal> GetFacilityBalanceAsync(
+        Guid facilityRenterId,
+        Guid? facilityReservationId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>True when deposit and/or fee charges already exist for this reservation.</summary>
+    Task<bool> HasFacilityChargesAsync(
+        Guid facilityReservationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>True when any payment exists for this reservation.</summary>
+    Task<bool> HasFacilityPaymentsAsync(
+        Guid facilityReservationId,
+        CancellationToken cancellationToken = default);
+
     Task<int> ApplyLateFeesAsync(
         DateTime? asOfUtc = null,
         CancellationToken cancellationToken = default);

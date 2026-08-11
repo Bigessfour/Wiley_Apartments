@@ -4,16 +4,11 @@ using Microsoft.Playwright;
 namespace Wiley.Apartments.E2ETests;
 
 [Collection("E2E")]
-public class DashboardPageE2ETests : IAsyncLifetime
+public class DashboardPageE2ETests(E2EWebApplicationFactory factory) : IAsyncLifetime
 {
-    private readonly E2EWebApplicationFactory _factory;
+    private readonly E2EWebApplicationFactory _factory = factory;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
-
-    public DashboardPageE2ETests(E2EWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
 
     public async Task InitializeAsync()
     {
