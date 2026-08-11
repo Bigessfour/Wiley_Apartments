@@ -154,7 +154,11 @@
 @code {
     private SfGrid<Unit>? GridRef;
     private List<Unit> Units { get; set; } = [];
+    private List<Unit> AllUnits { get; set; } = [];
     private string? ErrorMessage { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusFilter { get; set; }
     private int ResidentialCount => Units.Count(u => !u.IsFacility);
     private int FacilityCount => Units.Count(u => u.IsFacility);
     private bool CanAddUnit => UnitService.MaxUnits <= 0 || ResidentialCount < UnitService.MaxUnits;
@@ -191,7 +195,25 @@
 
     private async Task ReloadAsync()
     {
-        Units = (await UnitService.GetAllAsync()).ToList();
+        AllUnits = (await UnitService.GetAllAsync()).ToList();
+        ApplyStatusFilter();
+    }
+
+    private void ApplyStatusFilter()
+    {
+        if (string.IsNullOrWhiteSpace(StatusFilter))
+        {
+            Units = AllUnits.ToList();
+            return;
+        }
+
+        var wanted = StatusFilter.Trim().Replace("-", "", StringComparison.Ordinal);
+        Units = AllUnits.Where(u =>
+        {
+            var key = u.Status.ToString().Replace("-", "", StringComparison.Ordinal);
+            return key.Equals(wanted, StringComparison.OrdinalIgnoreCase)
+                   || (wanted.Equals("MakeReady", StringComparison.OrdinalIgnoreCase) && u.Status == UnitStatus.MakeReady);
+        }).ToList();
     }
 
     private void OpenUnit(Guid unitId) => Navigation.NavigateTo($"/units/{unitId}");

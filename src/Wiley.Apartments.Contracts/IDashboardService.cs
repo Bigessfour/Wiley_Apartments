@@ -62,6 +62,7 @@ public sealed record DashboardLeaseRow(
 
 public sealed record DashboardMaintenanceRow(
     Guid Id,
+    Guid UnitId,
     string UnitNumber,
     string Priority,
     string Status,

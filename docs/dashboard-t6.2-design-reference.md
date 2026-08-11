@@ -1,3 +1,5 @@
+> **Superseded for current master:** see `docs/dashboard-full-repo-audit.md` and `docs/dashboard-closeout.md` (phase2 product is on master).
+
 # T6.2 Clerk home dashboard — design reference
 
 ## Goal

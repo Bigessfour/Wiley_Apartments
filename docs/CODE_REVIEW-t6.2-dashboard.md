@@ -1,3 +1,5 @@
+> **Superseded for current master:** see `docs/dashboard-full-repo-audit.md` and `docs/dashboard-closeout.md` (phase2 product is on master).
+
 # Code review — T6.2 dashboard data viz
 
 **Branch:** `feature/t6.2-dashboard-dataviz`  

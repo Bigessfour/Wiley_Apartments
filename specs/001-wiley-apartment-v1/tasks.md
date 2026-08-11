@@ -210,6 +210,7 @@ Clerk schedule for unit-linked date work (cleaning, vacancy, inspections, remind
   - **Done (2026-08-09):** `/` Home.razor SfDashboardLayout + cards; `IDashboardService` snapshot; links to units/leases/maintenance/reports.
   - **Done (2026-08-10):** Phase 1 data-viz — occupancy CircularGauge, collection KPI + sparkline, unit-status doughnut, 12-month rent-collected chart.
   - **Done (2026-08-10):** Phase 2–3 data-viz — LinearGauge collection rate, unit×month HeatMap, chart zoom/pan (range UX), Charts3D P/L by unit, PNG export, layout persistence, `/reports/rent-pivot`.
+  - **Closeout (2026-08-11):** Skeleton + as-of, layout lock default, KPI deep links, vacant/make-ready KPI, WO `unitId` links, urgency chips, single ledger aggregate query, expanded snapshot tests, Syncfusion API review doc.
 
 - [x] **T6.3** Basic exportable reports (rent roll, occupancy, warranty list).
   - **Done when:** Rent roll printable/downloadable; occupancy and warranty status reports available.

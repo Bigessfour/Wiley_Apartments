@@ -180,4 +180,116 @@ public class DashboardServiceTests
             snap.PaymentHeatmap.Should().Contain(c => c.Unit == "301" && c.Month.Contains("Aug") && c.Value == 900);
         }
     }
+
+
+    [Fact]
+    public async Task GetSnapshotAsync_ExcludesFacilityUnitsFromOccupancy()
+    {
+        var (db, service) = Create();
+        await using (db)
+        {
+            db.Units.AddRange(
+                new Unit
+                {
+                    Id = Guid.NewGuid(),
+                    Number = "1",
+                    SqFt = 500,
+                    Beds = 1,
+                    Baths = 1,
+                    Status = UnitStatus.Occupied
+                },
+                new Unit
+                {
+                    Id = Guid.NewGuid(),
+                    Number = "CC",
+                    SqFt = 2000,
+                    Beds = 0,
+                    Baths = 2,
+                    Status = UnitStatus.Occupied,
+                    IsFacility = true
+                });
+            await db.SaveChangesAsync();
+
+            var snap = await service.GetSnapshotAsync();
+            snap.TotalUnits.Should().Be(1);
+            snap.Occupied.Should().Be(1);
+            snap.OccupancyPercent.Should().Be(100);
+        }
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_SplitsLeaseExpirationsAndOpenWorkOrders()
+    {
+        var (db, service) = Create();
+        await using (db)
+        {
+            var unit = new Unit
+            {
+                Id = Guid.NewGuid(),
+                Number = "10",
+                SqFt = 600,
+                Beds = 2,
+                Baths = 1,
+                Status = UnitStatus.Occupied
+            };
+            var tenant = new Tenant
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Pat",
+                LastName = "Resident",
+                IsDeleted = false
+            };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            db.Leases.AddRange(
+                new Lease
+                {
+                    Id = Guid.NewGuid(),
+                    UnitId = unit.Id,
+                    TenantId = tenant.Id,
+                    StartUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EndUtc = new DateTime(2026, 8, 20, 0, 0, 0, DateTimeKind.Utc), // 11 days from clock 8/9
+                    Rent = 800,
+                    Deposit = 800,
+                    Status = LeaseStatus.Active
+                },
+                new Lease
+                {
+                    Id = Guid.NewGuid(),
+                    UnitId = unit.Id,
+                    TenantId = tenant.Id,
+                    StartUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EndUtc = new DateTime(2026, 9, 20, 0, 0, 0, DateTimeKind.Utc), // ~42 days
+                    Rent = 800,
+                    Deposit = 800,
+                    Status = LeaseStatus.Active
+                });
+            db.MaintenanceRequests.Add(new MaintenanceRequest
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                Description = "Leaky faucet",
+                Status = MaintenanceStatus.Open,
+                Priority = MaintenancePriority.High,
+                CreatedUtc = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+            db.ScheduledItems.Add(new ScheduledItem
+            {
+                Id = Guid.NewGuid(),
+                Title = "Inspection",
+                UnitId = unit.Id,
+                Category = ScheduledItemCategory.Inspection,
+                StartUtc = new DateTime(2026, 8, 12, 15, 0, 0, DateTimeKind.Utc),
+                DueUtc = new DateTime(2026, 8, 12, 15, 0, 0, DateTimeKind.Utc),
+                ReminderOffset = TimeSpan.FromDays(2)
+            });
+            await db.SaveChangesAsync();
+
+            var snap = await service.GetSnapshotAsync();
+            snap.ExpiringLeasesWithin30.Should().ContainSingle(l => l.UnitNumber == "10" && l.DaysRemaining <= 30);
+            snap.ExpiringLeasesWithin60.Should().ContainSingle(l => l.DaysRemaining > 30 && l.DaysRemaining <= 60);
+            snap.OpenWorkOrders.Should().ContainSingle(w => w.Description.Contains("faucet") && w.UnitId == unit.Id);
+            snap.ScheduleReminders.Should().NotBeEmpty();
+        }
+    }
 }
