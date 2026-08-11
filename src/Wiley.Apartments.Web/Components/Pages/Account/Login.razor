@@ -8,6 +8,7 @@
 @using Syncfusion.Blazor.Inputs
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
+@inject ILogger<Login> Logger
 @using Wiley.Apartments.Web.Infrastructure
 
 <PageTitle>Sign in — ClerkSuite</PageTitle>
@@ -68,12 +69,14 @@
 
         if (result.Succeeded)
         {
+            Logger.LogInformation("Sign-in succeeded for {Email}.", Input.Email);
             Navigation.NavigateTo(
                 LoginRedirectHelper.GetSafeReturnUrl(ReturnUrl),
                 forceLoad: true);
             return;
         }
 
+        Logger.LogWarning("Sign-in failed for {Email}.", Input.Email);
         ErrorMessage = "Invalid email or password.";
     }
 

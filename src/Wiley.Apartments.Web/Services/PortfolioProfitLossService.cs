@@ -9,11 +9,16 @@ public sealed class PortfolioProfitLossService : IPortfolioProfitLossService
 {
     private readonly ApartmentsDbContext _db;
     private readonly IDateTimeService _clock;
+    private readonly ILogger<PortfolioProfitLossService> _logger;
 
-    public PortfolioProfitLossService(ApartmentsDbContext db, IDateTimeService clock)
+    public PortfolioProfitLossService(
+        ApartmentsDbContext db,
+        IDateTimeService clock,
+        ILogger<PortfolioProfitLossService> logger)
     {
         _db = db;
         _clock = clock;
+        _logger = logger;
     }
 
     public async Task<PortfolioProfitLossReport> GetAsync(
@@ -81,6 +86,14 @@ public sealed class PortfolioProfitLossService : IPortfolioProfitLossService
         var totalExpense = costs.Sum(c => c.Amount);
 
         var series = BuildSeries(period, start, end, payments, costs);
+
+        _logger.LogInformation(
+            "Portfolio P/L {Period}: income {Income:C}, expense {Expense:C}, net {Net:C} ({UnitCount} unit rows).",
+            period,
+            totalIncome,
+            totalExpense,
+            totalIncome - totalExpense,
+            byUnit.Count);
 
         return new PortfolioProfitLossReport(
             period,

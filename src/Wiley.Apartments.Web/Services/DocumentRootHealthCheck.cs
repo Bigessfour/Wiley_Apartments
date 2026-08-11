@@ -9,10 +9,12 @@ namespace Wiley.Apartments.Web.Services;
 public sealed class DocumentRootHealthCheck : IHealthCheck
 {
     private readonly IDocumentPathResolver _paths;
+    private readonly ILogger<DocumentRootHealthCheck> _logger;
 
-    public DocumentRootHealthCheck(IDocumentPathResolver paths)
+    public DocumentRootHealthCheck(IDocumentPathResolver paths, ILogger<DocumentRootHealthCheck> logger)
     {
         _paths = paths;
+        _logger = logger;
     }
 
     public Task<HealthCheckResult> CheckHealthAsync(
@@ -25,6 +27,7 @@ public sealed class DocumentRootHealthCheck : IHealthCheck
             Directory.CreateDirectory(root);
             if (!Directory.Exists(root))
             {
+                _logger.LogWarning("Document root health check failed: '{Root}' does not exist.", root);
                 return Task.FromResult(HealthCheckResult.Unhealthy(
                     $"Document root '{root}' does not exist. Check NAS share mount."));
             }
@@ -36,6 +39,7 @@ public sealed class DocumentRootHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Document root health check failed (NAS share unavailable).");
             return Task.FromResult(HealthCheckResult.Unhealthy(
                 "Document root unavailable — do not report documents as saved. Contact IT / check NAS share.",
                 ex));

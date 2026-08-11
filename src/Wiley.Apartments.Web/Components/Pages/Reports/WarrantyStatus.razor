@@ -8,6 +8,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ILogger<WarrantyStatus> Logger
 
 <PageTitle>Warranty status</PageTitle>
 
@@ -73,6 +74,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "WarrantyStatus operation failed.");
             ErrorMessage = ex.Message;
         }
     }

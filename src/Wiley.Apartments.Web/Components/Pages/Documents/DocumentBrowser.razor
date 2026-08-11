@@ -21,6 +21,7 @@
 @inject AntiforgeryStateProvider AntiforgeryState
 @inject CircuitAuthCookieAccessor CircuitCookies
 @inject IClerkToast Toast
+@inject ILogger<DocumentBrowser> Logger
 
 <PageTitle>Document vault</PageTitle>
 
@@ -246,6 +247,7 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Document vault list failed.");
             ErrorMessage = ex.Message;
         }
     }
@@ -311,6 +313,7 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Document vault upload failed for {EntityType} {EntityId}.", UploadEntityType, UploadEntityId);
             ErrorMessage = ex.Message;
         }
         finally

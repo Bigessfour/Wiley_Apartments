@@ -15,6 +15,7 @@
 @inject AuthenticationStateProvider AuthState
 @inject Microsoft.Extensions.Options.IOptions<ClerkSuiteOptions> ClerkOptions
 @inject IHostEnvironment HostEnvironment
+@inject ILogger<Settings> Logger
 @using Microsoft.Extensions.Hosting
 
 <PageTitle>Settings</PageTitle>
@@ -274,6 +275,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Settings operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -302,6 +304,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Settings operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -324,6 +327,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Settings operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -356,6 +360,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Settings operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -377,6 +382,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Settings operation failed.");
             ErrorMessage = ex.Message;
         }
         finally

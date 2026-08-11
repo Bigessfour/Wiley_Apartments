@@ -368,6 +368,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Ledger page load failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -459,6 +460,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Ledger save failed for tenant {TenantId} unit {UnitId}.", FormTenantId, FormUnitId);
             ErrorMessage = ex.Message;
         }
         finally
@@ -484,6 +486,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Generate rent charges failed.");
             ErrorMessage = ex.Message;
         }
         finally

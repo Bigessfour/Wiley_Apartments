@@ -8,6 +8,7 @@
 @inject IUnitService UnitService
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ILogger<MaintenanceCosts> Logger
 
 <PageTitle>Maintenance cost by unit</PageTitle>
 
@@ -64,6 +65,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "MaintenanceCosts operation failed.");
             ErrorMessage = ex.Message;
         }
     }

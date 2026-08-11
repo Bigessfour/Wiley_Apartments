@@ -4,11 +4,15 @@
 @using Microsoft.AspNetCore.Identity
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
+@inject ILogger<Logout> Logger
+@inject IHttpContextAccessor HttpContextAccessor
 
 @code {
     protected override async Task OnInitializedAsync()
     {
+        var user = HttpContextAccessor.HttpContext?.User?.Identity?.Name ?? "unknown";
         await SignInManager.SignOutAsync();
+        Logger.LogInformation("Sign-out completed for {User}.", user);
         Navigation.NavigateTo("/Account/Login", forceLoad: true);
     }
 }

@@ -132,6 +132,11 @@ public sealed class UnitOperatingCostService : IUnitOperatingCostService
         cost.Vendor = Trim(vendor, 256);
         cost.Notes = Trim(notes, 2000);
         await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Updated ops cost {Id} {Category} {Amount}.",
+            cost.Id,
+            category,
+            cost.Amount);
         return (await GetByIdAsync(cost.Id, cancellationToken))!;
     }
 
@@ -142,6 +147,7 @@ public sealed class UnitOperatingCostService : IUnitOperatingCostService
                    ?? throw new InvalidOperationException($"Operating cost {id} was not found.");
         cost.IsDeleted = true;
         await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Soft-deleted ops cost {Id}.", id);
     }
 
     private async Task EnsureUnitExistsAsync(Guid? unitId, CancellationToken cancellationToken)

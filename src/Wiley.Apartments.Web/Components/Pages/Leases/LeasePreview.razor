@@ -18,6 +18,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthState
 @inject IClerkToast Toast
+@inject ILogger<LeasePreview> Logger
 
 <PageTitle>Lease preview</PageTitle>
 
@@ -344,6 +345,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "LeasePreview operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -374,6 +376,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "LeasePreview operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -404,6 +407,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "LeasePreview operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -473,6 +477,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "LeasePreview operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -525,6 +530,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "LeasePreview operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -573,6 +579,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "LeasePreview operation failed.");
             ErrorMessage = ex.Message;
         }
         finally

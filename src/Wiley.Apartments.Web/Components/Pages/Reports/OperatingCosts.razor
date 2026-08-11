@@ -11,6 +11,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ILogger<OperatingCosts> Logger
 
 <PageTitle>Operating costs</PageTitle>
 
@@ -153,6 +154,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OperatingCosts operation failed.");
             ErrorMessage = ex.Message;
         }
     }
@@ -184,6 +186,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OperatingCosts operation failed.");
             ErrorMessage = ex.Message;
         }
         finally

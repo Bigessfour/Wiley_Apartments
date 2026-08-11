@@ -28,7 +28,8 @@ public class LedgerServiceTests
         db.Database.EnsureCreated();
         var lateFees = new LateFeeSettingsService(
             db,
-            Options.Create(new ClerkSuiteOptions()));
+            Options.Create(new ClerkSuiteOptions()),
+            NullLogger<LateFeeSettingsService>.Instance);
         var clock = new FixedClock();
         var service = new LedgerService(db, lateFees, clock, NullLogger<LedgerService>.Instance);
         return (db, service, lateFees, clock);

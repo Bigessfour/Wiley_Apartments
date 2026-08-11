@@ -12,6 +12,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IClerkToast Toast
+@inject ILogger<MaintenanceList> Logger
 
 <PageTitle>Maintenance</PageTitle>
 
@@ -217,6 +218,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "MaintenanceList operation failed.");
             ErrorMessage = ex.Message;
         }
     }
@@ -265,6 +267,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "MaintenanceList operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -293,6 +296,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "MaintenanceList operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -327,6 +331,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "MaintenanceList operation failed.");
             ErrorMessage = ex.Message;
         }
         finally

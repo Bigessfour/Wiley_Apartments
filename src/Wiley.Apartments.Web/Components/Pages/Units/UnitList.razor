@@ -8,6 +8,7 @@
 @using Wiley.Apartments.Domain
 @inject IUnitService UnitService
 @inject NavigationManager Navigation
+@inject ILogger<UnitList> Logger
 
 <PageTitle>Units</PageTitle>
 
@@ -298,6 +299,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "UnitList operation failed.");
             ErrorMessage = ex.Message;
             await ReloadAsync();
             if (GridRef is not null)

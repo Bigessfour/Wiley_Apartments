@@ -13,6 +13,7 @@ public sealed class DashboardService : IDashboardService
     private readonly IMaintenanceService _maintenance;
     private readonly IScheduleService _schedule;
     private readonly IDateTimeService _clock;
+    private readonly ILogger<DashboardService> _logger;
 
     public DashboardService(
         ApartmentsDbContext db,
@@ -20,7 +21,8 @@ public sealed class DashboardService : IDashboardService
         ILeaseService leases,
         IMaintenanceService maintenance,
         IScheduleService schedule,
-        IDateTimeService clock)
+        IDateTimeService clock,
+        ILogger<DashboardService> logger)
     {
         _db = db;
         _rentRoll = rentRoll;
@@ -28,6 +30,7 @@ public sealed class DashboardService : IDashboardService
         _maintenance = maintenance;
         _schedule = schedule;
         _clock = clock;
+        _logger = logger;
     }
 
     public async Task<DashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
@@ -142,7 +145,7 @@ public sealed class DashboardService : IDashboardService
                 x.Item.Category.ToString()))
             .ToList();
 
-        return new DashboardSnapshot(
+        var snapshot = new DashboardSnapshot(
             total,
             occupied,
             vacant,
@@ -163,6 +166,19 @@ public sealed class DashboardService : IDashboardService
             collectionByMonth,
             collectionRate,
             heatmap);
+
+        _logger.LogInformation(
+            "Dashboard snapshot: {Occupied}/{Total} occupied ({OccupancyPercent}%), collected {Collected:C} of {Expected:C} ({CollectionRate}%), {Delinquencies} delinquent, {OpenWo} open WO.",
+            occupied,
+            total,
+            occupancyPercent,
+            collectedThisMonth,
+            expectedRent,
+            collectionRate,
+            delinquencies.Count,
+            openWo.Count);
+
+        return snapshot;
     }
 
     private (DateTime StartUtc, DateTime EndUtc) CurrentLocalMonthUtcRange(DateTime utcNow)
@@ -267,7 +283,7 @@ public sealed class DashboardService : IDashboardService
             })
             .ToListAsync(cancellationToken);
 
-        return rows.Select(e =>
+        var pivot = rows.Select(e =>
         {
             var local = _clock.ToDisplayTime(e.DateUtc);
             var type = e.EntryType == LedgerEntryType.Charge
@@ -282,6 +298,9 @@ public sealed class DashboardService : IDashboardService
                 e.EntryType == LedgerEntryType.Payment ? e.Amount : 0m,
                 e.EntryType == LedgerEntryType.Charge ? e.Amount : 0m);
         }).ToList();
+
+        _logger.LogInformation("Rent pivot loaded {RowCount} ledger row(s).", pivot.Count);
+        return pivot;
     }
 
     private static DashboardLeaseRow ToLeaseRow(Lease l, DateTime now) =>

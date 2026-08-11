@@ -540,6 +540,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Household member edit failed for tenant {TenantId}.", TenantId);
             ErrorMessage = ex.Message;
             await ReloadAsync();
         }
@@ -577,6 +578,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Vehicle edit failed for tenant {TenantId}.", TenantId);
             ErrorMessage = ex.Message;
             await ReloadAsync();
         }
@@ -614,6 +616,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Pet edit failed for tenant {TenantId}.", TenantId);
             ErrorMessage = ex.Message;
             await ReloadAsync();
         }

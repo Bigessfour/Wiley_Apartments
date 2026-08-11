@@ -20,6 +20,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IClerkToast Toast
+@inject ILogger<UnitDetail> Logger
 
 <PageTitle>Unit @Unit?.Number</PageTitle>
 
@@ -582,6 +583,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "UnitDetail operation failed.");
             LayoutError = ex.Message;
             await LoadAsync();
         }
@@ -682,6 +684,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "UnitDetail operation failed.");
             OccupancyError = ex.Message;
         }
     }
@@ -696,6 +699,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "UnitDetail operation failed.");
             OccupancyError = ex.Message;
         }
     }
@@ -742,6 +746,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "UnitDetail operation failed.");
             GridError = ex.Message;
             await ReloadInventoryAsync();
             if (AssetGridRef is not null)
@@ -791,6 +796,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "UnitDetail operation failed.");
             GridError = ex.Message;
             await ReloadInventoryAsync();
             if (FlooringGridRef is not null)

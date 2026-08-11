@@ -8,6 +8,7 @@
 @inject IPortfolioProfitLossService ProfitLoss
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ILogger<PortfolioProfitLoss> Logger
 
 <PageTitle>Portfolio P/L</PageTitle>
 
@@ -154,6 +155,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "PortfolioProfitLoss operation failed.");
             ErrorMessage = ex.Message;
         }
     }

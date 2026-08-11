@@ -11,11 +11,16 @@ public sealed class LateFeeSettingsService : ILateFeeSettingsService
 {
     private readonly ApartmentsDbContext _db;
     private readonly ClerkSuiteOptions _defaults;
+    private readonly ILogger<LateFeeSettingsService> _logger;
 
-    public LateFeeSettingsService(ApartmentsDbContext db, IOptions<ClerkSuiteOptions> options)
+    public LateFeeSettingsService(
+        ApartmentsDbContext db,
+        IOptions<ClerkSuiteOptions> options,
+        ILogger<LateFeeSettingsService> logger)
     {
         _db = db;
         _defaults = options.Value;
+        _logger = logger;
     }
 
     public async Task<LateFeeSettings> GetAsync(CancellationToken cancellationToken = default)
@@ -67,6 +72,11 @@ public sealed class LateFeeSettingsService : ILateFeeSettingsService
         row.Amount = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
         row.GraceDays = graceDays;
         await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation(
+            "Updated late-fee settings: Enabled={Enabled}, Amount={Amount}, GraceDays={GraceDays}.",
+            row.Enabled,
+            row.Amount,
+            row.GraceDays);
         return await GetAsync(cancellationToken);
     }
 }

@@ -5,6 +5,7 @@
 @using Wiley.Apartments.Contracts
 @inject IRentRollService RentRollService
 @inject NavigationManager Navigation
+@inject ILogger<RentRoll> Logger
 
 <PageTitle>Rent roll</PageTitle>
 
@@ -50,6 +51,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "RentRoll operation failed.");
             ErrorMessage = ex.Message;
         }
     }

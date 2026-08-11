@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Domain;
 using Wiley.Apartments.Web.Data;
@@ -25,7 +26,7 @@ public class PortfolioProfitLossServiceTests
         var db = new ApartmentsDbContext(options);
         db.Database.EnsureCreated();
         var clock = new FixedClock();
-        return (db, new PortfolioProfitLossService(db, clock), clock);
+        return (db, new PortfolioProfitLossService(db, clock, NullLogger<PortfolioProfitLossService>.Instance), clock);
     }
 
     [Fact]

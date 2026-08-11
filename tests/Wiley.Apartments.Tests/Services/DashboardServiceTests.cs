@@ -48,7 +48,14 @@ public class DashboardServiceTests
         var ops = new UnitOperatingCostService(db, NullLogger<UnitOperatingCostService>.Instance);
         var maintenance = new MaintenanceService(db, ops, clock, NullLogger<MaintenanceService>.Instance);
         var schedule = new ScheduleService(db, clock, NullLogger<ScheduleService>.Instance);
-        var service = new DashboardService(db, rentRoll, leases, maintenance, schedule, clock);
+        var service = new DashboardService(
+            db,
+            rentRoll,
+            leases,
+            maintenance,
+            schedule,
+            clock,
+            NullLogger<DashboardService>.Instance);
         return (db, service);
     }
 

@@ -12,6 +12,7 @@
 @inject IDateTimeService Clock
 @inject IClerkToast Toast
 @inject NavigationManager Navigation
+@inject ILogger<OperationsCalendar> Logger
 
 <PageTitle>Operations calendar</PageTitle>
 
@@ -182,6 +183,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OperationsCalendar operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -233,6 +235,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OperationsCalendar operation failed.");
             ErrorMessage = ex.Message;
         }
         finally
@@ -334,6 +337,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "OperationsCalendar operation failed.");
             ErrorMessage = ex.Message;
             await ReloadAsync();
         }

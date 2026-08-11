@@ -10,6 +10,7 @@
 @inject ILedgerService LedgerService
 @inject IOccupancyService OccupancyService
 @inject NavigationManager Navigation
+@inject ILogger<TenantList> Logger
 
 <PageTitle>Tenants</PageTitle>
 
@@ -196,6 +197,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "TenantList operation failed.");
             ErrorMessage = ex.Message;
             await ReloadAsync();
             if (GridRef is not null)

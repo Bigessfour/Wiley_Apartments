@@ -17,6 +17,7 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
+@inject ILogger<Home> Logger
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
@@ -642,6 +643,7 @@ else
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Dashboard load failed.");
             Snap = null;
             ErrorMessage = "Could not load dashboard. " + ex.Message;
         }

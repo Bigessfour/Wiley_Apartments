@@ -5,6 +5,7 @@
 @using Wiley.Apartments.Domain
 @inject IAuditQueryService AuditQuery
 @inject IDateTimeService Clock
+@inject ILogger<AuditLogList> Logger
 
 <PageTitle>Audit log</PageTitle>
 
@@ -80,6 +81,7 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "AuditLogList operation failed.");
             ErrorMessage = ex.Message;
         }
     }

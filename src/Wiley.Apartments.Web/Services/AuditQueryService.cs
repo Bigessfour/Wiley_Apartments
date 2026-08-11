@@ -8,8 +8,13 @@ namespace Wiley.Apartments.Web.Services;
 public sealed class AuditQueryService : IAuditQueryService
 {
     private readonly ApartmentsDbContext _db;
+    private readonly ILogger<AuditQueryService> _logger;
 
-    public AuditQueryService(ApartmentsDbContext db) => _db = db;
+    public AuditQueryService(ApartmentsDbContext db, ILogger<AuditQueryService> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     public async Task<IReadOnlyList<AuditLog>> QueryAsync(
         string? entityType = null,
@@ -42,9 +47,18 @@ public sealed class AuditQueryService : IAuditQueryService
             query = query.Where(a => a.TimestampUtc <= toUtc);
         }
 
-        return await query
+        var rows = await query
             .OrderByDescending(a => a.TimestampUtc)
             .Take(take)
             .ToListAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Audit log queried: returned {Count} (take={Take}, entityType={EntityType}, userId={UserId}).",
+            rows.Count,
+            take,
+            entityType ?? "*",
+            string.IsNullOrWhiteSpace(userId) ? "*" : userId);
+
+        return rows;
     }
 }
