@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.Buttons
 @using Wiley.Apartments.Contracts
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
@@ -11,18 +12,49 @@
         <h1 class="h3 mb-1">Dashboard</h1>
         <p class="text-muted mb-0">Portfolio health for Town of Wiley units</p>
     </div>
-    <p class="text-muted small mb-0 tabular-nums">
-        As of @DisplayTime
-    </p>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <p class="text-muted small mb-0 tabular-nums">
+            @if (LoadedAtDisplay is not null)
+            {
+                <span>As of @LoadedAtDisplay</span>
+            }
+        </p>
+        <SfButton CssClass="e-outline e-small"
+                  Content="Refresh"
+                  Disabled="@(IsLoading)"
+                  OnClick="RefreshAsync" />
+    </div>
 </div>
 
 @if (LoadError is not null)
 {
-    <div class="alert alert-danger">@LoadError</div>
+    <div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
+        <span>@LoadError</span>
+        <SfButton CssClass="e-small e-outline" Content="Retry" OnClick="RefreshAsync" />
+    </div>
 }
-else if (Snapshot is null)
+else if (IsLoading || Snapshot is null)
 {
-    <p class="text-muted">Loading dashboard…</p>
+    <div class="dashboard-skeleton" aria-busy="true" aria-live="polite">
+        <div class="row g-3 mb-3">
+            @for (var i = 0; i < 4; i++)
+            {
+                <div class="col-md-6 col-xl-3">
+                    <div class="skeleton-card">
+                        <div class="skeleton-line w-40"></div>
+                        <div class="skeleton-line w-60 skeleton-lg"></div>
+                        <div class="skeleton-line w-80"></div>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-lg-4"><div class="skeleton-card skeleton-tall"></div></div>
+            <div class="col-lg-8"><div class="skeleton-card skeleton-tall"></div></div>
+        </div>
+        <div class="skeleton-card skeleton-table"></div>
+        <p class="text-muted small mt-2 mb-0">Loading dashboard…</p>
+    </div>
 }
 else
 {
@@ -37,20 +69,26 @@ else
             <DashboardLayoutPanel Id="kpi-occupancy" SizeX="3" SizeY="1" Row="0" Column="0">
                 <HeaderTemplate><div>Occupancy</div></HeaderTemplate>
                 <ContentTemplate>
-                    <div class="kpi-panel">
+                    <button type="button"
+                            class="kpi-panel kpi-panel-btn @(StatusFilter == "Occupied" ? "is-active" : null)"
+                            @onclick='() => ToggleStatusFilter("Occupied")'>
                         <p class="kpi-metric">@Snapshot.OccupancyRate.ToString("0.#")%</p>
                         <p class="kpi-sub">@Snapshot.OccupiedCount of @Snapshot.TotalUnits units occupied</p>
-                    </div>
+                        <p class="kpi-hint">Filter portfolio: Occupied</p>
+                    </button>
                 </ContentTemplate>
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="kpi-vacant" SizeX="3" SizeY="1" Row="0" Column="3">
                 <HeaderTemplate><div>Vacant / Make-Ready</div></HeaderTemplate>
                 <ContentTemplate>
-                    <div class="kpi-panel">
+                    <button type="button"
+                            class="kpi-panel kpi-panel-btn @(StatusFilter is "Vacant" or "Make-Ready" ? "is-active" : null)"
+                            @onclick="ToggleVacantMakeReadyFilter">
                         <p class="kpi-metric">@(Snapshot.VacantCount + Snapshot.MakeReadyCount)</p>
                         <p class="kpi-sub">@Snapshot.VacantCount vacant · @Snapshot.MakeReadyCount make-ready</p>
-                    </div>
+                        <p class="kpi-hint">Filter portfolio: Vacant + Make-Ready</p>
+                    </button>
                 </ContentTemplate>
             </DashboardLayoutPanel>
 
@@ -59,7 +97,10 @@ else
                 <ContentTemplate>
                     <div class="kpi-panel">
                         <p class="kpi-metric">@Snapshot.OpenWorkOrders</p>
-                        <p class="kpi-sub">Maintenance module not yet active</p>
+                        <p class="kpi-sub">
+                            <span class="badge text-bg-secondary fw-normal">Deferred</span>
+                            Maintenance module not yet active
+                        </p>
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
@@ -69,7 +110,10 @@ else
                 <ContentTemplate>
                     <div class="kpi-panel">
                         <p class="kpi-metric">@Snapshot.DelinquentAmount.ToString("C0")</p>
-                        <p class="kpi-sub">@Snapshot.DelinquentCount unit@(Snapshot.DelinquentCount == 1 ? "" : "s") · payments deferred</p>
+                        <p class="kpi-sub">
+                            <span class="badge text-bg-secondary fw-normal">Deferred</span>
+                            Payments module not yet active
+                        </p>
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
@@ -80,12 +124,20 @@ else
                     <ul class="status-mix list-unstyled mb-0">
                         @foreach (var s in Snapshot.StatusBreakdown)
                         {
-                            <li class="d-flex justify-content-between py-1 border-bottom">
-                                <span>@s.Name</span>
-                                <strong class="tabular-nums">@s.Count</strong>
+                            <li>
+                                <button type="button"
+                                        class="status-mix-btn @(StatusFilter == s.Name ? "is-active" : null)"
+                                        @onclick="() => ToggleStatusFilter(s.Name)">
+                                    <span>@s.Name</span>
+                                    <strong class="tabular-nums">@s.Count</strong>
+                                </button>
                             </li>
                         }
                     </ul>
+                    @if (StatusFilter is not null)
+                    {
+                        <button type="button" class="btn btn-link btn-sm px-0 mt-2" @onclick="ClearFilter">Clear filter</button>
+                    }
                 </ContentTemplate>
             </DashboardLayoutPanel>
 
@@ -115,7 +167,9 @@ else
                                             <td><a href="@($"/units/{row.UnitId}")">@row.UnitNumber</a></td>
                                             <td>@row.AssetType</td>
                                             <td class="tabular-nums">@row.WarrantyEnd.ToString("MM/dd/yyyy")</td>
-                                            <td class="text-end tabular-nums">@row.DaysLeft</td>
+                                            <td class="text-end tabular-nums">
+                                                <span class="@(row.DaysLeft <= 30 ? "text-warning fw-semibold" : null)">@row.DaysLeft</span>
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -126,8 +180,29 @@ else
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="rent-roll" SizeX="12" SizeY="3" Row="3" Column="0">
-                <HeaderTemplate><div>Unit portfolio</div></HeaderTemplate>
+                <HeaderTemplate>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 w-100">
+                        <span>Unit portfolio</span>
+                        @if (StatusFilter is not null)
+                        {
+                            <span class="badge text-bg-primary fw-normal">@FilterLabel</span>
+                        }
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
+                    <div class="portfolio-filters mb-2" role="group" aria-label="Status filter">
+                        <button type="button"
+                                class="filter-chip @(StatusFilter is null ? "is-active" : null)"
+                                @onclick="ClearFilter">All (@Snapshot.TotalUnits)</button>
+                        @foreach (var s in Snapshot.StatusBreakdown)
+                        {
+                            <button type="button"
+                                    class="filter-chip @(StatusFilter == s.Name ? "is-active" : null)"
+                                    @onclick="() => ToggleStatusFilter(s.Name)">
+                                @s.Name (@s.Count)
+                            </button>
+                        }
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle mb-0">
                             <thead>
@@ -140,15 +215,24 @@ else
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var row in Snapshot.Units)
+                                @if (FilteredUnits.Count == 0)
                                 {
                                     <tr>
-                                        <td><a href="@($"/units/{row.Id}")">@row.Number</a></td>
-                                        <td>@row.Status</td>
-                                        <td class="text-end tabular-nums">@row.Beds</td>
-                                        <td class="text-end tabular-nums">@row.Baths</td>
-                                        <td class="text-end tabular-nums">@row.SqFt.ToString("N0")</td>
+                                        <td colspan="5" class="text-muted small">No units match this filter.</td>
                                     </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var row in FilteredUnits)
+                                    {
+                                        <tr>
+                                            <td><a href="@($"/units/{row.Id}")">@row.Number</a></td>
+                                            <td>@row.Status</td>
+                                            <td class="text-end tabular-nums">@row.Beds</td>
+                                            <td class="text-end tabular-nums">@row.Baths</td>
+                                            <td class="text-end tabular-nums">@row.SqFt.ToString("N0")</td>
+                                        </tr>
+                                    }
                                 }
                             </tbody>
                         </table>
@@ -165,19 +249,86 @@ else
 
     private DashboardSnapshot? Snapshot { get; set; }
     private string? LoadError { get; set; }
+    private bool IsLoading { get; set; } = true;
+    private string? StatusFilter { get; set; }
+    private bool VacantMakeReadyMode { get; set; }
+    private string? LoadedAtDisplay { get; set; }
 
-    private string DisplayTime =>
-        DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
-
-    protected override async Task OnInitializedAsync()
+    private IReadOnlyList<UnitStatusRow> FilteredUnits
     {
+        get
+        {
+            if (Snapshot is null)
+            {
+                return Array.Empty<UnitStatusRow>();
+            }
+
+            if (VacantMakeReadyMode)
+            {
+                return Snapshot.Units
+                    .Where(u => u.Status is "Vacant" or "Make-Ready")
+                    .ToList();
+            }
+
+            if (StatusFilter is null)
+            {
+                return Snapshot.Units;
+            }
+
+            return Snapshot.Units.Where(u => u.Status == StatusFilter).ToList();
+        }
+    }
+
+    private string FilterLabel => VacantMakeReadyMode
+        ? "Vacant + Make-Ready"
+        : StatusFilter ?? "All";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task RefreshAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        IsLoading = true;
+        LoadError = null;
         try
         {
             Snapshot = await DashboardService.GetSnapshotAsync();
+            LoadedAtDisplay = DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
         }
         catch (Exception ex)
         {
+            Snapshot = null;
             LoadError = "Could not load dashboard. " + ex.Message;
         }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ToggleStatusFilter(string status)
+    {
+        VacantMakeReadyMode = false;
+        StatusFilter = StatusFilter == status ? null : status;
+    }
+
+    private void ToggleVacantMakeReadyFilter()
+    {
+        if (VacantMakeReadyMode)
+        {
+            VacantMakeReadyMode = false;
+            StatusFilter = null;
+            return;
+        }
+
+        VacantMakeReadyMode = true;
+        StatusFilter = null;
+    }
+
+    private void ClearFilter()
+    {
+        StatusFilter = null;
+        VacantMakeReadyMode = false;
     }
 }
