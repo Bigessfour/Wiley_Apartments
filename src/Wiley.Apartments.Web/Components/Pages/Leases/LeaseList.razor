@@ -1,6 +1,8 @@
 @page "/leases"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @inject ILeaseService LeaseService
@@ -18,10 +20,11 @@
 }
 
 <SfGrid TValue="Lease" DataSource="@Leases" AllowPaging="true" AllowSorting="true" AllowFiltering="true" Height="420">
+    <GridEvents TValue="Lease" OnRecordDoubleClick="OnLeaseDoubleClick" />
     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridTemplates>
         <EmptyRecordTemplate>
-            <div class="grid-empty-hint">No leases yet — use New lease on the toolbar.</div>
+            <div class="grid-empty-hint">No leases yet — use New lease above.</div>
         </EmptyRecordTemplate>
     </GridTemplates>
     <GridColumns>
@@ -67,6 +70,14 @@
 @code {
     private List<Lease> Leases { get; set; } = [];
     private string? ErrorMessage { get; set; }
+
+    private void OnLeaseDoubleClick(RecordDoubleClickEventArgs<Lease> args)
+    {
+        if (args.RowData is Lease lease)
+        {
+            Navigation.NavigateTo($"/leases/{lease.Id}");
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

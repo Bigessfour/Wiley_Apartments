@@ -122,7 +122,7 @@ else
     {
         Templates = (await LeaseService.ListTemplatesAsync()).ToList();
         SelectedTemplate = Templates.FirstOrDefault()?.FileName;
-        Units = (await UnitService.GetAllAsync()).OrderBy(u => u.Number).ToList();
+        Units = (await UnitService.GetAllAsync()).Where(u => !u.IsFacility).OrderBy(u => u.Number).ToList();
         Tenants = (await TenantService.SearchAsync())
             .OrderBy(t => t.LastName)
             .ThenBy(t => t.FirstName)
