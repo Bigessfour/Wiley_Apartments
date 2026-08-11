@@ -1,21 +1,186 @@
-﻿@page "/"
+@page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Buttons
+@using Wiley.Apartments.Contracts
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
-<h1>ClerkSuite</h1>
-<p class="lead">Town of Wiley apartment management — 16 units.</p>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Dashboard</h1>
+        <p class="text-muted mb-0">Portfolio health for Town of Wiley units</p>
+    </div>
+    <p class="text-muted small mb-0 tabular-nums">
+        As of @DisplayTime
+    </p>
+</div>
 
-<SfButton CssClass="e-primary" Content="Syncfusion Ready" />
+@if (LoadError is not null)
+{
+    <div class="alert alert-danger">@LoadError</div>
+}
+else if (Snapshot is null)
+{
+    <p class="text-muted">Loading dashboard…</p>
+}
+else
+{
+    <SfDashboardLayout Columns="12"
+                       CellSpacing="@(new double[] { 12, 12 })"
+                       CellAspectRatio="0.85"
+                       MediaQuery="max-width: 768px"
+                       AllowDragging="false"
+                       AllowResizing="false"
+                       CssClass="clerksuite-dashboard">
+        <DashboardLayoutPanels>
+            <DashboardLayoutPanel Id="kpi-occupancy" SizeX="3" SizeY="1" Row="0" Column="0">
+                <HeaderTemplate><div>Occupancy</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-metric">@Snapshot.OccupancyRate.ToString("0.#")%</p>
+                        <p class="kpi-sub">@Snapshot.OccupiedCount of @Snapshot.TotalUnits units occupied</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
 
-<p class="text-muted mt-3">
-    Mountain Time: @DisplayTime
-</p>
+            <DashboardLayoutPanel Id="kpi-vacant" SizeX="3" SizeY="1" Row="0" Column="3">
+                <HeaderTemplate><div>Vacant / Make-Ready</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-metric">@(Snapshot.VacantCount + Snapshot.MakeReadyCount)</p>
+                        <p class="kpi-sub">@Snapshot.VacantCount vacant · @Snapshot.MakeReadyCount make-ready</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+
+            <DashboardLayoutPanel Id="kpi-workorders" SizeX="3" SizeY="1" Row="0" Column="6">
+                <HeaderTemplate><div>Open work orders</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-metric">@Snapshot.OpenWorkOrders</p>
+                        <p class="kpi-sub">Maintenance module not yet active</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+
+            <DashboardLayoutPanel Id="kpi-delinquent" SizeX="3" SizeY="1" Row="0" Column="9">
+                <HeaderTemplate><div>Delinquent</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-metric">@Snapshot.DelinquentAmount.ToString("C0")</p>
+                        <p class="kpi-sub">@Snapshot.DelinquentCount unit@(Snapshot.DelinquentCount == 1 ? "" : "s") · payments deferred</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+
+            <DashboardLayoutPanel Id="status-mix" SizeX="4" SizeY="2" Row="1" Column="0">
+                <HeaderTemplate><div>Portfolio mix</div></HeaderTemplate>
+                <ContentTemplate>
+                    <ul class="status-mix list-unstyled mb-0">
+                        @foreach (var s in Snapshot.StatusBreakdown)
+                        {
+                            <li class="d-flex justify-content-between py-1 border-bottom">
+                                <span>@s.Name</span>
+                                <strong class="tabular-nums">@s.Count</strong>
+                            </li>
+                        }
+                    </ul>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+
+            <DashboardLayoutPanel Id="warranties" SizeX="8" SizeY="2" Row="1" Column="4">
+                <HeaderTemplate><div>Warranty alerts (90 days)</div></HeaderTemplate>
+                <ContentTemplate>
+                    @if (Snapshot.WarrantyAlerts.Count == 0)
+                    {
+                        <p class="text-muted mb-0 small">No warranties expiring in the next 90 days.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Unit</th>
+                                        <th>Asset</th>
+                                        <th>Ends</th>
+                                        <th class="text-end">Days</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in Snapshot.WarrantyAlerts)
+                                    {
+                                        <tr>
+                                            <td><a href="@($"/units/{row.UnitId}")">@row.UnitNumber</a></td>
+                                            <td>@row.AssetType</td>
+                                            <td class="tabular-nums">@row.WarrantyEnd.ToString("MM/dd/yyyy")</td>
+                                            <td class="text-end tabular-nums">@row.DaysLeft</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+
+            <DashboardLayoutPanel Id="rent-roll" SizeX="12" SizeY="3" Row="3" Column="0">
+                <HeaderTemplate><div>Unit portfolio</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Unit</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Beds</th>
+                                    <th class="text-end">Baths</th>
+                                    <th class="text-end">Sq ft</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Snapshot.Units)
+                                {
+                                    <tr>
+                                        <td><a href="@($"/units/{row.Id}")">@row.Number</a></td>
+                                        <td>@row.Status</td>
+                                        <td class="text-end tabular-nums">@row.Beds</td>
+                                        <td class="text-end tabular-nums">@row.Baths</td>
+                                        <td class="text-end tabular-nums">@row.SqFt.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+        </DashboardLayoutPanels>
+    </SfDashboardLayout>
+}
 
 @code {
-    [Inject]
-    private Wiley.Apartments.Contracts.IDateTimeService DateTimeService { get; set; } = default!;
+    [Inject] private IDashboardService DashboardService { get; set; } = default!;
+    [Inject] private IDateTimeService DateTimeService { get; set; } = default!;
 
-    private string DisplayTime => DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
+    private DashboardSnapshot? Snapshot { get; set; }
+    private string? LoadError { get; set; }
+
+    private string DisplayTime =>
+        DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Snapshot = await DashboardService.GetSnapshotAsync();
+        }
+        catch (Exception ex)
+        {
+            LoadError = "Could not load dashboard. " + ex.Message;
+        }
+    }
 }
