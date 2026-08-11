@@ -19,12 +19,21 @@ public sealed class TenantService : ITenantService
     public async Task<IReadOnlyList<Tenant>> SearchAsync(
         string? query = null,
         bool includeDeleted = false,
+        bool currentOnly = false,
         CancellationToken cancellationToken = default)
     {
         var q = _db.Tenants.AsNoTracking().AsQueryable();
         if (!includeDeleted)
         {
             q = q.Where(t => !t.IsDeleted);
+        }
+
+        if (currentOnly)
+        {
+            // Current resident (open occupancy) or prospect (no occupancy history yet).
+            q = q.Where(t =>
+                !_db.Occupancies.Any(o => o.TenantId == t.Id)
+                || _db.Occupancies.Any(o => o.TenantId == t.Id && o.EndUtc == null));
         }
 
         if (!string.IsNullOrWhiteSpace(query))

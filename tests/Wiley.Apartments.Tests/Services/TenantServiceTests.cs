@@ -64,6 +64,84 @@ public class TenantServiceTests
     }
 
     [Fact]
+    public async Task SearchAsync_CurrentOnly_IncludesOpenOccupancyAndProspects_ExcludesFormer()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+
+        var current = await service.CreateAsync(new Tenant { FirstName = "Cur", LastName = "Rent" });
+        var prospect = await service.CreateAsync(new Tenant { FirstName = "New", LastName = "Prospect" });
+        var former = await service.CreateAsync(new Tenant { FirstName = "For", LastName = "Mer" });
+
+        var unitCurrent = new Unit { Id = Guid.NewGuid(), Number = "1", SqFt = 700, Beds = 2, Baths = 1 };
+        var unitFormer = new Unit { Id = Guid.NewGuid(), Number = "2", SqFt = 700, Beds = 2, Baths = 1 };
+        db.Units.AddRange(unitCurrent, unitFormer);
+        db.Occupancies.AddRange(
+            new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unitCurrent.Id,
+                TenantId = current.Id,
+                StartUtc = DateTime.UtcNow.AddMonths(-2),
+                EndUtc = null
+            },
+            new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unitFormer.Id,
+                TenantId = former.Id,
+                StartUtc = DateTime.UtcNow.AddYears(-1),
+                EndUtc = DateTime.UtcNow.AddMonths(-1)
+            });
+        await db.SaveChangesAsync();
+
+        var currentOnly = await service.SearchAsync(currentOnly: true);
+
+        currentOnly.Select(t => t.Id).Should().BeEquivalentTo([current.Id, prospect.Id]);
+        currentOnly.Should().NotContain(t => t.Id == former.Id);
+    }
+
+    [Fact]
+    public async Task SearchAsync_IncludeFormer_ReturnsEndedOccupancyTenants()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+
+        var former = await service.CreateAsync(new Tenant { FirstName = "For", LastName = "Mer" });
+        var unit = new Unit { Id = Guid.NewGuid(), Number = "2", SqFt = 700, Beds = 2, Baths = 1 };
+        db.Units.Add(unit);
+        db.Occupancies.Add(new Occupancy
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            TenantId = former.Id,
+            StartUtc = DateTime.UtcNow.AddYears(-1),
+            EndUtc = DateTime.UtcNow.AddMonths(-1)
+        });
+        await db.SaveChangesAsync();
+
+        var all = await service.SearchAsync(currentOnly: false);
+
+        all.Should().Contain(t => t.Id == former.Id);
+    }
+
+    [Fact]
+    public async Task SearchAsync_CurrentOnly_StillExcludesSoftDeleted()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+
+        var prospect = await service.CreateAsync(new Tenant { FirstName = "Ann", LastName = "Active" });
+        var deleted = await service.CreateAsync(new Tenant { FirstName = "Bob", LastName = "Gone" });
+        await service.SoftDeleteAsync(deleted.Id);
+
+        var results = await service.SearchAsync(currentOnly: true);
+
+        results.Should().ContainSingle(t => t.Id == prospect.Id);
+        results.Should().NotContain(t => t.Id == deleted.Id);
+    }
+
+    [Fact]
     public async Task SoftDeleteAsync_BlocksUpdate()
     {
         await using var db = CreateContext();

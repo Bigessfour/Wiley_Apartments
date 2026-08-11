@@ -7,6 +7,7 @@ public interface ITenantService
     Task<IReadOnlyList<Tenant>> SearchAsync(
         string? query = null,
         bool includeDeleted = false,
+        bool currentOnly = false,
         CancellationToken cancellationToken = default);
 
     Task<Tenant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

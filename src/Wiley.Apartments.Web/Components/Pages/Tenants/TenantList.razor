@@ -8,12 +8,16 @@
 @using Wiley.Apartments.Web.Components.Shared
 @inject ITenantService TenantService
 @inject ILedgerService LedgerService
+@inject IOccupancyService OccupancyService
 @inject NavigationManager Navigation
 
 <PageTitle>Tenants</PageTitle>
 
-<PageHeader Title="Tenants"
-            Subtitle="@($"{TenantCount} active tenants — Open or double-click a row for profile & deposit status")" />
+<PageHeader Title="Tenants" Subtitle="@HeaderSubtitle">
+    <SfButton CssClass="e-outline e-small"
+              Content="@(CurrentOnly ? "Include former" : "Current only")"
+              OnClick="ToggleCurrentOnlyAsync" />
+</PageHeader>
 
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
@@ -34,7 +38,7 @@
     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridTemplates>
         <EmptyRecordTemplate>
-            <div class="grid-empty-hint">No tenants yet — use Add on the toolbar.</div>
+            <div class="grid-empty-hint">@EmptyHint</div>
         </EmptyRecordTemplate>
     </GridTemplates>
     <GridEditSettings AllowAdding="true"
@@ -52,6 +56,10 @@
                     HeaderText="First name"
                     Width="140"
                     ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(TenantRow.ResidenceStatus)"
+                    HeaderText="Status"
+                    Width="100"
+                    AllowEditing="false" />
         <GridColumn Field="@nameof(TenantRow.Phone)"
                     HeaderText="Phone"
                     Width="130" />
@@ -102,7 +110,16 @@
     private SfGrid<TenantRow>? GridRef;
     private List<TenantRow> Rows { get; set; } = [];
     private string? ErrorMessage { get; set; }
+    private bool CurrentOnly { get; set; } = true;
     private int TenantCount => Rows.Count;
+
+    private string HeaderSubtitle => CurrentOnly
+        ? $"{TenantCount} current tenants — Open or double-click a row for profile & deposit status"
+        : $"{TenantCount} tenants (including former) — Open or double-click a row for profile & deposit status";
+
+    private string EmptyHint => CurrentOnly
+        ? "No current tenants — use Include former to see past residents, or Add on the toolbar."
+        : "No tenants yet — use Add on the toolbar.";
 
     private readonly List<string> ToolbarItems =
     [
@@ -111,14 +128,25 @@
 
     protected override async Task OnInitializedAsync() => await ReloadAsync();
 
+    private async Task ToggleCurrentOnlyAsync()
+    {
+        CurrentOnly = !CurrentOnly;
+        await ReloadAsync();
+        if (GridRef is not null)
+        {
+            await GridRef.Refresh();
+        }
+    }
+
     private async Task ReloadAsync()
     {
-        var tenants = (await TenantService.SearchAsync()).ToList();
+        var tenants = (await TenantService.SearchAsync(currentOnly: CurrentOnly)).ToList();
         Rows = [];
         foreach (var tenant in tenants)
         {
             var deposit = await LedgerService.GetDepositSummaryAsync(tenant.Id);
-            Rows.Add(TenantRow.From(tenant, deposit));
+            var history = await OccupancyService.GetHistoryForTenantAsync(tenant.Id);
+            Rows.Add(TenantRow.From(tenant, deposit, history));
         }
     }
 
@@ -182,6 +210,7 @@
         public Guid Id { get; set; }
         public string FirstName { get; set; } = "";
         public string LastName { get; set; } = "";
+        public string ResidenceStatus { get; set; } = "—";
         public string? Phone { get; set; }
         public string? Email { get; set; }
         public string? MailingAddress { get; set; }
@@ -190,19 +219,32 @@
         public string? UnitNumber { get; set; }
         public string DepositStatus { get; set; } = "None";
 
-        public static TenantRow From(Tenant tenant, DepositSummary deposit) => new()
+        public static TenantRow From(
+            Tenant tenant,
+            DepositSummary deposit,
+            IReadOnlyList<Occupancy> history)
         {
-            Id = tenant.Id,
-            FirstName = tenant.FirstName,
-            LastName = tenant.LastName,
-            Phone = tenant.Phone,
-            Email = tenant.Email,
-            MailingAddress = tenant.MailingAddress,
-            EmergencyContact = tenant.EmergencyContact,
-            Notes = tenant.Notes,
-            UnitNumber = deposit.UnitNumber,
-            DepositStatus = deposit.StatusLabel
-        };
+            var status = history.Any(o => o.EndUtc is null)
+                ? "Current"
+                : history.Count > 0
+                    ? "Former"
+                    : "—";
+
+            return new()
+            {
+                Id = tenant.Id,
+                FirstName = tenant.FirstName,
+                LastName = tenant.LastName,
+                ResidenceStatus = status,
+                Phone = tenant.Phone,
+                Email = tenant.Email,
+                MailingAddress = tenant.MailingAddress,
+                EmergencyContact = tenant.EmergencyContact,
+                Notes = tenant.Notes,
+                UnitNumber = deposit.UnitNumber,
+                DepositStatus = deposit.StatusLabel
+            };
+        }
 
         public Tenant ToTenant() => new()
         {
