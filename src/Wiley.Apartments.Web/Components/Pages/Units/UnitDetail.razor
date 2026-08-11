@@ -3,15 +3,23 @@
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
-@using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
 @inject IUnitService UnitService
 @inject IAssetService AssetService
 @inject IFlooringService FlooringService
+@inject IOccupancyService OccupancyService
+@inject ITenantService TenantService
+@inject IUnitOperatingCostService OpsCostService
+@inject IMaintenanceService MaintenanceService
+@inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject IClerkToast Toast
 
 <PageTitle>Unit @Unit?.Number</PageTitle>
 
@@ -25,79 +33,223 @@ else if (Unit is null)
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-1">Unit @Unit.Number</h1>
-            <p class="text-muted mb-0">Complete unit inventory and status</p>
-        </div>
+    <PageHeader Title="@($"Unit {Unit.Number}")" Subtitle="Complete unit inventory and status">
         <SfButton CssClass="e-outline" Content="Back to units" OnClick="GoToUnitList" />
-    </div>
+    </PageHeader>
 
     @if (!string.IsNullOrEmpty(GridError))
     {
         <div class="alert alert-warning">@GridError</div>
     }
 
-    <SfDashboardLayout Columns="12"
-                       CellSpacing="@(new double[] { 12, 12 })"
-                       CellAspectRatio="0.9"
-                       MediaQuery="max-width: 768px"
-                       AllowDragging="false"
-                       AllowResizing="false"
-                       CssClass="unit-detail-kpis mb-4">
-        <DashboardLayoutPanels>
-            <DashboardLayoutPanel Id="ud-status" SizeX="3" SizeY="1" Row="0" Column="0">
-                <HeaderTemplate><div>Status & layout</div></HeaderTemplate>
-                <ContentTemplate>
-                    <div class="kpi-panel">
-                        <p class="mb-2">
-                            <span class="badge @StatusBadgeClass(Unit.Status)">@FormatStatus(Unit.Status)</span>
-                        </p>
-                        <p class="kpi-metric kpi-metric-sm">@Unit.Beds / @Unit.Baths</p>
-                        <p class="kpi-sub">@Unit.SqFt.ToString("N0") sq ft · beds / baths</p>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="ud-assets" SizeX="3" SizeY="1" Row="0" Column="3">
-                <HeaderTemplate><div>Assets & appliances</div></HeaderTemplate>
-                <ContentTemplate>
-                    <div class="kpi-panel">
-                        <p class="kpi-metric">@UnitAssets.Count</p>
-                        <p class="kpi-sub">
-                            @if (ExpiringWarrantyCount > 0)
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-4">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Unit layout (FR-002)" />
+                <CardContent>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label">Beds</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Unit.Beds" Min="0" Max="10" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Baths</label>
+                            <SfNumericTextBox TValue="int" @bind-Value="Unit.Baths" Min="0" Max="10" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Square footage</label>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Unit.SqFt" Min="0" Format="N0" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Monthly rent</label>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Unit.MonthlyRent" Min="0" Format="C2" Decimals="2" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Security deposit</label>
+                            <SfNumericTextBox TValue="decimal" @bind-Value="Unit.SecurityDeposit" Min="0" Format="C2" Decimals="2" ShowSpinButton="true" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Lease term (sheet)</label>
+                            <SfDropDownList TValue="string" TItem="LeaseTermOption"
+                                            DataSource="@LeaseTermOptions"
+                                            @bind-Value="Unit.LeaseTerm"
+                                            Placeholder="Year / Month-to-Month">
+                                <DropDownListFieldSettings Value="Value" Text="Text" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-6 d-flex align-items-end pb-2">
+                            <SfCheckBox @bind-Checked="Unit.IsHandicapAccessible" Label="Handicap accessible" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Status</label>
+                            <SfDropDownList TValue="UnitStatus" TItem="UnitStatusOption"
+                                            DataSource="@StatusOptions"
+                                            @bind-Value="Unit.Status">
+                                <DropDownListFieldSettings Value="Value" Text="Text" />
+                            </SfDropDownList>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Layout notes</label>
+                            <SfTextBox @bind-Value="Unit.Notes" Multiline="true" Placeholder="Floor plan notes, storage…" />
+                        </div>
+                        <div class="col-12">
+                            <SfButton CssClass="e-primary e-small" Content="@(LayoutBusy ? "Saving…" : "Save layout")"
+                                      Disabled="@LayoutBusy" OnClick="SaveLayoutAsync" />
+                            @if (!string.IsNullOrEmpty(LayoutError))
                             {
-                                <span>@ExpiringWarrantyCount warranty@(ExpiringWarrantyCount == 1 ? "" : "ies") expiring within 90 days</span>
+                                <div class="alert alert-warning mt-2 mb-0 py-1">@LayoutError</div>
                             }
-                            else
-                            {
-                                <span>No warranties expiring soon</span>
-                            }
+                        </div>
+                    </div>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Status" />
+                <CardContent>
+                    <p class="mb-2">
+                        <UnitStatusChip Status="Unit.Status" />
+                    </p>
+                    <p class="mb-1">@Unit.Beds bed · @Unit.Baths bath</p>
+                    <p class="mb-1">@(Unit.MonthlyRent > 0 ? Unit.MonthlyRent.ToString("C") : "—") / mo</p>
+                    <p class="mb-0 text-muted">@Unit.SqFt.ToString("N0") sq ft@(Unit.IsHandicapAccessible ? " · HC" : "")</p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Assets & appliances" />
+                <CardContent>
+                    <p class="unit-summary-value mb-1">@UnitAssets.Count</p>
+                    <p class="mb-0 text-muted">
+                        @if (ExpiringWarrantyCount > 0)
+                        {
+                            <span>@ExpiringWarrantyCount warranty@(ExpiringWarrantyCount == 1 ? "" : "ies") expiring within 90 days</span>
+                        }
+                        else
+                        {
+                            <span>No warranties expiring soon</span>
+                        }
+                    </p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Flooring & carpet" />
+                <CardContent>
+                    <p class="unit-summary-value mb-1">@UnitFloorings.Count</p>
+                    <p class="mb-0 text-muted">@CurrentFlooringSummary</p>
+                </CardContent>
+            </SfCard>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <SfCard CssClass="unit-summary-card h-100">
+                <CardHeader Title="Current tenant" />
+                <CardContent>
+                    @if (CurrentOccupancy?.Tenant is not null)
+                    {
+                        <p class="mb-1">
+                            <a href="@($"/tenants/{CurrentOccupancy.TenantId}")">
+                                @CurrentOccupancy.Tenant.LastName, @CurrentOccupancy.Tenant.FirstName
+                            </a>
                         </p>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="ud-flooring" SizeX="3" SizeY="1" Row="0" Column="6">
-                <HeaderTemplate><div>Flooring & carpet</div></HeaderTemplate>
-                <ContentTemplate>
-                    <div class="kpi-panel">
-                        <p class="kpi-metric">@UnitFloorings.Count</p>
-                        <p class="kpi-sub">@CurrentFlooringSummary</p>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-            <DashboardLayoutPanel Id="ud-notes" SizeX="3" SizeY="1" Row="0" Column="9">
-                <HeaderTemplate><div>Notes</div></HeaderTemplate>
-                <ContentTemplate>
-                    <div class="kpi-panel">
-                        <p class="kpi-sub notes-clamp">@(string.IsNullOrWhiteSpace(Unit.Notes) ? "No unit notes recorded." : Unit.Notes)</p>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-        </DashboardLayoutPanels>
-    </SfDashboardLayout>
+                        <p class="mb-0 text-muted small">Since @Clock.ToDisplayTime(CurrentOccupancy.StartUtc).ToString("g") MT</p>
+                    }
+                    else
+                    {
+                        <p class="mb-0 text-muted">Vacant — no active occupancy</p>
+                    }
+                </CardContent>
+            </SfCard>
+        </div>
+    </div>
 
     <SfTab>
         <TabItems>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Occupancy"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    @if (!string.IsNullOrEmpty(OccupancyError))
+                    {
+                        <div class="alert alert-warning">@OccupancyError</div>
+                    }
+
+                    <div class="row g-3 mb-3 align-items-end">
+                        @if (CurrentOccupancy is null)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">Start occupancy</label>
+                                <SfDropDownList TValue="Guid?"
+                                                TItem="TenantOption"
+                                                DataSource="@TenantOptions"
+                                                @bind-Value="SelectedTenantId"
+                                                Placeholder="Select tenant"
+                                                AllowFiltering="true">
+                                    <DropDownListFieldSettings Value="Id" Text="DisplayName" />
+                                </SfDropDownList>
+                            </div>
+                            <div class="col-md-3">
+                                <SfButton CssClass="e-primary"
+                                          Content="Start occupancy"
+                                          Disabled="@(SelectedTenantId is null)"
+                                          OnClick="StartOccupancyAsync" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-md-6">
+                                <p class="mb-2">
+                                    Active: <strong>@CurrentOccupancy.Tenant!.LastName, @CurrentOccupancy.Tenant.FirstName</strong>
+                                </p>
+                                <SfButton CssClass="e-outline e-danger"
+                                          Content="End occupancy"
+                                          OnClick="EndOccupancyAsync" />
+                            </div>
+                        }
+                    </div>
+
+                    <h2 class="h6 mb-2">Occupancy history</h2>
+                    <SfGrid TValue="Occupancy"
+                            DataSource="@OccupancyHistory"
+                            AllowPaging="true"
+                            AllowSorting="true"
+                            Height="280">
+                        <GridColumns>
+                            <GridColumn HeaderText="Tenant" Width="180">
+                                <Template>
+                                    @{
+                                        var row = (Occupancy)context;
+                                        var name = row.Tenant is null
+                                            ? row.TenantId.ToString()[..8]
+                                            : $"{row.Tenant.LastName}, {row.Tenant.FirstName}";
+                                    }
+                                    <span>@name</span>
+                                </Template>
+                            </GridColumn>
+                            <GridColumn HeaderText="Start (MT)" Width="160">
+                                <Template>
+                                    @{
+                                        var row = (Occupancy)context;
+                                    }
+                                    <span>@Clock.ToDisplayTime(row.StartUtc).ToString("g")</span>
+                                </Template>
+                            </GridColumn>
+                            <GridColumn HeaderText="End (MT)" Width="160">
+                                <Template>
+                                    @{
+                                        var row = (Occupancy)context;
+                                    }
+                                    <span>@(row.EndUtc is null ? "Active" : Clock.ToDisplayTime(row.EndUtc.Value).ToString("g"))</span>
+                                </Template>
+                            </GridColumn>
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
             <TabItem>
                 <ChildContent>
                     <TabHeader Text="Overview"></TabHeader>
@@ -118,7 +270,7 @@ else
                                     <GridColumn Field="@nameof(Asset.Serial)" HeaderText="Serial" Width="120" />
                                     <GridColumn Field="@nameof(Asset.WarrantyEnd)"
                                                 HeaderText="Warranty end"
-                                                Format="MM/dd/yyyy"
+                                                Format="d"
                                                 Width="120" />
                                     <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
                                 </GridColumns>
@@ -135,12 +287,12 @@ else
                                     <GridColumn Field="@nameof(Flooring.Type)" HeaderText="Type / material" Width="140" />
                                     <GridColumn Field="@nameof(Flooring.InstallDate)"
                                                 HeaderText="Installed"
-                                                Format="MM/dd/yyyy"
+                                                Format="d"
                                                 Width="110" />
                                     <GridColumn Field="@nameof(Flooring.Condition)" HeaderText="Condition" Width="110" />
                                     <GridColumn Field="@nameof(Flooring.ReplacedDate)"
                                                 HeaderText="Replaced"
-                                                Format="MM/dd/yyyy"
+                                                Format="d"
                                                 Width="110" />
                                     <GridColumn Field="@nameof(Flooring.Notes)" HeaderText="Notes" Width="160" />
                                 </GridColumns>
@@ -186,22 +338,37 @@ else
                             <GridColumn Field="@nameof(Asset.InstallDate)"
                                         HeaderText="Installed"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="MM/dd/yyyy"
+                                        Format="d"
                                         Width="120" />
                             <GridColumn Field="@nameof(Asset.WarrantyStart)"
                                         HeaderText="Warranty start"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="MM/dd/yyyy"
+                                        Format="d"
                                         Width="130" />
                             <GridColumn Field="@nameof(Asset.WarrantyEnd)"
                                         HeaderText="Warranty end"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="MM/dd/yyyy"
+                                        Format="d"
                                         Width="130" />
                             <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
                             <GridColumn Field="@nameof(Asset.Notes)" HeaderText="Notes" Width="180" />
                         </GridColumns>
                     </SfGrid>
+                    <div class="mt-3">
+                        <label class="form-label">Asset documents (manuals, receipts, photos)</label>
+                        <SfDropDownList TValue="Guid?" TItem="AssetFilterOption" DataSource="@AssetFilterOptions"
+                                        @bind-Value="DocumentAssetId" Placeholder="Select asset" AllowFiltering="true">
+                            <DropDownListFieldSettings Text="Text" Value="Id" />
+                        </SfDropDownList>
+                        @if (DocumentAssetId is Guid docAssetId)
+                        {
+                            <EntityDocumentsPanel EntityType="DocumentEntityType.Asset"
+                                                  EntityId="docAssetId"
+                                                  Title="Asset attachments"
+                                                  RelativeDirectory="assets"
+                                                  DefaultCategory="DocumentCategory.Manual" />
+                        }
+                    </div>
                 </ContentTemplate>
             </TabItem>
             <TabItem>
@@ -235,7 +402,7 @@ else
                             <GridColumn Field="@nameof(Flooring.InstallDate)"
                                         HeaderText="Installed"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="MM/dd/yyyy"
+                                        Format="d"
                                         Width="120" />
                             <GridColumn Field="@nameof(Flooring.Condition)"
                                         HeaderText="Condition"
@@ -243,11 +410,71 @@ else
                             <GridColumn Field="@nameof(Flooring.ReplacedDate)"
                                         HeaderText="Replaced"
                                         EditType="EditType.DatePickerEdit"
-                                        Format="MM/dd/yyyy"
+                                        Format="d"
                                         Width="120" />
                             <GridColumn Field="@nameof(Flooring.Notes)"
                                         HeaderText="Notes"
                                         Width="200" />
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Maintenance"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="d-flex justify-content-between align-items-end mb-2 flex-wrap gap-2">
+                        <p class="text-muted small mb-0">
+                            Work-order history for this unit.
+                            <a href="/maintenance">All maintenance</a>
+                        </p>
+                        <div style="min-width: 220px;">
+                            <label class="form-label small mb-1">Filter by asset</label>
+                            <SfDropDownList TValue="Guid?" TItem="AssetFilterOption"
+                                            DataSource="@AssetFilterOptions"
+                                            Placeholder="All (unit + assets)"
+                                            ShowClearButton="true"
+                                            @bind-Value="MaintenanceAssetFilter"
+                                            ValueChange="OnMaintenanceAssetFilterChanged">
+                                <DropDownListFieldSettings Text="Text" Value="Id" />
+                            </SfDropDownList>
+                        </div>
+                    </div>
+                    <SfGrid TValue="MaintenanceRow" DataSource="@DisplayedMaintenanceRows" AllowPaging="true" AllowSorting="true" Height="360">
+                        <GridPageSettings PageSize="10" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(MaintenanceRow.CreatedDisplay)" HeaderText="Created" Width="110" />
+                            <GridColumn Field="@nameof(MaintenanceRow.AssetLabel)" HeaderText="Asset" Width="140" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Priority)" HeaderText="Priority" Width="100" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Status)" HeaderText="Status" Width="110" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Description)" HeaderText="Description" />
+                            <GridColumn Field="@nameof(MaintenanceRow.Cost)" HeaderText="Cost" Format="C2" Width="100" TextAlign="TextAlign.Right" />
+                            <GridColumn Field="@nameof(MaintenanceRow.CompletedDisplay)" HeaderText="Completed" Width="110" />
+                        </GridColumns>
+                    </SfGrid>
+                </ContentTemplate>
+            </TabItem>
+            <TabItem>
+                <ChildContent>
+                    <TabHeader Text="Ops costs"></TabHeader>
+                </ChildContent>
+                <ContentTemplate>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <p class="text-muted small mb-0">
+                            Landlord expenses for this unit (Utility / Repair / Replace / CommonUpkeep).
+                            Full portfolio entry: <a href="/reports/operating-costs">Operating costs report</a>.
+                        </p>
+                        <span class="fw-semibold">Total @OpsCostTotal.ToString("C")</span>
+                    </div>
+                    <SfGrid TValue="OpsCostRow" DataSource="@OpsCostRows" AllowPaging="true" AllowSorting="true" Height="360">
+                        <GridPageSettings PageSize="10" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(OpsCostRow.DateDisplay)" HeaderText="Date" Width="110" />
+                            <GridColumn Field="@nameof(OpsCostRow.Category)" HeaderText="Category" Width="120" />
+                            <GridColumn Field="@nameof(OpsCostRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="TextAlign.Right" />
+                            <GridColumn Field="@nameof(OpsCostRow.Vendor)" HeaderText="Vendor" Width="140" />
+                            <GridColumn Field="@nameof(OpsCostRow.Notes)" HeaderText="Notes" />
                         </GridColumns>
                     </SfGrid>
                 </ContentTemplate>
@@ -263,10 +490,39 @@ else
     private Unit? Unit { get; set; }
     private List<Asset> UnitAssets { get; set; } = [];
     private List<Flooring> UnitFloorings { get; set; } = [];
+    private List<OpsCostRow> OpsCostRows { get; set; } = [];
+    private decimal OpsCostTotal { get; set; }
+    private List<MaintenanceRow> MaintenanceRows { get; set; } = [];
+    private List<MaintenanceRow> DisplayedMaintenanceRows { get; set; } = [];
+    private List<AssetFilterOption> AssetFilterOptions { get; set; } = [];
+    private Guid? MaintenanceAssetFilter { get; set; }
+    private Guid? DocumentAssetId { get; set; }
+    private Occupancy? CurrentOccupancy { get; set; }
+    private List<Occupancy> OccupancyHistory { get; set; } = [];
+    private List<TenantOption> TenantOptions { get; set; } = [];
+    private Guid? SelectedTenantId { get; set; }
     private SfGrid<Asset>? AssetGridRef;
     private SfGrid<Flooring>? FlooringGridRef;
     private string? LoadError { get; set; }
     private string? GridError { get; set; }
+    private string? OccupancyError { get; set; }
+    private string? LayoutError { get; set; }
+    private bool LayoutBusy { get; set; }
+
+    private readonly List<UnitStatusOption> StatusOptions =
+    [
+        new(UnitStatus.Vacant, "Vacant"),
+        new(UnitStatus.Occupied, "Occupied"),
+        new(UnitStatus.Maintenance, "Maintenance"),
+        new(UnitStatus.MakeReady, "Make-Ready")
+    ];
+
+    private readonly List<LeaseTermOption> LeaseTermOptions =
+    [
+        new("", "—"),
+        new("Year", "Year"),
+        new("Month-to-Month", "Month-to-Month")
+    ];
 
     private int ExpiringWarrantyCount => UnitAssets.Count(a =>
         a.WarrantyEnd is not null
@@ -284,7 +540,7 @@ else
                 return "No flooring records yet.";
             }
 
-            var installed = current.InstallDate?.ToString("MM/dd/yyyy") ?? "unknown date";
+            var installed = current.InstallDate?.ToString("d") ?? "unknown date";
             return $"{current.Type} · installed {installed}";
         }
     }
@@ -299,9 +555,40 @@ else
         "Add", "Edit", "Delete", "Update", "Cancel", "Search"
     ];
 
+    private Guid? _loadedUnitId;
+
     protected override async Task OnParametersSetAsync()
     {
-        await LoadAsync();
+        if (_loadedUnitId != UnitId)
+        {
+            await LoadAsync();
+            _loadedUnitId = UnitId;
+        }
+    }
+
+    private async Task SaveLayoutAsync()
+    {
+        if (Unit is null)
+        {
+            return;
+        }
+
+        LayoutBusy = true;
+        LayoutError = null;
+        try
+        {
+            Unit = await UnitService.UpdateAsync(Unit);
+            await Toast.ShowSuccessAsync($"Unit {Unit.Number} layout saved.");
+        }
+        catch (Exception ex)
+        {
+            LayoutError = ex.Message;
+            await LoadAsync();
+        }
+        finally
+        {
+            LayoutBusy = false;
+        }
     }
 
     private async Task LoadAsync()
@@ -316,6 +603,101 @@ else
 
         UnitAssets = (await AssetService.GetByUnitIdAsync(UnitId)).ToList();
         UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
+        await ReloadOpsCostsAsync();
+        await ReloadMaintenanceAsync();
+        await ReloadOccupancyAsync();
+        TenantOptions = (await TenantService.SearchAsync())
+            .Select(t => new TenantOption(t.Id, $"{t.LastName}, {t.FirstName}"))
+            .ToList();
+    }
+
+    private async Task ReloadOpsCostsAsync()
+    {
+        var costs = await OpsCostService.QueryAsync(unitId: UnitId);
+        OpsCostRows = costs.Select(c => new OpsCostRow(
+            Clock.ToDisplayTime(c.IncurredUtc).ToString("d"),
+            c.Category.ToString(),
+            c.Amount,
+            c.Vendor ?? "",
+            c.Notes ?? "")).ToList();
+        OpsCostTotal = OpsCostRows.Sum(r => r.Amount);
+    }
+
+    private async Task ReloadMaintenanceAsync()
+    {
+        var items = await MaintenanceService.GetForUnitAsync(UnitId);
+        MaintenanceRows = items.Select(ToMaintenanceRow).ToList();
+        AssetFilterOptions = UnitAssets
+            .Select(a => new AssetFilterOption { Id = a.Id, Text = $"{a.Type} ({a.Serial})" })
+            .ToList();
+        ApplyMaintenanceFilter();
+    }
+
+    private void ApplyMaintenanceFilter()
+    {
+        DisplayedMaintenanceRows = MaintenanceAssetFilter is Guid aid
+            ? MaintenanceRows.Where(r => r.AssetId == aid).ToList()
+            : MaintenanceRows;
+    }
+
+    private async Task OnMaintenanceAssetFilterChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<Guid?, AssetFilterOption> args)
+    {
+        MaintenanceAssetFilter = args.Value;
+        ApplyMaintenanceFilter();
+        await Task.CompletedTask;
+    }
+
+    private MaintenanceRow ToMaintenanceRow(MaintenanceRequest m) => new(
+        m.Id,
+        m.AssetId,
+        Clock.ToDisplayTime(m.CreatedUtc).ToString("d"),
+        m.Asset is null ? "(Unit)" : $"{m.Asset.Type} ({m.Asset.Serial})",
+        m.Priority.ToString(),
+        m.Status.ToString(),
+        m.Description,
+        m.Cost,
+        m.CompletedUtc is DateTime c ? Clock.ToDisplayTime(c).ToString("d") : "");
+
+    private async Task ReloadOccupancyAsync()
+    {
+        CurrentOccupancy = await OccupancyService.GetCurrentForUnitAsync(UnitId);
+        OccupancyHistory = (await OccupancyService.GetHistoryForUnitAsync(UnitId)).ToList();
+        Unit = await UnitService.GetByIdAsync(UnitId);
+    }
+
+    private async Task StartOccupancyAsync()
+    {
+        OccupancyError = null;
+        if (SelectedTenantId is null)
+        {
+            OccupancyError = "Select a tenant first.";
+            return;
+        }
+
+        try
+        {
+            await OccupancyService.StartAsync(UnitId, SelectedTenantId.Value);
+            SelectedTenantId = null;
+            await ReloadOccupancyAsync();
+        }
+        catch (Exception ex)
+        {
+            OccupancyError = ex.Message;
+        }
+    }
+
+    private async Task EndOccupancyAsync()
+    {
+        OccupancyError = null;
+        try
+        {
+            await OccupancyService.EndAsync(UnitId);
+            await ReloadOccupancyAsync();
+        }
+        catch (Exception ex)
+        {
+            OccupancyError = ex.Message;
+        }
     }
 
     private void GoToUnitList() => Navigation.NavigateTo("/units");
@@ -424,18 +806,33 @@ else
         UnitFloorings = (await FlooringService.GetByUnitIdAsync(UnitId)).ToList();
     }
 
-    private static string FormatStatus(UnitStatus status) => status switch
-    {
-        UnitStatus.MakeReady => "Make-Ready",
-        _ => status.ToString()
-    };
+    private sealed record TenantOption(Guid Id, string DisplayName);
 
-    private static string StatusBadgeClass(UnitStatus status) => status switch
+    private sealed record UnitStatusOption(UnitStatus Value, string Text);
+
+    private sealed record LeaseTermOption(string Value, string Text);
+
+    private sealed record OpsCostRow(
+        string DateDisplay,
+        string Category,
+        decimal Amount,
+        string Vendor,
+        string Notes);
+
+    private sealed record MaintenanceRow(
+        Guid Id,
+        Guid? AssetId,
+        string CreatedDisplay,
+        string AssetLabel,
+        string Priority,
+        string Status,
+        string Description,
+        decimal? Cost,
+        string CompletedDisplay);
+
+    private sealed class AssetFilterOption
     {
-        UnitStatus.Occupied => "text-bg-success",
-        UnitStatus.Vacant => "text-bg-secondary",
-        UnitStatus.Maintenance => "text-bg-warning",
-        UnitStatus.MakeReady => "text-bg-info",
-        _ => "text-bg-light"
-    };
+        public Guid? Id { get; set; }
+        public string Text { get; set; } = "";
+    }
 }

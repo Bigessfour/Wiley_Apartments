@@ -18,6 +18,10 @@ services:
       ClerkSuite__LateFeesEnabled: "false"
       ClerkSuite__PaymentPortalUrl: ${PaymentPortalUrl:-https://www.townofwiley.gov/government/departments/finance/utility-billing}
       SYNCFUSION_LICENSE_KEY: ${SYNCFUSION_LICENSE_KEY}
+      # Seeded on first boot only (skips if email already exists). Do not put real passwords in git.
+      SeedUsers__Users__0__Email: ${SeedUsers__Users__0__Email:-}
+      SeedUsers__Users__0__Password: ${SeedUsers__Users__0__Password:-}
+      SeedUsers__Users__0__DisplayName: ${SeedUsers__Users__0__DisplayName:-Town Clerk}
     volumes:
       - clerksuite-data:/data
       - ${DOCUMENTS_HOST_PATH}:/docs

@@ -11,5 +11,9 @@ public class ClerkSuiteOptions
     public bool LateFeesEnabled { get; set; }
     public decimal LateFeeAmount { get; set; }
     public int LateFeeGraceDays { get; set; }
+    /// <summary>
+    /// Soft residential unit cap (excludes facility CC). Default <c>16</c> per Edge Case 3 / FR-001.
+    /// Set <c>ClerkSuite__MaxUnits=0</c> only as an admin override for unlimited creates.
+    /// </summary>
     public int MaxUnits { get; set; } = 16;
 }

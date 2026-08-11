@@ -18,7 +18,7 @@ SKIP_ENV=false
 PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 
 usage() {
-  cat <<'EOF'
+	cat <<'EOF'
 Usage: deploy-to-nas.sh [options]
 
 Build on Mac, transfer image to Synology (mr-storage), load, and recreate container.
@@ -36,78 +36,88 @@ EOF
 }
 
 read_license_from_keychain() {
-  local raw=""
-  raw="$(security find-generic-password -w -s 'SYNCFUSION_LICENSE_KEY' -a 'SYNCFUSION' 2>/dev/null || true)"
-  if [[ -z "${raw}" ]]; then
-    raw="$(security find-generic-password -w -s 'com.townofwiley.clerksuite' -a 'SYNCFUSION_LICENSE_KEY' 2>/dev/null || true)"
-  fi
-  printf '%s' "${raw}" | tr -d '\r\n'
+	local raw=""
+	raw="$(security find-generic-password -w -s 'SYNCFUSION_LICENSE_KEY' -a 'SYNCFUSION' 2>/dev/null || true)"
+	if [[ -z ${raw} ]]; then
+		raw="$(security find-generic-password -w -s 'com.townofwiley.clerksuite' -a 'SYNCFUSION_LICENSE_KEY' 2>/dev/null || true)"
+	fi
+	printf '%s' "${raw}" | tr -d '\r\n'
 }
 
 # Synology OpenSSH often rejects the SFTP subsystem; prefer legacy SCP (-O) then ssh pipe.
 nas_upload() {
-  local src="$1"
-  local remote_path="$2"
-  if scp -O "${src}" "${NAS_HOST}:${remote_path}" 2>/dev/null; then
-    return 0
-  fi
-  echo "    scp -O failed; falling back to ssh pipe for ${remote_path}"
-  ssh "${NAS_HOST}" "cat > $(printf %q "${remote_path}")" <"${src}"
+	local src="$1"
+	local remote_path="$2"
+	if scp -O "${src}" "${NAS_HOST}:${remote_path}" 2>/dev/null; then
+		return 0
+	fi
+	echo "    scp -O failed; falling back to ssh pipe for ${remote_path}"
+	# Remote path is printf-quoted locally; intentional client-side expansion for ssh.
+	# shellcheck disable=SC2029
+	ssh "${NAS_HOST}" "cat > $(printf %q "${remote_path}")" <"${src}"
 }
 
 nas_ssh() {
-  ssh "${NAS_HOST}" "$@"
+	# shellcheck disable=SC2029
+	ssh "${NAS_HOST}" "$@"
 }
 
 for arg in "$@"; do
-  case "${arg}" in
-    --skip-build) SKIP_BUILD=true ;;
-    --skip-env) SKIP_ENV=true ;;
-    --help|-h) usage; exit 0 ;;
-    *)
-      echo "Unknown option: ${arg}" >&2
-      usage
-      exit 1
-      ;;
-  esac
+	case "${arg}" in
+	--skip-build) SKIP_BUILD=true ;;
+	--skip-env) SKIP_ENV=true ;;
+	--help | -h)
+		usage
+		exit 0
+		;;
+	*)
+		echo "Unknown option: ${arg}" >&2
+		usage
+		exit 1
+		;;
+	esac
 done
 
-if [[ ! -f "${COMPOSE_SRC}" ]]; then
-  echo "ERROR: missing ${COMPOSE_SRC}" >&2
-  exit 1
+if [[ ! -f ${COMPOSE_SRC} ]]; then
+	echo "ERROR: missing ${COMPOSE_SRC}" >&2
+	exit 1
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "ERROR: docker not found (start Docker Desktop)" >&2
-  exit 1
+	echo "ERROR: docker not found (start Docker Desktop)" >&2
+	exit 1
 fi
 
-if ! nas_ssh -o BatchMode=yes -o ConnectTimeout=10 'true' 2>/dev/null; then
-  echo "ERROR: cannot SSH to ${NAS_HOST} (check Tailscale)" >&2
-  exit 1
+set +e
+nas_ssh -o BatchMode=yes -o ConnectTimeout=10 'true' 2>/dev/null
+ssh_ok=$?
+set -e
+if [[ ${ssh_ok} -ne 0 ]]; then
+	echo "ERROR: cannot SSH to ${NAS_HOST} (check Tailscale)" >&2
+	exit 1
 fi
 
 echo "==> Target ${NAS_HOST}:${NAS_DIR} (image ${IMAGE_TAG})"
 
-if [[ "${SKIP_BUILD}" == false ]]; then
-  echo "==> Building ${IMAGE_TAG} and ${IMAGE_NAME}:latest (${PLATFORM})"
-  docker build \
-    --platform "${PLATFORM}" \
-    -f "${ROOT}/deploy/Dockerfile" \
-    -t "${IMAGE_TAG}" \
-    -t "${IMAGE_NAME}:latest" \
-    "${ROOT}"
+if [[ ${SKIP_BUILD} == false ]]; then
+	echo "==> Building ${IMAGE_TAG} and ${IMAGE_NAME}:latest (${PLATFORM})"
+	docker build \
+		--platform "${PLATFORM}" \
+		-f "${ROOT}/deploy/Dockerfile" \
+		-t "${IMAGE_TAG}" \
+		-t "${IMAGE_NAME}:latest" \
+		"${ROOT}"
 else
-  echo "==> Skipping build (using local ${IMAGE_NAME}:latest)"
-  if ! docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1; then
-    echo "ERROR: ${IMAGE_NAME}:latest not found locally" >&2
-    exit 1
-  fi
-  local_arch="$(docker image inspect "${IMAGE_NAME}:latest" --format '{{.Architecture}}')"
-  if [[ "${local_arch}" != "amd64" ]]; then
-    echo "ERROR: ${IMAGE_NAME}:latest is ${local_arch}; NAS needs amd64. Re-run without --skip-build." >&2
-    exit 1
-  fi
+	echo "==> Skipping build (using local ${IMAGE_NAME}:latest)"
+	if ! docker image inspect "${IMAGE_NAME}:latest" >/dev/null 2>&1; then
+		echo "ERROR: ${IMAGE_NAME}:latest not found locally" >&2
+		exit 1
+	fi
+	local_arch="$(docker image inspect "${IMAGE_NAME}:latest" --format '{{.Architecture}}')"
+	if [[ ${local_arch} != "amd64" ]]; then
+		echo "ERROR: ${IMAGE_NAME}:latest is ${local_arch}; NAS needs amd64. Re-run without --skip-build." >&2
+		exit 1
+	fi
 fi
 
 echo "==> Saving image archive ${ARCHIVE}"
@@ -126,30 +136,41 @@ nas_ssh "sudo mkdir -p '${NAS_DIR}' \
 nas_ssh "sudo mv /tmp/clerksuite-docker-compose.yml '${NAS_DIR}/docker-compose.yml'"
 nas_ssh "sudo chown root:root '${NAS_DIR}/docker-compose.yml'"
 
-if [[ "${SKIP_ENV}" == false ]]; then
-  echo "==> Ensuring remote .env from Keychain (values not printed)"
-  license="$(read_license_from_keychain)"
-  if [[ -z "${license}" ]]; then
-    echo "ERROR: Syncfusion license not found in Keychain" >&2
-    exit 1
-  fi
+RECEIPT_TEMPLATE="${ROOT}/deploy/templates/Wiley_Payment_Receipt_Template.pdf"
+if [[ -f ${RECEIPT_TEMPLATE} ]]; then
+	echo "==> Ensuring payment receipt template on NAS DocumentRoot"
+	nas_upload "${RECEIPT_TEMPLATE}" "/tmp/Wiley_Payment_Receipt_Template.pdf"
+	nas_ssh "sudo mv /tmp/Wiley_Payment_Receipt_Template.pdf /volume1/apartments/docs/templates/Wiley_Payment_Receipt_Template.pdf && sudo chmod 644 /volume1/apartments/docs/templates/Wiley_Payment_Receipt_Template.pdf"
+fi
 
-  env_tmp="$(mktemp)"
-  chmod 600 "${env_tmp}"
-  cat >"${env_tmp}" <<EOF
+if [[ ${SKIP_ENV} == false ]]; then
+	echo "==> Ensuring remote .env from Keychain (values not printed)"
+	license="$(read_license_from_keychain)"
+	if [[ -z ${license} ]]; then
+		echo "ERROR: Syncfusion license not found in Keychain" >&2
+		exit 1
+	fi
+
+	env_tmp="$(mktemp)"
+	chmod 600 "${env_tmp}"
+	cat >"${env_tmp}" <<EOF
 DOCUMENTS_HOST_PATH=/volume1/apartments/docs
 SYNCFUSION_LICENSE_KEY=${license}
 PaymentPortalUrl=https://www.townofwiley.gov/government/departments/finance/utility-billing
 EOF
-  nas_upload "${env_tmp}" "/tmp/clerksuite.env"
-  rm -f "${env_tmp}"
-  nas_ssh "sudo mv /tmp/clerksuite.env '${NAS_DIR}/.env' && sudo chmod 600 '${NAS_DIR}/.env' && sudo chown root:root '${NAS_DIR}/.env'"
+	nas_upload "${env_tmp}" "/tmp/clerksuite.env"
+	rm -f "${env_tmp}"
+	nas_ssh "sudo mv /tmp/clerksuite.env '${NAS_DIR}/.env' && sudo chmod 600 '${NAS_DIR}/.env' && sudo chown root:root '${NAS_DIR}/.env'"
 else
-  echo "==> Skipping .env update (--skip-env)"
-  if ! nas_ssh "test -f '${NAS_DIR}/.env'"; then
-    echo "ERROR: ${NAS_DIR}/.env missing; re-run without --skip-env" >&2
-    exit 1
-  fi
+	echo "==> Skipping .env update (--skip-env)"
+	set +e
+	nas_ssh "test -f '${NAS_DIR}/.env'"
+	env_ok=$?
+	set -e
+	if [[ ${env_ok} -ne 0 ]]; then
+		echo "ERROR: ${NAS_DIR}/.env missing; re-run without --skip-env" >&2
+		exit 1
+	fi
 fi
 
 echo "==> Loading image and recreating container"

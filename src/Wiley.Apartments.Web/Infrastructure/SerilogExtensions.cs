@@ -7,16 +7,38 @@ public static class SerilogExtensions
 {
     public static WebApplicationBuilder AddClerkSuiteSerilog(this WebApplicationBuilder builder)
     {
+        var contentRoot = builder.Environment.ContentRootPath;
+        var logDir = Path.Combine(contentRoot, "logs");
+        Directory.CreateDirectory(logDir);
+        var logPath = Path.Combine(logDir, "clerksuite-.log");
+
+        // Surface Serilog sink/config failures to stderr (otherwise File sink can silently no-op).
+        Serilog.Debugging.SelfLog.Enable(msg => Console.Error.WriteLine("[Serilog SelfLog] " + msg));
+
         builder.Host.UseSerilog((context, services, configuration) =>
         {
             configuration
-                .ReadFrom.Configuration(context.Configuration)
-                .ReadFrom.Services(services)
+                .MinimumLevel.Information()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+                .MinimumLevel.Override("Microsoft.AspNetCore.Components", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft.AspNetCore.Components.Server", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft.AspNetCore.Components.Server.Circuits", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+                .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+                .MinimumLevel.Override("System", LogEventLevel.Warning)
                 .Enrich.FromLogContext()
                 .Enrich.WithMachineName()
                 .Enrich.WithEnvironmentName()
                 .Enrich.WithProperty("Application", "ClerkSuite")
-                .Enrich.WithProperty("Repository", "Wiley.Apartments");
+                .Enrich.WithProperty("Repository", "Wiley.Apartments")
+                .WriteTo.File(
+                    path: logPath,
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 14,
+                    shared: true,
+                    outputTemplate:
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}");
 
             if (context.Configuration.GetValue<bool>("Serilog:WriteToConsole", true))
             {

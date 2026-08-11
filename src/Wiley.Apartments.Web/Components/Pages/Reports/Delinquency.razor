@@ -1,0 +1,76 @@
+@page "/reports/delinquency"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@inject IRentRollService RentRollService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Delinquency</PageTitle>
+
+<PageHeader Title="Delinquency" Subtitle="Tenant/unit pairs with positive ledger balance." CssClass="d-print-none">
+    <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+    <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+
+<p class="small text-muted">
+    @Rows.Count delinquent account(s) · Total @TotalBalance.ToString("C")
+</p>
+
+<SfGrid TValue="DelinquencyView" DataSource="@Rows" AllowSorting="true">
+    <GridColumns>
+        <GridColumn Field="@nameof(DelinquencyView.UnitNumber)" HeaderText="Unit" Width="80" />
+        <GridColumn Field="@nameof(DelinquencyView.TenantName)" HeaderText="Tenant" Width="180" />
+        <GridColumn Field="@nameof(DelinquencyView.Balance)" HeaderText="Balance" Format="C2" Width="120" TextAlign="TextAlign.Right" />
+        <GridColumn Field="@nameof(DelinquencyView.OldestChargeDisplay)" HeaderText="Oldest charge" Width="130" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<DelinquencyView> Rows { get; set; } = [];
+    private decimal TotalBalance { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var data = await RentRollService.GetDelinquencyAsync();
+            Rows = data.Select(d => new DelinquencyView
+            {
+                UnitNumber = d.UnitNumber,
+                TenantName = d.TenantName,
+                Balance = d.Balance,
+                OldestChargeDisplay = d.OldestChargeUtc is DateTime utc
+                    ? Clock.ToDisplayTime(utc).ToString("d")
+                    : ""
+            }).ToList();
+            TotalBalance = Rows.Sum(r => r.Balance);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    private sealed class DelinquencyView
+    {
+        public string UnitNumber { get; set; } = "";
+        public string TenantName { get; set; } = "";
+        public decimal Balance { get; set; }
+        public string OldestChargeDisplay { get; set; } = "";
+    }
+}

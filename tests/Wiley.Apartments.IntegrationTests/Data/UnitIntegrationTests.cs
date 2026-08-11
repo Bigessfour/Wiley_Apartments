@@ -16,7 +16,7 @@ public class UnitSeederIntegrationTests : IClassFixture<Support.ClerkSuiteWebApp
     }
 
     [Fact]
-    public async Task UnitSeeder_SeedsSixteenPlaceholderUnits()
+    public async Task UnitSeeder_SeedsSixteenResidentialPlusCommunityCenter()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApartmentsDbContext>();
@@ -28,9 +28,16 @@ public class UnitSeederIntegrationTests : IClassFixture<Support.ClerkSuiteWebApp
         await seeder.SeedAsync();
 
         var units = await db.Units.OrderBy(u => u.Number).ToListAsync();
-        units.Should().HaveCount(16);
-        units.Select(u => u.Number).Should().BeEquivalentTo(Enumerable.Range(1, 16).Select(i => i.ToString()));
-        units.Should().OnlyContain(u => u.Status == UnitStatus.Vacant);
+        var residential = units.Where(u => !u.IsFacility).ToList();
+        var facilities = units.Where(u => u.IsFacility).ToList();
+
+        residential.Should().HaveCount(16);
+        residential.Select(u => u.Number).Should().BeEquivalentTo(Enumerable.Range(1, 16).Select(i => i.ToString()));
+        residential.Should().OnlyContain(u => u.Status == UnitStatus.Vacant);
+
+        facilities.Should().ContainSingle();
+        facilities[0].Number.Should().Be("CC");
+        facilities[0].IsFacility.Should().BeTrue();
     }
 
     [Fact]

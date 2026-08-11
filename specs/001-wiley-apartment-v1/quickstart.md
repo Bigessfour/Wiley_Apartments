@@ -7,7 +7,7 @@
 1. Containers `wiley-apartments-app` and `wiley-apartments-db` running.
 2. NAS share `apartments/docs` mounted at `/volume1/apartments/docs`; Hyper Backup configured.
 3. Clerk accounts seeded; `PaymentPortalUrl` set in env.
-4. Browse `http://<nas>:8080` from both clerk PCs.
+4. Browse `http://<nas>:8082` from both clerk PCs (host port **8082**; 8080 is reserved for `tikr-web`).
 
 ## FR-1 Unit Management
 
@@ -61,8 +61,10 @@
 
 ## Sign-off
 
-| Clerk    | Date | Pass |
-| -------- | ---- | ---- |
-| Clerk A  |      |      |
-| Clerk B  |      |      |
-| IT/Mayor |      |      |
+| Clerk    | Date       | Pass |
+| -------- | ---------- | ---- |
+| Clerk A  | 2026-08-10 | Yes  |
+| Clerk B  | 2026-08-10 | Yes  |
+| IT/Mayor |            |      |
+
+**Clerk acceptance (T7.1):** Signed off 2026-08-10 after live review with both town clerks (Stephen present). Workflow create-unit → tenant → lease → payment → document verified on ClerkSuite. IT/Mayor row remains for backup/restore (T7.2).

@@ -65,7 +65,7 @@ attributed in AuditLog. **No role differentiation** — every authenticated user
 to all features. Remove Clerk / ReadOnly / Elevated roles. Seed **1–2 full-access accounts**
 on first deploy (passwords chosen at deploy).
 
-**Rationale**: Simplifies v1 for two staff; audit still captures *who* changed data. Role-based
+**Rationale**: Simplifies v1 for two staff; audit still captures _who_ changed data. Role-based
 access deferred unless town requests it later.
 
 **Alternatives considered**:
@@ -90,24 +90,26 @@ level where supported; app layer rejects audit mutations.
 `sf-blazor-mcp` (`sf_blazor_assistant`), and official Blazor docs. Non-Syncfusion UI is out of
 compliance.
 
-| Surface         | Syncfusion component               |
-| --------------- | ---------------------------------- |
-| Grids           | SfGrid                             |
-| Dashboard       | SfDashboardLayout, SfCard, SfChart |
-| Lease templates | SfDocumentEditor                   |
-| PDF read        | SfPdfViewer                        |
-| File vault      | SfFileManager                      |
-| Forms / dialogs | SfDataForm, SfDialog               |
+| Surface         | Syncfusion component                                          |
+| --------------- | ------------------------------------------------------------- |
+| Grids           | SfGrid                                                        |
+| Dashboard       | SfDashboardLayout, SfCard, SfChart                            |
+| Lease templates | Fillable AcroForm PDF + DocIO bootstrap from Brookside DOCX   |
+| PDF read        | SfPdfViewer / SfPdfViewer2                                    |
+| File vault      | SfFileManager (T6.1); DocumentEditor optional for Office edit |
+| Forms / dialogs | SfDataForm, SfDialog                                          |
 
 **Rationale**: Constitution V (strict); clerk-quality enterprise UI; MCP-assisted correct APIs.
 
 ## Decision 7: Colorado lease templates
 
-**Decision**: Ship default SFDT templates in `templates/leases/` covering standard Colorado
-residential fields (parties, premises, term, rent, security deposit, notice addresses);
-clerks edit via in-app template manager stored on NAS.
+**Decision**: Use Brookside / Wiley Housing Authority blank DOCX on NAS
+(`DocumentRoot/templates/brookside-*.docx`) as legal masters. Runtime prefers fillable
+AcroForm PDF siblings (bootstrapped once via DocIO → PDF + named fields). Clerks review
+in SfPdfViewer2; optional custom clauses append as a PDF addendum page. Template edits
+are file replacements on NAS (no code deploy).
 
-**Rationale**: Template edits without deploy; preview before finalize satisfies FR-005/FR-006.
+**Rationale**: Real town forms; template edits without deploy; preview before finalize.
 Legal review once at deploy; clerk maintains wording thereafter.
 
 **Note**: Templates are starting points — town counsel should review before production use.
@@ -244,7 +246,7 @@ Tailscale provides secure remote access when not on town LAN.
 | G5 Syncfusion tier | Community license; Keychain process                          | **Closed**                      |
 | G6 NAS access      | Tailscale + SSH for T0.3 / deploy                            | **Closed**                      |
 | G7 Roles           | No differentiation; auth for audit; 1–2 full-access accounts | **Closed**                      |
-| G8 Lease templates | Ship blank SFDT; counsel review before go-live               | **Deferred** (T3.2)             |
+| G8 Lease templates | Brookside blanks on NAS; counsel review before go-live       | **In progress** (T3.2 PDF path) |
 | G9 Data import     | Manual entry v1                                              | **Deferred**                    |
 | G10 App URL        | LAN / Tailscale until reverse proxy                          | **Deferred** (T0.2, T7.1)       |
 | G11 Account naming | 1–2 accounts; passwords at deploy                            | **Closed** (merged with G7)     |

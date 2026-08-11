@@ -9,6 +9,8 @@ namespace Wiley.Apartments.Web.Services;
 
 public sealed class UnitService : IUnitService
 {
+    public const string CommunityCenterNumber = "CC";
+
     private readonly ApartmentsDbContext _db;
     private readonly ClerkSuiteOptions _options;
     private readonly ILogger<UnitService> _logger;
@@ -26,24 +28,55 @@ public sealed class UnitService : IUnitService
     public int MaxUnits => _options.MaxUnits;
 
     public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
-        _db.Units.CountAsync(cancellationToken);
+        _db.Units.CountAsync(u => !u.IsFacility, cancellationToken);
 
     public async Task<IReadOnlyList<Unit>> GetAllAsync(CancellationToken cancellationToken = default) =>
         await _db.Units
             .AsNoTracking()
-            .OrderBy(u => u.Number)
+            .OrderBy(u => u.IsFacility ? 1 : 0)
+            .ThenBy(u => u.Number)
             .ToListAsync(cancellationToken);
 
     public async Task<Unit?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _db.Units.FindAsync([id], cancellationToken);
 
+    public async Task<Unit?> GetFacilityAsync(CancellationToken cancellationToken = default)
+    {
+        var cc = await _db.Units
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                u => u.IsFacility && u.Number == CommunityCenterNumber,
+                cancellationToken);
+        if (cc is not null)
+        {
+            return cc;
+        }
+
+        return await _db.Units
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.IsFacility, cancellationToken);
+    }
+
     public async Task<Unit> CreateAsync(Unit unit, CancellationToken cancellationToken = default)
     {
         ValidateUnit(unit);
 
-        if (await _db.Units.CountAsync(cancellationToken) >= MaxUnits)
+        if (unit.IsFacility)
         {
-            throw new InvalidOperationException($"Cannot add more than {MaxUnits} units.");
+            if (unit.Number != CommunityCenterNumber
+                && await _db.Units.AnyAsync(u => u.IsFacility, cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    "A facility unit already exists. Use Number \"CC\" for Community Center only.");
+            }
+        }
+        else if (MaxUnits > 0)
+        {
+            var residentialCount = await _db.Units.CountAsync(u => !u.IsFacility, cancellationToken);
+            if (residentialCount >= MaxUnits)
+            {
+                throw new InvalidOperationException($"Cannot add more than {MaxUnits} residential units.");
+            }
         }
 
         if (await _db.Units.AnyAsync(u => u.Number == unit.Number, cancellationToken))
@@ -52,9 +85,22 @@ public sealed class UnitService : IUnitService
         }
 
         unit.Id = Guid.NewGuid();
+        if (unit.Number == CommunityCenterNumber)
+        {
+            unit.IsFacility = true;
+        }
+
         _db.Units.Add(unit);
         await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Created unit {UnitNumber} ({UnitId}).", unit.Number, unit.Id);
+        _logger.LogInformation(
+            "Created unit {UnitNumber} ({UnitId}) facility={IsFacility} rent={MonthlyRent} deposit={SecurityDeposit} handicap={IsHandicapAccessible} leaseTerm={LeaseTerm}.",
+            unit.Number,
+            unit.Id,
+            unit.IsFacility,
+            unit.MonthlyRent,
+            unit.SecurityDeposit,
+            unit.IsHandicapAccessible,
+            unit.LeaseTerm);
         return unit;
     }
 
@@ -70,6 +116,14 @@ public sealed class UnitService : IUnitService
             throw new InvalidOperationException($"Unit number '{unit.Number}' already exists.");
         }
 
+        // Facility flag is system-managed: preserve for seeded CC; allow Number "CC" to force facility.
+        var isFacility = existing.IsFacility || unit.IsFacility || unit.Number == CommunityCenterNumber;
+        if (existing.IsFacility && unit.Number != CommunityCenterNumber && unit.Number != existing.Number)
+        {
+            // Keep facility identity if renumbering away from CC is attempted without clearing flag.
+            isFacility = true;
+        }
+
         existing.Number = unit.Number.Trim();
         existing.SqFt = unit.SqFt;
         existing.Beds = unit.Beds;
@@ -77,9 +131,28 @@ public sealed class UnitService : IUnitService
         existing.Status = unit.Status;
         existing.Notes = unit.Notes;
         existing.CurrentTenantId = unit.CurrentTenantId;
+        existing.MonthlyRent = unit.MonthlyRent;
+        existing.SecurityDeposit = unit.SecurityDeposit;
+        existing.IsHandicapAccessible = unit.IsHandicapAccessible;
+        existing.LeaseTerm = string.IsNullOrWhiteSpace(unit.LeaseTerm)
+            ? string.Empty
+            : unit.LeaseTerm.Trim();
+        existing.IsFacility = isFacility;
 
-        await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Updated unit {UnitNumber} ({UnitId}).", existing.Number, existing.Id);
+        _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = unit.RowVersion;
+        ConcurrencyHelper.BumpRowVersion(existing);
+
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Unit", cancellationToken);
+        _logger.LogInformation(
+            "Updated unit {UnitNumber} ({UnitId}) status={Status} rent={MonthlyRent} deposit={SecurityDeposit} handicap={IsHandicapAccessible} leaseTerm={LeaseTerm} currentTenant={CurrentTenantId}.",
+            existing.Number,
+            existing.Id,
+            existing.Status,
+            existing.MonthlyRent,
+            existing.SecurityDeposit,
+            existing.IsHandicapAccessible,
+            existing.LeaseTerm,
+            existing.CurrentTenantId);
         return existing;
     }
 
@@ -87,6 +160,12 @@ public sealed class UnitService : IUnitService
     {
         var unit = await _db.Units.FindAsync([id], cancellationToken)
             ?? throw new InvalidOperationException($"Unit {id} was not found.");
+
+        if (unit.IsFacility || unit.Number == CommunityCenterNumber)
+        {
+            throw new InvalidOperationException(
+                "Community Center facility unit cannot be deleted. Soft-close by status/notes instead.");
+        }
 
         if (unit.Status == UnitStatus.Occupied)
         {
@@ -120,6 +199,19 @@ public sealed class UnitService : IUnitService
             throw new ArgumentException("Bath count cannot be negative.", nameof(unit));
         }
 
+        if (unit.MonthlyRent < 0)
+        {
+            throw new ArgumentException("Monthly rent cannot be negative.", nameof(unit));
+        }
+
+        if (unit.SecurityDeposit < 0)
+        {
+            throw new ArgumentException("Security deposit cannot be negative.", nameof(unit));
+        }
+
         unit.Number = unit.Number.Trim();
+        unit.LeaseTerm = string.IsNullOrWhiteSpace(unit.LeaseTerm)
+            ? string.Empty
+            : unit.LeaseTerm.Trim();
     }
 }

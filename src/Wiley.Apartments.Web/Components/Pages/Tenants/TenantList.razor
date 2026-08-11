@@ -1,0 +1,219 @@
+@page "/tenants"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Components.Shared
+@inject ITenantService TenantService
+@inject ILedgerService LedgerService
+@inject NavigationManager Navigation
+
+<PageTitle>Tenants</PageTitle>
+
+<PageHeader Title="Tenants"
+            Subtitle="@($"{TenantCount} active tenants — Open or double-click a row for profile & deposit status")" />
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<SfGrid @ref="GridRef"
+        TValue="TenantRow"
+        DataSource="@Rows"
+        Toolbar="@ToolbarItems"
+        AllowPaging="true"
+        AllowSorting="true"
+        AllowFiltering="true"
+        Height="420">
+    <GridEvents TValue="TenantRow"
+                OnActionComplete="OnActionCompleteAsync"
+                OnRecordDoubleClick="OnRecordDoubleClick" />
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No tenants yet — use Add on the toolbar.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
+    <GridEditSettings AllowAdding="true"
+                      AllowEditing="true"
+                      AllowDeleting="true"
+                      Mode="EditMode.Normal"
+                      ShowDeleteConfirmDialog="true" />
+    <GridColumns>
+        <GridColumn Field="@nameof(TenantRow.Id)" IsPrimaryKey="true" Visible="false" />
+        <GridColumn Field="@nameof(TenantRow.LastName)"
+                    HeaderText="Last name"
+                    Width="140"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(TenantRow.FirstName)"
+                    HeaderText="First name"
+                    Width="140"
+                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(TenantRow.Phone)"
+                    HeaderText="Phone"
+                    Width="130" />
+        <GridColumn Field="@nameof(TenantRow.MailingAddress)"
+                    HeaderText="Mailing address"
+                    Width="180" />
+        <GridColumn Field="@nameof(TenantRow.Email)"
+                    HeaderText="Email"
+                    Width="200" />
+        <GridColumn Field="@nameof(TenantRow.UnitNumber)"
+                    HeaderText="Unit"
+                    Width="90"
+                    AllowEditing="false" />
+        <GridColumn Field="@nameof(TenantRow.DepositStatus)"
+                    HeaderText="Deposit"
+                    Width="120"
+                    AllowEditing="false">
+            <Template>
+                @{
+                    var row = context as TenantRow;
+                }
+                <DepositStatusChip Status="@row!.DepositStatus" />
+            </Template>
+        </GridColumn>
+        <GridColumn Field="@nameof(TenantRow.EmergencyContact)"
+                    HeaderText="Emergency"
+                    Width="180" />
+        <GridColumn Field="@nameof(TenantRow.Notes)"
+                    HeaderText="Notes"
+                    Width="160" />
+        <GridColumn HeaderText=""
+                    Width="90"
+                    AllowEditing="false"
+                    TextAlign="TextAlign.Center">
+            <Template>
+                @{
+                    var row = context as TenantRow;
+                }
+                <SfButton CssClass="e-small e-outline"
+                          Content="Open"
+                          OnClick="@(() => OpenTenant(row!.Id))" />
+            </Template>
+        </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private SfGrid<TenantRow>? GridRef;
+    private List<TenantRow> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private int TenantCount => Rows.Count;
+
+    private readonly List<string> ToolbarItems =
+    [
+        "Add", "Edit", "Delete", "Update", "Cancel", "Search"
+    ];
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        var tenants = (await TenantService.SearchAsync()).ToList();
+        Rows = [];
+        foreach (var tenant in tenants)
+        {
+            var deposit = await LedgerService.GetDepositSummaryAsync(tenant.Id);
+            Rows.Add(TenantRow.From(tenant, deposit));
+        }
+    }
+
+    private void OpenTenant(Guid tenantId) => Navigation.NavigateTo($"/tenants/{tenantId}");
+
+    private void OnRecordDoubleClick(RecordDoubleClickEventArgs<TenantRow> args)
+    {
+        if (args.RowData is { Id: var id })
+        {
+            OpenTenant(id);
+        }
+    }
+
+    private async Task OnActionCompleteAsync(ActionEventArgs<TenantRow> args)
+    {
+        try
+        {
+            switch (args.RequestType)
+            {
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Add" && args.Data is not null:
+                    await TenantService.CreateAsync(args.Data.ToTenant());
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Edit" && args.Data is not null:
+                    var existing = await TenantService.GetByIdAsync(args.Data.Id)
+                        ?? throw new InvalidOperationException("Tenant not found.");
+                    existing.FirstName = args.Data.FirstName;
+                    existing.LastName = args.Data.LastName;
+                    existing.Phone = args.Data.Phone ?? string.Empty;
+                    existing.Email = args.Data.Email ?? string.Empty;
+                    existing.MailingAddress = args.Data.MailingAddress ?? string.Empty;
+                    existing.EmergencyContact = args.Data.EmergencyContact ?? string.Empty;
+                    existing.Notes = args.Data.Notes;
+                    await TenantService.UpdateAsync(existing);
+                    break;
+                case Syncfusion.Blazor.Grids.Action.Delete when args.Data is not null:
+                    await TenantService.SoftDeleteAsync(args.Data.Id);
+                    break;
+                default:
+                    return;
+            }
+
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
+        }
+    }
+
+    private sealed class TenantRow
+    {
+        public Guid Id { get; set; }
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public string? MailingAddress { get; set; }
+        public string? EmergencyContact { get; set; }
+        public string? Notes { get; set; }
+        public string? UnitNumber { get; set; }
+        public string DepositStatus { get; set; } = "None";
+
+        public static TenantRow From(Tenant tenant, DepositSummary deposit) => new()
+        {
+            Id = tenant.Id,
+            FirstName = tenant.FirstName,
+            LastName = tenant.LastName,
+            Phone = tenant.Phone,
+            Email = tenant.Email,
+            MailingAddress = tenant.MailingAddress,
+            EmergencyContact = tenant.EmergencyContact,
+            Notes = tenant.Notes,
+            UnitNumber = deposit.UnitNumber,
+            DepositStatus = deposit.StatusLabel
+        };
+
+        public Tenant ToTenant() => new()
+        {
+            Id = Id == Guid.Empty ? Guid.NewGuid() : Id,
+            FirstName = FirstName,
+            LastName = LastName,
+            Phone = Phone ?? string.Empty,
+            Email = Email ?? string.Empty,
+            MailingAddress = MailingAddress ?? string.Empty,
+            EmergencyContact = EmergencyContact ?? string.Empty,
+            Notes = Notes
+        };
+    }
+}

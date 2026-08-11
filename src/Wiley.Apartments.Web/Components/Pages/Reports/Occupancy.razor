@@ -1,0 +1,131 @@
+@page "/reports/occupancy"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IUnitService UnitService
+@inject ILeaseService LeaseService
+@inject ITenantService TenantService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+@inject ILogger<Occupancy> Logger
+
+<PageTitle>Occupancy report</PageTitle>
+
+<PageHeader Title="Occupancy"
+            Subtitle="@($"{OccupiedCount} occupied · {VacantCount} vacant · {TotalUnits} units · as of {AsOfDisplay}")"
+            CssClass="d-print-none">
+    <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick='() => Navigation.NavigateTo("/reports")' />
+    <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+
+<SfGrid TValue="OccRow" DataSource="@Rows" AllowPaging="false" AllowSorting="true">
+    <GridColumns>
+        <GridColumn Field="@nameof(OccRow.UnitNumber)" HeaderText="Unit" Width="90" />
+        <GridColumn Field="@nameof(OccRow.Status)" HeaderText="Status" Width="110" />
+        <GridColumn Field="@nameof(OccRow.TenantName)" HeaderText="Tenant" />
+        <GridColumn Field="@nameof(OccRow.LeaseEndDisplay)" HeaderText="Lease / term" Width="140" />
+        <GridColumn Field="@nameof(OccRow.MonthlyRentDisplay)" HeaderText="Rent" Width="100" TextAlign="TextAlign.Right" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<OccRow> Rows { get; set; } = [];
+    private int TotalUnits { get; set; }
+    private int OccupiedCount { get; set; }
+    private int VacantCount { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string AsOfDisplay => Clock.ToDisplayTime(Clock.UtcNow).ToString("g");
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var units = (await UnitService.GetAllAsync()).Where(u => !u.IsFacility).ToList();
+            var leases = await LeaseService.GetAllAsync();
+            var activeByUnit = leases
+                .Where(l => l.Status == LeaseStatus.Active)
+                .GroupBy(l => l.UnitId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StartUtc).First());
+
+            var tenantIds = units
+                .Select(u => activeByUnit.TryGetValue(u.Id, out var lease) ? lease.TenantId : u.CurrentTenantId)
+                .Where(id => id is not null)
+                .Cast<Guid>()
+                .Distinct()
+                .ToList();
+            var tenants = new Dictionary<Guid, Tenant>();
+            foreach (var id in tenantIds)
+            {
+                var t = await TenantService.GetByIdAsync(id);
+                if (t is not null)
+                {
+                    tenants[id] = t;
+                }
+            }
+
+            TotalUnits = units.Count;
+            OccupiedCount = units.Count(u => u.Status == UnitStatus.Occupied);
+            VacantCount = units.Count(u => u.Status == UnitStatus.Vacant);
+
+            Rows = units.OrderBy(u => u.Number).Select(u =>
+            {
+                activeByUnit.TryGetValue(u.Id, out var lease);
+                Guid? tenantId = lease?.TenantId ?? u.CurrentTenantId;
+                string tenantName = "—";
+                if (lease?.Tenant is not null)
+                {
+                    tenantName = $"{lease.Tenant.LastName}, {lease.Tenant.FirstName}";
+                }
+                else if (tenantId is Guid tid && tenants.TryGetValue(tid, out var t))
+                {
+                    tenantName = $"{t.LastName}, {t.FirstName}";
+                }
+
+                var rent = lease?.Rent ?? (u.MonthlyRent > 0 ? u.MonthlyRent : (decimal?)null);
+                return new OccRow
+                {
+                    UnitNumber = u.Number,
+                    Status = u.Status.ToString(),
+                    TenantName = tenantName,
+                    LeaseEndDisplay = lease is null
+                        ? (string.IsNullOrWhiteSpace(u.LeaseTerm) ? "—" : u.LeaseTerm)
+                        : Clock.ToDisplayTime(lease.EndUtc).ToString("d"),
+                    MonthlyRentDisplay = rent is null ? "—" : rent.Value.ToString("C")
+                };
+            }).ToList();
+            Logger.LogInformation(
+                "Occupancy report loaded: {Total} units, {Occupied} occupied, {Vacant} vacant.",
+                TotalUnits,
+                OccupiedCount,
+                VacantCount);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Occupancy report failed to load.");
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    private sealed class OccRow
+    {
+        public string UnitNumber { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string TenantName { get; set; } = "";
+        public string LeaseEndDisplay { get; set; } = "";
+        public string MonthlyRentDisplay { get; set; } = "";
+    }
+}

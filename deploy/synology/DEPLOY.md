@@ -96,6 +96,20 @@ sudo /usr/local/bin/docker logs clerksuite --tail 80
 From Mac: `curl -sI http://mr-storage:8082`
 (Host port **8082** — NAS `:8080` is used by `tikr-web`.)
 
+## Optional HTTPS (reverse proxy)
+
+ClerkSuite listens on plain HTTP inside Docker (`8082` on the NAS). For TLS on the town LAN or Tailscale:
+
+1. **Synology Application Portal** — add a reverse-proxy rule:
+   - Source: `https://clerksuite.town.local` (or NAS hostname + custom port)
+   - Destination: `http://127.0.0.1:8082`
+   - Enable HSTS only if all clerks use HTTPS consistently.
+2. **Certificate** — use DSM Let's Encrypt or town IT certificate on the NAS reverse proxy (not in the app container).
+3. **Tailscale** — clerks can use `http://mr-storage:8082` on the tailnet without public exposure; HTTPS is optional when traffic stays on Tailscale.
+4. **App behavior** — when `ASPNETCORE_URLS` includes `https://`, ClerkSuite enables `UseHttpsRedirection` and HSTS in production (see `ConfigureClerkSuitePipeline`).
+
+Do not terminate TLS inside the ClerkSuite container unless town IT requires it; reverse proxy on DSM is the usual Synology pattern.
+
 ## First-run checklist
 
 - [ ] Container `clerksuite` is Up

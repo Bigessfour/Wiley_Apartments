@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -23,15 +24,43 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.Configure<SeedUserOptions>(
             builder.Configuration.GetSection(SeedUserOptions.SectionName));
 
+        builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton<CircuitAuthCookieStore>();
+        builder.Services.AddScoped<CircuitAuthCookieAccessor>();
         builder.Services.AddSingleton<IDateTimeService, DateTimeService>();
+        builder.Services.AddSingleton<IDocumentPathResolver, DocumentPathResolver>();
+        builder.Services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         builder.Services.AddScoped<AuditSaveChangesInterceptor>();
         builder.Services.AddScoped<IIdentitySeeder, IdentitySeeder>();
         builder.Services.AddScoped<IUnitSeeder, UnitSeeder>();
         builder.Services.AddScoped<IUnitService, UnitService>();
+        builder.Services.AddScoped<ITenantService, TenantService>();
+        builder.Services.AddScoped<IOccupancyService, OccupancyService>();
         builder.Services.AddScoped<IAssetService, AssetService>();
         builder.Services.AddScoped<IFlooringService, FlooringService>();
+        builder.Services.AddSingleton<LeaseDocumentGenerator>();
+        builder.Services.AddSingleton<IElectronicSignatureHook, NullElectronicSignatureHook>();
+        builder.Services.AddScoped<IDocumentService, DocumentService>();
+        builder.Services.AddScoped<ILeaseService, LeaseService>();
+        builder.Services.AddScoped<IScheduleService, ScheduleService>();
+        builder.Services.AddScoped<ILateFeeSettingsService, LateFeeSettingsService>();
+        builder.Services.AddScoped<ILedgerService, LedgerService>();
+        builder.Services.AddScoped<PaymentReceiptGenerator>();
+        builder.Services.AddScoped<IPaymentReceiptService, PaymentReceiptService>();
+        builder.Services.AddScoped<IRentRollService, RentRollService>();
+        builder.Services.AddScoped<IUnitOperatingCostService, UnitOperatingCostService>();
+        builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
         builder.Services.AddScoped<IDashboardService, DashboardService>();
+        builder.Services.AddScoped<IPortfolioProfitLossService, PortfolioProfitLossService>();
+        builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+        builder.Services.AddScoped<IDocumentVaultAuditService, DocumentVaultAuditService>();
+        builder.Services.AddScoped<IDocumentVaultMetadataSync, DocumentVaultMetadataSync>();
+        builder.Services.AddScoped<ClerkToastService>();
+        builder.Services.AddScoped<IClerkToast>(sp => sp.GetRequiredService<ClerkToastService>());
+        builder.Services.AddScoped<DocumentVaultAntiforgeryFilter>();
+        builder.Services.AddHealthChecks()
+            .AddCheck<DocumentRootHealthCheck>("document-root");
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";
@@ -62,8 +91,15 @@ public static class ClerkSuiteServiceExtensions
 
         builder.Services.AddAuthorization();
         builder.Services.AddCascadingAuthenticationState();
+        builder.Services.AddControllers();
         builder.Services.AddSyncfusionBlazor();
-        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        builder.Services.AddScoped<CircuitHandler, LoggingCircuitHandler>();
+        builder.Services.AddScoped<CircuitHandler, CircuitAuthCookieHandler>();
+        builder.Services.AddRazorComponents()
+            .AddInteractiveServerComponents(options =>
+            {
+                options.DetailedErrors = builder.Environment.IsDevelopment();
+            });
 
         return builder;
     }
@@ -85,8 +121,12 @@ public static class ClerkSuiteServiceExtensions
         var unitSeeder = scope.ServiceProvider.GetRequiredService<IUnitSeeder>();
         await unitSeeder.SeedAsync();
 
-        var unitCount = await db.Units.CountAsync();
-        Log.Information("Database migrated. {UnitCount} units in portfolio.", unitCount);
+        var residentialCount = await db.Units.CountAsync(u => !u.IsFacility);
+        var facilityCount = await db.Units.CountAsync(u => u.IsFacility);
+        Log.Information(
+            "Database migrated. {ResidentialCount} residential + {FacilityCount} facility unit(s).",
+            residentialCount,
+            facilityCount);
     }
 
     public static WebApplication ConfigureClerkSuitePipeline(this WebApplication app)

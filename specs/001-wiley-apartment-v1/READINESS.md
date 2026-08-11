@@ -78,7 +78,7 @@ Authoritative detail: [research.md](./research.md) Decisions 4, 9, 10, 17, 20–
 
 | #   | Item                                   | Status     | When                                 |
 | --- | -------------------------------------- | ---------- | ------------------------------------ |
-| G8  | Colorado lease template counsel review | Deferred   | T3.2 — ship blank SFDT               |
+| G8  | Colorado lease template counsel review | Deferred   | T3.2 — Brookside fillable PDF on NAS |
 | G9  | Spreadsheet data import                | Deferred   | Manual entry v1                      |
 | G10 | App URL / hostname                     | Deferred   | T0.2, T7.1 — LAN / Tailscale first   |
 | G11 | Account naming                         | **Closed** | Merged with G7 — passwords at deploy |
@@ -181,3 +181,15 @@ Add to your shell profile or ensure `~/.cursor/scripts/run-sf-blazor-mcp.sh` exp
 | Toolchain      | UI Builder skill + component skills installed                                         |
 
 Log pass/fail in [deploy/synology/SYNCFUSION-SECRETS.md](../../../deploy/synology/SYNCFUSION-SECRETS.md) verification table — **dates only, no key values**.
+
+### E. Local run environment (Mac) — Development only
+
+| Do                                                                                                                       | Don't                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `./scripts/run-local.sh` or `dotnet run` with launch profile **http** / **https** (`ASPNETCORE_ENVIRONMENT=Development`) | Set `ASPNETCORE_ENVIRONMENT=Production` on the Mac for day-to-day debugging                                      |
+| Kill leftover listeners before relaunch (`run-local.sh` does this for port **5077**)                                     | Stack multiple `dotnet run` instances on the same port                                                           |
+| Use **Production** only for published output / NAS Docker (`deploy/synology`)                                            | Expect NuGet `_content/Syncfusion.*` assets to resolve from source without Development (or `UseStaticWebAssets`) |
+
+**Why:** Production + `dotnet run` from the project tree historically caused hundreds of `FileNotFoundException`s for Syncfusion static assets and scoped CSS. `Program.cs` calls `UseStaticWebAssets()` as a safety net and logs a warning if Production is detected under the source tree — still prefer Development locally.
+
+Default local URL: `http://localhost:5077` (see `Properties/launchSettings.json`). E2E tests use `127.0.0.1:5199` separately.

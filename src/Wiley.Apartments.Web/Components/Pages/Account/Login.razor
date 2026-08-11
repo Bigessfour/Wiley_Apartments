@@ -4,6 +4,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Identity
 @using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Inputs
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
@@ -11,32 +12,37 @@
 
 <PageTitle>Sign in — ClerkSuite</PageTitle>
 
-<div class="login-panel mx-auto mt-5" style="max-width: 420px;">
-    <h2>ClerkSuite</h2>
-    <p class="text-muted">Sign in to continue.</p>
+<div class="login-shell">
+    <SfCard CssClass="login-panel">
+        <CardContent>
+            <div class="login-mark" aria-hidden="true">CS</div>
+            <h1>ClerkSuite</h1>
+            <p class="text-muted mb-4">Town of Wiley Apartments — sign in to continue.</p>
 
-    @if (!string.IsNullOrEmpty(ErrorMessage))
-    {
-        <div class="alert alert-danger">@ErrorMessage</div>
-    }
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger">@ErrorMessage</div>
+            }
 
-    @* Static SSR form — Identity cookie sign-in must run outside Interactive Server circuit. *@
-    <EditForm Model="Input" FormName="login" method="post" OnValidSubmit="HandleLoginAsync">
-        <DataAnnotationsValidator />
-        <ValidationSummary class="text-danger" />
-        <div class="mb-3">
-            <label class="form-label">Email</label>
-            <InputText @bind-Value="Input.Email" class="form-control" placeholder="you@townofwiley.gov" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Password</label>
-            <InputText @bind-Value="Input.Password" type="password" class="form-control" />
-        </div>
-        <SfButton CssClass="e-primary"
-                  IsPrimary="true"
-                  Content="Sign in"
-                  HtmlAttributes="@SubmitButtonAttributes" />
-    </EditForm>
+            @* Static SSR form — Identity cookie sign-in must run outside Interactive Server circuit. *@
+            <EditForm Model="Input" FormName="login" method="post" OnValidSubmit="HandleLoginAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <InputText @bind-Value="Input.Email" class="form-control form-control-lg" placeholder="you@townofwiley.gov" autocomplete="username" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Password</label>
+                    <InputText @bind-Value="Input.Password" type="password" class="form-control form-control-lg" autocomplete="current-password" />
+                </div>
+                <SfButton CssClass="e-primary e-block"
+                          IsPrimary="true"
+                          Content="Sign in"
+                          HtmlAttributes="@SubmitButtonAttributes" />
+            </EditForm>
+        </CardContent>
+    </SfCard>
 </div>
 
 @code {

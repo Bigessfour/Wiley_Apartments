@@ -1,0 +1,54 @@
+@using Syncfusion.Blazor.Notifications
+@inject ClerkToastService ToastBridge
+@implements IDisposable
+
+<div class="clerksuite-toast-host">
+    <SfToast @ref="_toast"
+             Timeout="4000"
+             NewestOnTop="true"
+             ShowCloseButton="true"
+             ShowProgressBar="true">
+        <ToastPosition X="Right" Y="Top"></ToastPosition>
+    </SfToast>
+</div>
+
+@code {
+    private SfToast? _toast;
+
+    protected override void OnInitialized()
+    {
+        ToastBridge.Register(ShowSuccessCoreAsync, ShowErrorCoreAsync, ShowInfoCoreAsync);
+    }
+
+    private Task ShowSuccessCoreAsync(string title, string message) =>
+        ShowAsync(title, message, "e-toast-success");
+
+    private Task ShowErrorCoreAsync(string title, string message) =>
+        ShowAsync(title, message, "e-toast-danger");
+
+    private Task ShowInfoCoreAsync(string title, string message) =>
+        ShowAsync(title, message, "e-toast-info");
+
+    private async Task ShowAsync(string title, string message, string cssClass)
+    {
+        if (_toast is null)
+        {
+            return;
+        }
+
+        await _toast.ShowAsync(new ToastModel
+        {
+            Title = title,
+            Content = message,
+            CssClass = cssClass,
+            Timeout = 4000,
+            ShowCloseButton = true,
+            ShowProgressBar = true
+        });
+    }
+
+    public void Dispose()
+    {
+        ToastBridge.Register((_, _) => Task.CompletedTask, (_, _) => Task.CompletedTask, (_, _) => Task.CompletedTask);
+    }
+}

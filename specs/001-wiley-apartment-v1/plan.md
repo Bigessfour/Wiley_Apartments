@@ -25,7 +25,7 @@ framework or component library (no MudBlazor, Radzen, Angular, WASM-first UI, et
 | ---------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **UI (sole stack)**    | Blazor **Interactive Server** + **Syncfusion Blazor** | Only approved UI path; all surfaces use `Sf*` components                                        |
 | **Components**         | Syncfusion Blazor NuGet packages                      | Grid, DashboardLayout, DocumentEditor, PdfViewer, FileManager, Charts, Cards, Dialogs, Inputs   |
-| **Backend**            | ASP.NET Core 8                                        | Single web host                                                                                 |
+| **Backend**            | ASP.NET Core 9                                        | Single web host                                                                                 |
 | **Data access**        | **Entity Framework Core** (primary)                   | Migrations, audit interceptor, Identity integration                                             |
 |                        | Dapper (optional later)                               | Read-heavy reports only if profiling warrants                                                   |
 | **Database (default)** | **SQLite** (production default)                       | Single-container deploy; DB file on NAS-bound Docker volume                                     |
@@ -59,7 +59,7 @@ requests it (see [research.md](./research.md) Decisions 2, 21).
 
 ## Technical Context
 
-**Language/Version**: C# / .NET 8 (LTS)
+**Language/Version**: C# / .NET 9 (STS)
 
 **Primary Dependencies**: ASP.NET Core Blazor **Interactive Server** (sole UI host), **Syncfusion Blazor** (sole UI components),
 Entity Framework Core, ASP.NET Core Identity
@@ -107,7 +107,7 @@ flowchart TB
     subgraph nas [Synology DS225+ via Tailscale]
         RP[Reverse Proxy HTTPS optional]
         subgraph docker [Docker]
-            APP[ClerkSuite Blazor Server ASP.NET Core 8]
+            APP[ClerkSuite Blazor Server ASP.NET Core 9]
             DB[(SQLite or Postgres/MariaDB)]
         end
         DOCS["/volume1/apartments/docs"]
@@ -141,7 +141,7 @@ flowchart TB
 
 ```text
 clerk-suite/
-├── app (ASP.NET 8)
+├── app (ASP.NET 9)
 ├── /data/clerksuite.db     ← SQLite on Docker volume (NAS disk)
 └── /docs                   ← bind mount → /volume1/apartments/docs
 ```
@@ -155,14 +155,16 @@ clerk-suite-app  →  clerk-suite-db (postgres:16 or mariadb:11)
 
 ### Syncfusion surface map
 
-| Area                          | Component                          |
-| ----------------------------- | ---------------------------------- |
-| Units, tenants, ledger, audit | SfGrid                             |
-| Dashboard                     | SfDashboardLayout, SfCard, SfChart |
-| Lease templates               | DocumentEditor (SFDT)              |
-| PDF viewing                   | SfPdfViewer                        |
-| Document vault                | FileManager (custom NAS adapter)   |
-| Forms / dialogs               | SfDataForm, SfDialog               |
+| Area                            | Component                                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Units, tenants, ledger, audit   | SfGrid                                                                                                     |
+| Dashboard                       | SfDashboardLayout, SfCard, SfChart                                                                         |
+| Lease templates                 | Fillable AcroForm PDF (`templates/brookside-*.pdf` bootstrapped from Brookside DOCX); DocIO for conversion |
+| Lease preview / signed PDF      | SfPdfViewer2                                                                                               |
+| PDF viewing                     | SfPdfViewer                                                                                                |
+| Document vault                  | FileManager (custom NAS adapter); DocumentEditor deferred to T6.1 if in-app Office edit needed             |
+| Forms / dialogs                 | SfDataForm, SfDialog                                                                                       |
+| Operations calendar (Phase 3.5) | SfSchedule                                                                                                 |
 
 ---
 
@@ -182,7 +184,7 @@ This section is **constitution Principle V** — non-negotiable for all UI work.
    - **Blazor UI Builder skill** for Cursor (installed at T0.0)
    - **Component skills** (`syncfusion/blazor-ui-components-skills` or equivalent)
    - Project rules: [AGENTS.md](../../../AGENTS.md)
-   Skipping MCP/skills for convenience is **out of compliance**.
+     Skipping MCP/skills for convenience is **out of compliance**.
 4. **Out of compliance** — Raw HTML tables for data, MudBlazor, Radzen, Bootstrap-only grids,
    custom `<table>` CRUD, or AI-generated UI that ignores Syncfusion docs → **must rewrite**
    before task/phase done.
@@ -293,9 +295,9 @@ See [deploy/synology/SYNCFUSION-SECRETS.md](../../../deploy/synology/SYNCFUSION-
 3. **Documents on NAS, metadata in DB** — files never stored as blobs in DB; `Document.FilePathOnNas` + category only.
 4. **Payment portal** — Town of Wiley PayStar (`PaymentPortalUrl`); deep-link only; no card processing in ClerkSuite.
 5. **Late fees** — settings toggle default OFF; configurable amount + grace days when enabled (T4.2).
-5. **Lease generation** — Syncfusion DocumentEditor for template edit/preview; server-side export to DOCX/PDF from merged template.
-6. **UTC storage, local display** — all `DateTime` persisted UTC; UI displays `America/Denver`.
-7. **Soft deletes** — `Tenant` and `Lease` use soft delete where history matters; hard delete forbidden for governed entities.
+6. **Lease generation** — Fillable AcroForm PDF from Brookside templates (DocIO bootstrap + Pdf fill); preview via SfPdfViewer2; optional custom-clause addendum page.
+7. **UTC storage, local display** — all `DateTime` persisted UTC; UI displays `America/Denver`.
+8. **Soft deletes** — `Tenant` and `Lease` use soft delete where history matters; hard delete forbidden for governed entities.
 
 ---
 
@@ -340,7 +342,7 @@ volumes:
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 | Principle             | Gate                                                                   | Status |
 | --------------------- | ---------------------------------------------------------------------- | ------ |
@@ -350,7 +352,7 @@ volumes:
 | IV. Minimal parts     | 1 container default; max 2 with Postgres/MariaDB                       | PASS   |
 | V. Syncfusion mandate | Syncfusion-only UI; MCP/Agentic Builder; keys not in git               | PASS   |
 | VI. Security          | Identity login (audit); no roles v1; Tailscale optional; HTTPS at edge | PASS   |
-| VII. Colorado leases  | Editable SFDT templates; merge + preview                               | PASS   |
+| VII. Colorado leases  | Brookside fillable PDF templates; merge + PdfViewer preview            | PASS   |
 | VIII. Demonstrable    | quickstart.md on real NAS + Win11                                      | PASS   |
 
 Post-design re-check: No violations.
@@ -388,7 +390,7 @@ deploy/
 ├── docker-compose.postgres.yml # optional override
 ├── Dockerfile
 └── synology/                   # NAS setup, reverse proxy notes
-templates/leases/
+# Lease blanks live on NAS DocumentRoot/templates/ (not in git)
 tests/Wiley.Apartments.Tests/
 ```
 
@@ -399,3 +401,23 @@ tests/Wiley.Apartments.Tests/
 ## Complexity Tracking
 
 > No constitution violations requiring justification.
+
+---
+
+## Next version (v1.1 / feature 002 — planned)
+
+Deferred from v1 pilot after clerk feedback. Do **not** implement under 001 tasks; open `specs/002-*` (or append a Phase 9 backlog once T7 sign-off closes) before coding.
+
+| ID | Item | Clerk need | Notes |
+| -- | ---- | ---------- | ----- |
+| **NV-1** | **Payment receipt PDF** | After Paige (or Deb) records/accepts a payment on the ledger, generate a **PDF receipt** the clerk can **print** or **email** to the tenant. | **Implemented 2026-08-10** — `/payments/receipt/{id}`, ledger Receipt button, vault Receipt category. |
+| **NV-4** | **Tenant security deposit panel** | See required/paid/held deposit on Tenant page; record deposit payment. | **Implemented 2026-08-10** — Tenant detail card + `IsDeposit` ledger flag + `PostDepositPaymentAsync`. |
+| NV-2 | DocuSign / e-sign integration | Beyond export-ready PDF | Spec assumption already post-v1. |
+| NV-3 | Facility reservation entity / CC rental agreement PDF | Community Center bookings | Explicitly deferred from CC hub note in tasks.md. |
+
+**NV-1 acceptance sketch (for 002 specify):**
+
+1. From Payments/ledger (and tenant detail payment actions), clerk selects a **Payment** `LedgerEntry` → **Receipt**.
+2. App generates PDF; opens in SfPdfViewer (or download) with Print.
+3. Clerk can download and attach to email (mailto with attachment may be OS-limited — provide download + clear “email to tenant” instructions; optional later: SMTP if town IT provides).
+4. AuditLog records receipt generation.

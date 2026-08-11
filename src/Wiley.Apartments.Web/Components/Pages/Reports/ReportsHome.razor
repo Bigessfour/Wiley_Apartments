@@ -1,0 +1,49 @@
+@page "/reports"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Cards
+@inject NavigationManager Navigation
+
+<PageTitle>Reports</PageTitle>
+
+<PageHeader Title="Reports" Subtitle="Operational reports for clerks and town council packets." />
+
+<div class="report-card-grid">
+    @foreach (var report in Reports)
+    {
+        <div role="button" tabindex="0" class="report-card-hit"
+             @onclick="@(() => Navigation.NavigateTo(report.Href))"
+             @onkeydown="@(e => OnReportKey(e, report.Href))">
+            <SfCard CssClass="report-card">
+                <CardContent>
+                    <h2>@report.Title</h2>
+                    <p>@report.Blurb</p>
+                </CardContent>
+            </SfCard>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly ReportLink[] Reports =
+    [
+        new("/reports/rent-roll", "Rent roll", "Current rent status across all 16 units."),
+        new("/reports/occupancy", "Occupancy", "Occupied vs vacant portfolio snapshot."),
+        new("/reports/warranty", "Warranty status", "Appliance warranties nearing expiration."),
+        new("/reports/delinquency", "Delinquency", "Accounts with outstanding balances."),
+        new("/reports/operating-costs", "Operating costs", "Landlord ops costs by unit and category."),
+        new("/reports/maintenance-costs", "Maintenance cost by unit", "Work-order spend rolled up by unit."),
+        new("/reports/profit-loss", "Portfolio P/L", "Council income, expense, and net charts."),
+        new("/reports/rent-pivot", "Rent pivot", "Unit × year × month ledger pivot (export Excel/PDF).")
+    ];
+
+    private void OnReportKey(KeyboardEventArgs e, string href)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            Navigation.NavigateTo(href);
+        }
+    }
+
+    private sealed record ReportLink(string Href, string Title, string Blurb);
+}

@@ -1,0 +1,91 @@
+@page "/reports/warranty"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@inject IUnitService UnitService
+@inject IAssetService AssetService
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Warranty status</PageTitle>
+
+<PageHeader Title="Warranty status" Subtitle="@($"Assets with warranty end dates · as of {AsOfDisplay}")" CssClass="d-print-none">
+    <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick='() => Navigation.NavigateTo("/reports")' />
+    <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+    <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+
+<SfGrid TValue="WarrantyRow" DataSource="@Rows" AllowPaging="false" AllowSorting="true">
+    <GridColumns>
+        <GridColumn Field="@nameof(WarrantyRow.UnitNumber)" HeaderText="Unit" Width="90" />
+        <GridColumn Field="@nameof(WarrantyRow.AssetLabel)" HeaderText="Asset" />
+        <GridColumn Field="@nameof(WarrantyRow.Serial)" HeaderText="Serial" Width="140" />
+        <GridColumn Field="@nameof(WarrantyRow.WarrantyEndDisplay)" HeaderText="Warranty end" Width="130" />
+        <GridColumn Field="@nameof(WarrantyRow.DaysRemaining)" HeaderText="Days left" Width="100" TextAlign="TextAlign.Right" />
+        <GridColumn Field="@nameof(WarrantyRow.Status)" HeaderText="Status" Width="110" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<WarrantyRow> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+    private string AsOfDisplay => Clock.ToDisplayTime(Clock.UtcNow).ToString("g");
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var today = DateOnly.FromDateTime(Clock.ToDisplayTime(Clock.UtcNow).Date);
+            var units = await UnitService.GetAllAsync();
+            var rows = new List<WarrantyRow>();
+            foreach (var unit in units.OrderBy(u => u.Number))
+            {
+                var assets = await AssetService.GetByUnitIdAsync(unit.Id);
+                foreach (var a in assets.Where(x => x.WarrantyEnd.HasValue))
+                {
+                    var end = a.WarrantyEnd!.Value;
+                    var days = end.DayNumber - today.DayNumber;
+                    rows.Add(new WarrantyRow
+                    {
+                        UnitNumber = unit.Number,
+                        AssetLabel = string.IsNullOrWhiteSpace(a.Make)
+                            ? a.Type
+                            : $"{a.Type} ({a.Make})",
+                        Serial = a.Serial,
+                        WarrantyEndDisplay = end.ToString("d"),
+                        DaysRemaining = days,
+                        Status = days < 0 ? "Expired" : days <= 90 ? "Expiring" : "Active"
+                    });
+                }
+            }
+
+            Rows = rows.OrderBy(r => r.DaysRemaining).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    private sealed class WarrantyRow
+    {
+        public string UnitNumber { get; set; } = "";
+        public string AssetLabel { get; set; } = "";
+        public string Serial { get; set; } = "";
+        public string WarrantyEndDisplay { get; set; } = "";
+        public int DaysRemaining { get; set; }
+        public string Status { get; set; } = "";
+    }
+}

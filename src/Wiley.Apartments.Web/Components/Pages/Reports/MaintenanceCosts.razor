@@ -1,0 +1,80 @@
+@page "/reports/maintenance-costs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Grids
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IMaintenanceService Maintenance
+@inject IUnitService UnitService
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>Maintenance cost by unit</PageTitle>
+
+<PageHeader Title="Maintenance cost by unit"
+            Subtitle="Work-order costs rolled up per apartment (FR-023). Completed WOs with cost recorded."
+            CssClass="d-print-none">
+    <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+    <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning d-print-none">@ErrorMessage</div>
+}
+
+<SfGrid TValue="MaintCostRow" DataSource="@Rows" AllowPaging="true" AllowSorting="true" AllowFiltering="true">
+    <GridPageSettings PageSize="16" />
+    <GridColumns>
+        <GridColumn Field="@nameof(MaintCostRow.UnitNumber)" HeaderText="Unit" Width="90" />
+        <GridColumn Field="@nameof(MaintCostRow.RequestCount)" HeaderText="WO count" Width="100" />
+        <GridColumn Field="@nameof(MaintCostRow.TotalCost)" HeaderText="Total cost" Format="C2" Width="120" />
+        <GridColumn Field="@nameof(MaintCostRow.OpenCount)" HeaderText="Open" Width="90" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<MaintCostRow> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var units = await UnitService.GetAllAsync();
+            var all = await Maintenance.GetAllAsync(openOnly: false);
+            Rows = units
+                .OrderBy(u => u.Number)
+                .Select(u =>
+                {
+                    var forUnit = all.Where(m => m.UnitId == u.Id).ToList();
+                    return new MaintCostRow
+                    {
+                        UnitNumber = u.Number,
+                        RequestCount = forUnit.Count,
+                        OpenCount = forUnit.Count(m =>
+                            m.Status is MaintenanceStatus.Open or MaintenanceStatus.InProgress),
+                        TotalCost = forUnit.Where(m => m.Cost is not null).Sum(m => m.Cost!.Value)
+                    };
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task PrintAsync() => await Js.InvokeVoidAsync("window.print");
+
+    private sealed class MaintCostRow
+    {
+        public string UnitNumber { get; set; } = "";
+        public int RequestCount { get; set; }
+        public int OpenCount { get; set; }
+        public decimal TotalCost { get; set; }
+    }
+}

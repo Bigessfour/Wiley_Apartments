@@ -1,0 +1,583 @@
+@page "/leases/{LeaseId:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.Extensions.Options
+@using Syncfusion.Blazor.Inputs
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@using Wiley.Apartments.Web.Configuration
+@using Wiley.Apartments.Web.Components.Shared
+@inject ILeaseService LeaseService
+@inject IDocumentService DocumentService
+@inject IElectronicSignatureHook ESignHook
+@inject IOptions<ClerkSuiteOptions> Options
+@inject IHostEnvironment Environment
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
+@inject IClerkToast Toast
+
+<PageTitle>Lease preview</PageTitle>
+
+@if (Lease is null)
+{
+    <p class="text-muted">@(ErrorMessage ?? "Loading…")</p>
+}
+else
+{
+    <PageHeader Title="@($"Lease — unit {Lease.Unit?.Number}")"
+                Subtitle="@LeaseHeaderSubtitle">
+        <SfButton CssClass="e-outline" Content="← Leases" OnClick="@(() => Navigation.NavigateTo("/leases"))" />
+        @if (PaymentPortalConfigured)
+        {
+            <a class="e-btn e-outline" href="@PaymentPortalUrl" target="_blank" rel="noopener noreferrer">Payment portal</a>
+        }
+        else
+        {
+            <span class="text-danger small align-self-center">@PaymentPortalError</span>
+        }
+        <SfButton CssClass="e-primary" Content="@(string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) ? "Generate PDF" : "Regenerate PDF")"
+                  Disabled="@Busy" OnClick="GenerateAsync" />
+        @if (_pdfBytes is { Length: > 0 })
+        {
+            <a class="e-btn e-outline" href="@PdfDownloadHref" download="@PdfDownloadFileName">Download PDF</a>
+        }
+    </PageHeader>
+    <p class="small mb-3">
+        @Clock.ToDisplayTime(Lease.StartUtc).ToString("d") – @Clock.ToDisplayTime(Lease.EndUtc).ToString("d")
+        · Rent @Lease.Rent.ToString("C") · Deposit @Lease.Deposit.ToString("C")
+    </p>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-warning">@ErrorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Lease.LifecycleNote))
+    {
+        <p class="small text-muted">Lifecycle note: @Lease.LifecycleNote</p>
+    }
+    @if (Lease.PriorLeaseId is Guid priorId)
+    {
+        <p class="small mb-2">
+            Renewed from
+            <a href="@($"/leases/{priorId}")">prior lease</a>
+        </p>
+    }
+    @if (Lease.SuccessorLeaseId is Guid succId)
+    {
+        <p class="small mb-2">
+            Succeeded by
+            <a href="@($"/leases/{succId}")">renewal lease</a>
+        </p>
+    }
+
+    @if (Lease.Status is LeaseStatus.Active or LeaseStatus.Amended)
+    {
+        <h2 class="h5 mt-3">Lifecycle</h2>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <SfButton CssClass="e-outline e-small" Content="Amend…" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "amend")" />
+            <SfButton CssClass="e-outline e-small" Content="Renew…" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "renew")" />
+            <SfButton CssClass="e-outline e-small e-danger" Content="Terminate…" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "terminate")" />
+        </div>
+
+        @if (ShowPanel == "amend")
+        {
+            <div class="row g-2 mb-4" style="max-width: 640px;">
+                <div class="col-md-4">
+                    <label class="form-label">Rent</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="AmendRent" Format="C2" Min="0" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Deposit</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="AmendDeposit" Format="C2" Min="0" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">End</label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="AmendEnd" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Custom clauses</label>
+                    <SfTextBox @bind-Value="AmendClauses" Multiline="true" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Note</label>
+                    <SfTextBox @bind-Value="LifecycleNote" Placeholder="Optional note" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <SfButton CssClass="e-primary e-small" Content="Save amendment" Disabled="@Busy" OnClick="AmendAsync" />
+                    <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+                </div>
+            </div>
+        }
+        else if (ShowPanel == "renew")
+        {
+            <div class="row g-2 mb-4" style="max-width: 640px;">
+                <div class="col-md-4">
+                    <label class="form-label">New end</label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="RenewEnd" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Rent (optional)</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="RenewRent" Format="C2" Min="0" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Deposit (optional)</label>
+                    <SfNumericTextBox TValue="decimal?" @bind-Value="RenewDeposit" Format="C2" Min="0" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Note</label>
+                    <SfTextBox @bind-Value="LifecycleNote" Placeholder="Optional note" />
+                </div>
+                <div class="col-12">
+                    <p class="text-muted small mb-2">
+                        Creates a Draft successor starting @Clock.ToDisplayTime(Lease.EndUtc).ToString("d").
+                        Generate and attach signed PDF on the new lease.
+                    </p>
+                    <SfButton CssClass="e-primary e-small" Content="Create renewal draft" Disabled="@Busy" OnClick="RenewAsync" />
+                    <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+                </div>
+            </div>
+        }
+        else if (ShowPanel == "terminate")
+        {
+            <div class="row g-2 mb-4" style="max-width: 480px;">
+                <div class="col-md-6">
+                    <label class="form-label">Effective end</label>
+                    <SfDatePicker TValue="DateTime?" @bind-Value="TerminateEnd" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Note</label>
+                    <SfTextBox @bind-Value="LifecycleNote" Placeholder="Reason (optional)" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <SfButton CssClass="e-danger e-small" Content="Confirm terminate" Disabled="@Busy" OnClick="TerminateAsync" />
+                    <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+                </div>
+            </div>
+        }
+    }
+
+    <h2 class="h5 mt-2">Signed lease</h2>
+    <p class="text-muted small mb-2">
+        @(ESignHook.IsConfigured
+            ? "E-sign provider is configured."
+            : "E-sign is not configured in v1 — print/wet-ink signature, then upload the signed PDF below.")
+    </p>
+    @if (!string.IsNullOrWhiteSpace(Lease.CustomClauses))
+    {
+        <p class="small mb-2"><strong>Custom clauses:</strong> included as PDF addendum.</p>
+    }
+    @if (Lease.SignedDocumentId is Guid signedId)
+    {
+        <p class="small mb-2">
+            Linked vault document: <code>@signedId</code>
+            @if (SignedInfo is not null)
+            {
+                <span> — @SignedInfo.OriginalFileName (@SignedInfo.FilePathOnNas)</span>
+            }
+            <SfButton CssClass="e-small e-outline ms-2" Content="View signed PDF" OnClick="ViewSignedAsync" />
+        </p>
+    }
+    else
+    {
+        <p class="text-muted small mb-2">Upload the signed PDF to activate this lease (Draft → Active).</p>
+        @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+        {
+            <SfButton CssClass="e-small e-outline mb-2" Content="Request e-sign (hook)"
+                      Disabled="@Busy" OnClick="RequestESignAsync" />
+        }
+    }
+
+    <div style="max-width: 480px;" class="mb-4">
+        <SfUploader AllowedExtensions=".pdf"
+                    MaxFileSize="25000000"
+                    AutoUpload="false"
+                    Multiple="false">
+            <UploaderEvents ValueChange="OnSignedSelectedAsync" />
+        </SfUploader>
+        <SfButton CssClass="e-primary e-small mt-2"
+                  Content="@(Busy ? "Uploading…" : "Attach signed PDF")"
+                  Disabled="@(Busy || _pendingSigned is null)"
+                  OnClick="AttachSignedAsync" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) || _pdfBytes is not null)
+    {
+        <p class="small text-muted mb-2">
+            @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
+            {
+                <span>Generated: @Lease.GeneratedPdfRelativePath</span>
+            }
+            @if (!string.IsNullOrEmpty(Lease.GeneratedDocxRelativePath))
+            {
+                <span> · DOCX archive: @Lease.GeneratedDocxRelativePath</span>
+            }
+            @if (_pdfBytes is { Length: > 0 })
+            {
+                <span> · @_pdfBytes.Length.ToString("N0") bytes</span>
+            }
+        </p>
+        <ClerkPdfViewer PdfBytes="@_pdfBytes" DownloadFileName="@PdfDownloadFileName" Height="680px" />
+    }
+}
+
+@code {
+    [Parameter] public Guid LeaseId { get; set; }
+
+    private Lease? Lease { get; set; }
+    private Wiley.Apartments.Contracts.DocumentInfo? SignedInfo { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool Busy { get; set; }
+    private byte[]? _pdfBytes;
+    private (string Name, string ContentType, byte[] Bytes)? _pendingSigned;
+    private string? ShowPanel { get; set; }
+    private decimal? AmendRent { get; set; }
+    private decimal? AmendDeposit { get; set; }
+    private DateTime? AmendEnd { get; set; }
+    private string? AmendClauses { get; set; }
+    private DateTime? RenewEnd { get; set; }
+    private decimal? RenewRent { get; set; }
+    private decimal? RenewDeposit { get; set; }
+    private DateTime? TerminateEnd { get; set; }
+    private string? LifecycleNote { get; set; }
+    private Guid? _loadedLeaseId;
+
+    private string PdfDownloadFileName =>
+        Path.GetFileName(Lease?.GeneratedPdfRelativePath ?? "lease.pdf");
+
+    private string PdfDownloadHref =>
+        _pdfBytes is { Length: > 0 }
+            ? "data:application/pdf;base64," + Convert.ToBase64String(_pdfBytes)
+            : "#";
+
+    private string LeaseHeaderSubtitle
+    {
+        get
+        {
+            if (Lease is null)
+            {
+                return string.Empty;
+            }
+
+            var tenant = Lease.Tenant is null
+                ? ""
+                : $"{Lease.Tenant.FirstName} {Lease.Tenant.LastName}";
+            return string.Join(" · ", new[] { tenant, Lease.Status.ToString(), Lease.TemplateUsed }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+        }
+    }
+
+    private bool PaymentPortalConfigured =>
+        PaymentPortalConfiguration.TryResolve(Options.Value.PaymentPortalUrl, out _, out _);
+    private string PaymentPortalUrl =>
+        PaymentPortalConfiguration.TryResolve(Options.Value.PaymentPortalUrl, out var url, out _)
+            ? url
+            : string.Empty;
+    private string PaymentPortalError =>
+        PaymentPortalConfiguration.TryResolve(Options.Value.PaymentPortalUrl, out _, out var err)
+            ? string.Empty
+            : (err ?? PaymentPortalConfiguration.ItContactNote);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedLeaseId != LeaseId)
+        {
+            ShowPanel = null;
+            ErrorMessage = null;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        Lease = await LeaseService.GetByIdAsync(LeaseId);
+        _loadedLeaseId = LeaseId;
+        if (Lease is null)
+        {
+            ErrorMessage = "Lease not found.";
+            return;
+        }
+
+        SignedInfo = null;
+        if (Lease.SignedDocumentId is Guid sid)
+        {
+            SignedInfo = await DocumentService.GetByIdAsync(sid);
+        }
+
+        AmendRent = Lease.Rent;
+        AmendDeposit = Lease.Deposit;
+        AmendEnd = Clock.ToDisplayTime(Lease.EndUtc).Date;
+        AmendClauses = Lease.CustomClauses;
+        RenewEnd = Clock.ToDisplayTime(Lease.EndUtc).Date.AddYears(1);
+        RenewRent = Lease.Rent;
+        RenewDeposit = Lease.Deposit;
+        TerminateEnd = DateTime.Today;
+        LifecycleNote = null;
+
+        await PreferDisplayPdfAsync();
+    }
+
+    private async Task AmendAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            DateTime? endUtc = AmendEnd is null
+                ? null
+                : Clock.ToUtc(AmendEnd.Value.Date);
+            Lease = await LeaseService.AmendAsync(
+                LeaseId,
+                AmendRent,
+                AmendDeposit,
+                endUtc,
+                AmendClauses,
+                LifecycleNote);
+            ShowPanel = null;
+            await Toast.ShowSuccessAsync("Lease amended.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RenewAsync()
+    {
+        if (RenewEnd is null)
+        {
+            ErrorMessage = "Choose a new end date for the renewal.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var successor = await LeaseService.RenewAsync(
+                LeaseId,
+                Clock.ToUtc(RenewEnd.Value.Date),
+                RenewRent,
+                RenewDeposit,
+                LifecycleNote);
+            Navigation.NavigateTo($"/leases/{successor.Id}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task TerminateAsync()
+    {
+        if (TerminateEnd is null)
+        {
+            ErrorMessage = "Choose an effective termination date.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            Lease = await LeaseService.TerminateAsync(
+                LeaseId,
+                Clock.ToUtc(TerminateEnd.Value.Date),
+                LifecycleNote);
+            ShowPanel = null;
+            await Toast.ShowSuccessAsync("Lease terminated.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task PreferDisplayPdfAsync()
+    {
+        _pdfBytes = null;
+        if (Lease?.SignedDocumentId is Guid sid)
+        {
+            _pdfBytes = await DocumentService.ReadBytesAsync(sid);
+            if (_pdfBytes is not null)
+            {
+                return;
+            }
+        }
+
+        if (Lease?.GeneratedPdfRelativePath is null)
+        {
+            return;
+        }
+
+        var root = Options.Value.DocumentRoot;
+        if (!Path.IsPathRooted(root))
+        {
+            root = Path.GetFullPath(Path.Combine(Environment.ContentRootPath, root));
+        }
+
+        var path = Path.Combine(root, Lease.GeneratedPdfRelativePath);
+        if (!File.Exists(path))
+        {
+            ErrorMessage = $"Generated PDF missing: {Lease.GeneratedPdfRelativePath}";
+            return;
+        }
+
+        _pdfBytes = await File.ReadAllBytesAsync(path);
+        if (_pdfBytes.Length < 5
+            || _pdfBytes[0] != (byte)'%'
+            || _pdfBytes[1] != (byte)'P'
+            || _pdfBytes[2] != (byte)'D'
+            || _pdfBytes[3] != (byte)'F')
+        {
+            ErrorMessage = $"Generated file is not a valid PDF: {Lease.GeneratedPdfRelativePath}";
+            _pdfBytes = null;
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            Lease = await LeaseService.GenerateDocumentsAsync(LeaseId);
+            await PreferDisplayPdfAsync();
+            if (_pdfBytes is { Length: > 0 })
+            {
+                await Toast.ShowSuccessAsync("Lease PDF generated.");
+            }
+            else if (string.IsNullOrEmpty(ErrorMessage))
+            {
+                ErrorMessage = "Generate completed but PDF bytes could not be read from DocumentRoot.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task OnSignedSelectedAsync(UploadChangeEventArgs args)
+    {
+        ErrorMessage = null;
+        _pendingSigned = null;
+        var file = args.Files?.FirstOrDefault();
+        if (file?.FileInfo is null)
+        {
+            return;
+        }
+
+        await using var stream = file.File.OpenReadStream(25 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        _pendingSigned = (file.FileInfo.Name, file.FileInfo.Type ?? "application/pdf", ms.ToArray());
+    }
+
+    private async Task AttachSignedAsync()
+    {
+        if (_pendingSigned is null || Lease is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name
+                ?? auth.User.FindFirstValue(ClaimTypes.Email)
+                ?? "clerk";
+            await using var stream = new MemoryStream(_pendingSigned.Value.Bytes);
+            Lease = await LeaseService.AttachSignedDocumentAsync(
+                LeaseId,
+                _pendingSigned.Value.Name,
+                _pendingSigned.Value.ContentType,
+                stream,
+                user);
+            _pendingSigned = null;
+            await Toast.ShowSuccessAsync("Signed lease attached. Status is now Active.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ViewSignedAsync()
+    {
+        if (Lease?.SignedDocumentId is not Guid sid)
+        {
+            return;
+        }
+
+        _pdfBytes = await DocumentService.ReadBytesAsync(sid);
+    }
+
+    private async Task RequestESignAsync()
+    {
+        if (Lease?.GeneratedPdfRelativePath is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name
+                ?? auth.User.FindFirstValue(ClaimTypes.Email)
+                ?? "clerk";
+            var result = await ESignHook.RequestSignatureAsync(
+                Lease.Id,
+                Lease.GeneratedPdfRelativePath,
+                user);
+            if (result.Status == "NotConfigured")
+            {
+                await Toast.ShowSuccessAsync(result.Message);
+            }
+            else
+            {
+                await Toast.ShowSuccessAsync($"{result.Status}: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}

@@ -1,328 +1,501 @@
 @page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
-@using Syncfusion.Blazor.Layouts
 @using Syncfusion.Blazor.Buttons
-@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Chart3D
+@using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.HeatMap
+@using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.LinearGauge
+@using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
+@inject IDashboardService DashboardService
+@inject IPortfolioProfitLossService ProfitLoss
+@inject IDateTimeService Clock
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
-    <div>
-        <h1 class="h3 mb-1">Dashboard</h1>
-        <p class="text-muted mb-0">Portfolio health — Town of Wiley Apartments</p>
-    </div>
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        @if (LoadedAtDisplay is not null)
-        {
-            <p class="text-muted small mb-0 tabular-nums">As of @LoadedAtDisplay</p>
-        }
-        <SfButton CssClass="e-outline e-small"
-                  Content="Refresh"
-                  Disabled="@IsLoading"
-                  OnClick="RefreshAsync" />
-        <SfButton CssClass="e-flat e-small"
-                  Content="All units"
-                  OnClick='() => Nav.NavigateTo("/units")' />
-    </div>
-</div>
+<PageHeader Title="ClerkSuite dashboard"
+            Subtitle="@($"Occupancy, collection, expirations, work orders · Mountain Time {DisplayTime}")">
+    <SfButton CssClass="e-outline" Content="Refresh" OnClick="LoadAsync" />
+    <SfButton CssClass="e-outline" Content="Export charts" OnClick="ExportChartsAsync" Disabled="@(Snap is null)" />
+    <SfButton CssClass="e-outline" Content="Reset layout" OnClick="ResetLayoutAsync" />
+</PageHeader>
 
-@if (LoadError is not null)
+@if (!string.IsNullOrEmpty(ErrorMessage))
 {
-    <div class="alert alert-danger d-flex justify-content-between align-items-center gap-2" role="alert">
-        <span>@LoadError</span>
-        <SfButton CssClass="e-small e-outline" Content="Retry" OnClick="RefreshAsync" />
-    </div>
+    <div class="alert alert-warning">@ErrorMessage</div>
 }
-else if (IsLoading || Snapshot is null)
+else if (Snap is null)
 {
-    <div class="dashboard-skeleton" aria-busy="true" aria-live="polite">
-        <div class="row g-3 mb-3">
-            @for (var i = 0; i < 4; i++)
-            {
-                <div class="col-md-6 col-xl-3">
-                    <div class="skeleton-card">
-                        <div class="skeleton-line w-40"></div>
-                        <div class="skeleton-line w-60 skeleton-lg"></div>
-                        <div class="skeleton-line w-80"></div>
-                    </div>
-                </div>
-            }
-        </div>
-        <div class="row g-3 mb-3">
-            <div class="col-lg-4"><div class="skeleton-card skeleton-tall"></div></div>
-            <div class="col-lg-8"><div class="skeleton-card skeleton-tall"></div></div>
-        </div>
-        <div class="skeleton-card skeleton-table"></div>
-        <p class="text-muted small mt-2 mb-0">Loading dashboard…</p>
-    </div>
+    <p class="text-muted">Loading…</p>
 }
 else
 {
-    <SfDashboardLayout Columns="12"
-                       CellSpacing="@(new double[] { 12, 12 })"
-                       CellAspectRatio="0.85"
-                       MediaQuery="max-width: 768px"
-                       AllowDragging="false"
-                       AllowResizing="false"
-                       CssClass="clerksuite-dashboard">
+    <div class="kpi-grid kpi-grid--viz">
+        <SfCard CssClass="kpi-card kpi-card--accent kpi-card--gauge">
+            <CardContent>
+                <div class="kpi-label">Occupancy</div>
+                <div class="kpi-gauge-wrap">
+                    <SfCircularGauge Height="120px" Width="100%" Theme="@ChartTheme">
+                        <CircularGaugeAxes>
+                            <CircularGaugeAxis StartAngle="210" EndAngle="150" Minimum="0" Maximum="100">
+                                <CircularGaugeAxisMajorTicks Height="0" />
+                                <CircularGaugeAxisMinorTicks Height="0" />
+                                <CircularGaugeAxisLabelStyle Format=" " />
+                                <CircularGaugeRanges>
+                                    <CircularGaugeRange Start="0" End="100" Color="#c5d8f0" StartWidth="12" EndWidth="12" Radius="90%" />
+                                </CircularGaugeRanges>
+                                <CircularGaugePointers>
+                                    <CircularGaugePointer Value="@Snap.OccupancyPercent"
+                                                          Type="PointerType.RangeBar"
+                                                          PointerWidth="12"
+                                                          Color="#0f6cbd"
+                                                          Radius="90%"
+                                                          RoundedCornerRadius="6" />
+                                </CircularGaugePointers>
+                                <CircularGaugeAnnotations>
+                                    <CircularGaugeAnnotation Content="@($"{Snap.OccupancyPercent:0.#}%")" Angle="180" Radius="0%" ZIndex="1">
+                                        <CircularGaugeAnnotationTextStyle Size="18px" FontWeight="600" />
+                                    </CircularGaugeAnnotation>
+                                </CircularGaugeAnnotations>
+                            </CircularGaugeAxis>
+                        </CircularGaugeAxes>
+                    </SfCircularGauge>
+                </div>
+                <div class="kpi-sub"><a href="units">@Snap.Occupied / @Snap.TotalUnits occupied</a></div>
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card">
+            <CardContent>
+                <div class="kpi-label">Collected this month</div>
+                <div class="kpi-value">@Snap.CollectedThisMonth.ToString("C0")</div>
+                <div class="kpi-sub">Expected @Snap.ExpectedRentThisMonth.ToString("C0") · @CollectionRateLabel</div>
+                <div class="kpi-linear-gauge">
+                    <SfLinearGauge Height="56px" Width="100%" Theme="@ChartTheme">
+                        <LinearGaugeAxes>
+                            <LinearGaugeAxis Minimum="0" Maximum="@(Math.Max(100, Snap.CollectionRatePercent))">
+                                <LinearGaugeAxisLabelStyle Format="{value}%" />
+                                <LinearGaugePointers>
+                                    <LinearGaugePointer PointerValue="@Snap.CollectionRatePercent"
+                                                        Type="Syncfusion.Blazor.LinearGauge.Point.Bar"
+                                                        Color="#0f6cbd"
+                                                        Width="12" />
+                                </LinearGaugePointers>
+                            </LinearGaugeAxis>
+                        </LinearGaugeAxes>
+                    </SfLinearGauge>
+                </div>
+                @if (CollectionSparkData.Count > 0)
+                {
+                    <div class="kpi-spark">
+                        <SfSparkline TValue="SparkPoint"
+                                     DataSource="@CollectionSparkData"
+                                     XName="Label"
+                                     YName="Amount"
+                                     Type="SparklineType.Area"
+                                     Height="28px"
+                                     Width="100%"
+                                     Fill="#0f6cbd"
+                                     LineWidth="1.5"
+                                     Theme="@ChartTheme">
+                        </SfSparkline>
+                    </div>
+                }
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card kpi-card--danger">
+            <CardContent>
+                <div class="kpi-label">Outstanding</div>
+                <div class="kpi-value"><a href="reports/delinquency">@Snap.OutstandingBalanceTotal.ToString("C0")</a></div>
+                <div class="kpi-sub">@Snap.Delinquencies.Count delinquent account(s)</div>
+            </CardContent>
+        </SfCard>
+        <SfCard CssClass="kpi-card kpi-card--warn">
+            <CardContent>
+                <div class="kpi-label">Open work orders</div>
+                <div class="kpi-value"><a href="maintenance">@Snap.OpenWorkOrders.Count</a></div>
+                <div class="kpi-sub">Maintenance queue</div>
+            </CardContent>
+        </SfCard>
+    </div>
+
+    <SfDashboardLayout @ref="_layout"
+                       ID="clerksuite-home-dashboard"
+                       Columns="6"
+                       CellSpacing="@(new double[] { 14, 14 })"
+                       AllowResizing="true"
+                       AllowDragging="true"
+                       EnablePersistence="true"
+                       MediaQuery="max-width: 768px">
         <DashboardLayoutPanels>
-            <DashboardLayoutPanel Id="kpi-occupancy" SizeX="3" SizeY="1" Row="0" Column="0">
-                <HeaderTemplate><div>Occupancy</div></HeaderTemplate>
-                <ContentTemplate>
-                    <button type="button"
-                            class="kpi-panel kpi-panel-btn @(StatusFilter == "Occupied" ? "is-active" : null)"
-                            @onclick='() => ToggleStatusFilter("Occupied")'>
-                        <p class="kpi-metric">@Snapshot.OccupancyRate.ToString("0.#")%</p>
-                        <div class="occupancy-bar" aria-hidden="true">
-                            <div class="occupancy-bar-fill" style="width: @($"{Math.Clamp(Snapshot.OccupancyRate, 0, 100):0.#}%")"></div>
-                        </div>
-                        <p class="kpi-sub">@Snapshot.OccupiedCount of @Snapshot.TotalUnits units occupied</p>
-                        <p class="kpi-hint">Filter portfolio · Occupied</p>
-                    </button>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="kpi-vacant" SizeX="3" SizeY="1" Row="0" Column="3">
-                <HeaderTemplate><div>Vacant / Make-Ready</div></HeaderTemplate>
-                <ContentTemplate>
-                    <button type="button"
-                            class="kpi-panel kpi-panel-btn @(VacantMakeReadyMode ? "is-active" : null)"
-                            @onclick="ToggleVacantMakeReadyFilter">
-                        <p class="kpi-metric">@(Snapshot.VacantCount + Snapshot.MakeReadyCount)</p>
-                        <p class="kpi-sub">@Snapshot.VacantCount vacant · @Snapshot.MakeReadyCount make-ready</p>
-                        <p class="kpi-hint">Filter portfolio · Vacant + Make-Ready</p>
-                    </button>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="kpi-maintenance" SizeX="3" SizeY="1" Row="0" Column="6">
-                <HeaderTemplate><div>Maintenance</div></HeaderTemplate>
-                <ContentTemplate>
-                    <button type="button"
-                            class="kpi-panel kpi-panel-btn @(StatusFilter == "Maintenance" ? "is-active" : null)"
-                            @onclick='() => ToggleStatusFilter("Maintenance")'>
-                        <p class="kpi-metric">@Snapshot.MaintenanceCount</p>
-                        <p class="kpi-sub">Units marked maintenance</p>
-                        <p class="kpi-hint">Filter portfolio · Maintenance</p>
-                    </button>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="kpi-warranties" SizeX="3" SizeY="1" Row="0" Column="9">
-                <HeaderTemplate><div>Warranty alerts</div></HeaderTemplate>
-                <ContentTemplate>
-                    <div class="kpi-panel">
-                        <p class="kpi-metric">@Snapshot.WarrantyAlerts.Count</p>
-                        <p class="kpi-sub">Assets ending in next 90 days</p>
-                        <p class="kpi-hint">Live from asset records</p>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="status-mix" SizeX="4" SizeY="2" Row="1" Column="0">
-                <HeaderTemplate><div>Portfolio mix</div></HeaderTemplate>
-                <ContentTemplate>
-                    @if (Snapshot.TotalUnits > 0)
-                    {
-                        <div class="mix-bar" role="img" aria-label="Portfolio status mix">
-                            @foreach (var s in Snapshot.StatusBreakdown)
-                            {
-                                var pct = 100.0 * s.Count / Snapshot.TotalUnits;
-                                <div class="mix-seg mix-@CssStatusKey(s.Name)"
-                                     style="width: @($"{pct:0.#}%")"
-                                     title="@($"{s.Name}: {s.Count}")"></div>
-                            }
-                        </div>
-                    }
-                    <ul class="status-mix list-unstyled mb-0 mt-2">
-                        @foreach (var s in Snapshot.StatusBreakdown)
-                        {
-                            <li>
-                                <button type="button"
-                                        class="status-mix-btn @(StatusFilter == s.Name ? "is-active" : null)"
-                                        @onclick="() => ToggleStatusFilter(s.Name)">
-                                    <span class="status-dot mix-@CssStatusKey(s.Name)"></span>
-                                    <span>@s.Name</span>
-                                    <strong class="tabular-nums ms-auto">@s.Count</strong>
-                                </button>
-                            </li>
-                        }
-                    </ul>
-                    @if (StatusFilter is not null || VacantMakeReadyMode)
-                    {
-                        <button type="button" class="btn btn-link btn-sm px-0 mt-2" @onclick="ClearFilter">Clear filter</button>
-                    }
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="warranties" SizeX="8" SizeY="2" Row="1" Column="4">
-                <HeaderTemplate><div>Warranty alerts (90 days)</div></HeaderTemplate>
-                <ContentTemplate>
-                    @if (Snapshot.WarrantyAlerts.Count == 0)
-                    {
-                        <p class="text-muted mb-0 small">No warranties expiring in the next 90 days.</p>
-                    }
-                    else
-                    {
-                        <SfGrid TValue="WarrantyAlertItem"
-                                DataSource="@Snapshot.WarrantyAlerts"
-                                AllowSorting="true"
-                                AllowPaging="true"
-                                Height="220"
-                                GridLines="GridLine.Horizontal">
-                            <GridPageSettings PageSize="6" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(WarrantyAlertItem.UnitNumber)" HeaderText="Unit" Width="90">
-                                    <Template>
-                                        @{
-                                            var row = context as WarrantyAlertItem;
-                                        }
-                                        @if (row is not null)
-                                        {
-                                            <a href="@($"/units/{row.UnitId}")">@row.UnitNumber</a>
-                                        }
-                                    </Template>
-                                </GridColumn>
-                                <GridColumn Field="@nameof(WarrantyAlertItem.AssetType)" HeaderText="Asset" Width="140" />
-                                <GridColumn Field="@nameof(WarrantyAlertItem.WarrantyEnd)"
-                                            HeaderText="Ends"
-                                            Width="110"
-                                            TextAlign="TextAlign.Right">
-                                    <Template>
-                                        @{
-                                            var row = context as WarrantyAlertItem;
-                                        }
-                                        @if (row is not null)
-                                        {
-                                            <span class="tabular-nums">@row.WarrantyEnd.ToString("MM/dd/yyyy")</span>
-                                        }
-                                    </Template>
-                                </GridColumn>
-                                <GridColumn Field="@nameof(WarrantyAlertItem.DaysLeft)"
-                                            HeaderText="Days"
-                                            Width="80"
-                                            TextAlign="TextAlign.Right">
-                                    <Template>
-                                        @{
-                                            var row = context as WarrantyAlertItem;
-                                        }
-                                        @if (row is not null)
-                                        {
-                                            <span class="tabular-nums @(row.DaysLeft <= 30 ? "text-warning fw-semibold" : null)">@row.DaysLeft</span>
-                                        }
-                                    </Template>
-                                </GridColumn>
-                            </GridColumns>
-                        </SfGrid>
-                    }
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="pipeline" SizeX="12" SizeY="1" Row="3" Column="0">
-                <HeaderTemplate><div>Coming modules</div></HeaderTemplate>
-                <ContentTemplate>
-                    <div class="pipeline-row">
-                        <div class="pipeline-card">
-                            <strong>Lease expirations</strong>
-                            <span class="badge text-bg-secondary fw-normal">Phase 3</span>
-                            <p class="small text-muted mb-0">Needs Lease entity (T3.x) — not in domain yet.</p>
-                        </div>
-                        <div class="pipeline-card">
-                            <strong>Work orders</strong>
-                            <span class="badge text-bg-secondary fw-normal">Phase 4</span>
-                            <p class="small text-muted mb-0">Needs MaintenanceRequest — open WO KPI will wire here.</p>
-                        </div>
-                        <div class="pipeline-card">
-                            <strong>Delinquencies</strong>
-                            <span class="badge text-bg-secondary fw-normal">Phase 3</span>
-                            <p class="small text-muted mb-0">Needs LedgerEntry payments — balance KPIs deferred.</p>
-                        </div>
-                        <div class="pipeline-card">
-                            <strong>Tenants</strong>
-                            <span class="badge text-bg-secondary fw-normal">Phase 2</span>
-                            <p class="small text-muted mb-0">
-                                <a href="/tenants">Tenants page</a> stub — Unit.CurrentTenantId reserved, no Tenant table yet.
-                            </p>
-                        </div>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-
-            <DashboardLayoutPanel Id="rent-roll" SizeX="12" SizeY="3" Row="4" Column="0">
+            <DashboardLayoutPanel Id="statusDonut" SizeX="3" SizeY="3" Row="0" Column="0">
                 <HeaderTemplate>
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 w-100">
-                        <span>Unit portfolio</span>
-                        @if (StatusFilter is not null || VacantMakeReadyMode)
-                        {
-                            <span class="badge text-bg-primary fw-normal">@FilterLabel · @FilteredUnits.Count</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted small">@Snapshot.TotalUnits units</span>
-                        }
+                    <div class="panel-header-title">Units by status</div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        <SfAccumulationChart Width="100%" Height="100%" Theme="@ChartTheme" EnableSmartLabels="true">
+                            <AccumulationChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Bottom" />
+                            <AccumulationChartTooltipSettings Enable="true" Format="${point.x}: <b>${point.y}</b>" />
+                            <AccumulationChartSeriesCollection>
+                                <AccumulationChartSeries DataSource="@StatusSlices"
+                                                         XName="Status"
+                                                         YName="Count"
+                                                         Name="Units"
+                                                         InnerRadius="55%"
+                                                         Radius="80%"
+                                                         Type="AccumulationType.Pie">
+                                    <AccumulationDataLabelSettings Visible="true" Name="Status" />
+                                </AccumulationChartSeries>
+                            </AccumulationChartSeriesCollection>
+                        </SfAccumulationChart>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="collectionTrend" SizeX="3" SizeY="3" Row="0" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
+                        <span>Rent collected (12 months)</span>
+                        <span class="small text-muted">zoom / pan</span>
                     </div>
                 </HeaderTemplate>
                 <ContentTemplate>
-                    <div class="portfolio-filters mb-2" role="group" aria-label="Status filter">
-                        <button type="button"
-                                class="filter-chip @(StatusFilter is null && !VacantMakeReadyMode ? "is-active" : null)"
-                                @onclick="ClearFilter">All (@Snapshot.TotalUnits)</button>
-                        @foreach (var s in Snapshot.StatusBreakdown)
+                    <div style="height:100%; width:100%; padding:4px;">
+                        @if (CollectionChart.Count == 0 || CollectionChart.All(c => c.Amount == 0))
                         {
-                            <button type="button"
-                                    class="filter-chip @(StatusFilter == s.Name ? "is-active" : null)"
-                                    @onclick="() => ToggleStatusFilter(s.Name)">
-                                @s.Name (@s.Count)
-                            </button>
+                            <p class="text-muted small p-2 mb-0">No non-deposit payments in the last 12 months.</p>
+                        }
+                        else
+                        {
+                            <SfChart @ref="_collectionChart" Width="100%" Height="100%" Theme="@ChartTheme">
+                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
+                                <ChartPrimaryYAxis LabelFormat="C0" />
+                                <ChartTooltipSettings Enable="true" />
+                                <ChartZoomSettings EnableSelectionZooming="true"
+                                                   EnableMouseWheelZooming="true"
+                                                   EnablePinchZooming="true"
+                                                   Mode="Syncfusion.Blazor.Charts.ZoomMode.X"
+                                                   EnableScrollbar="true" />
+                                <ChartSeriesCollection>
+                                    <ChartSeries DataSource="@CollectionChart"
+                                                 XName="Label"
+                                                 YName="Amount"
+                                                 Type="ChartSeriesType.Column"
+                                                 Name="Collected"
+                                                 Fill="#0f6cbd" />
+                                </ChartSeriesCollection>
+                            </SfChart>
                         }
                     </div>
-                    <SfGrid TValue="UnitStatusRow"
-                            DataSource="@FilteredUnits"
-                            AllowSorting="true"
-                            AllowPaging="true"
-                            Height="280"
-                            GridLines="GridLine.Horizontal">
-                        <GridPageSettings PageSize="10" />
-                        <GridColumns>
-                            <GridColumn Field="@nameof(UnitStatusRow.Number)" HeaderText="Unit" Width="100">
-                                <Template>
-                                    @{
-                                        var row = context as UnitStatusRow;
-                                    }
-                                    @if (row is not null)
-                                    {
-                                        <a href="@($"/units/{row.Id}")">@row.Number</a>
-                                    }
-                                </Template>
-                            </GridColumn>
-                            <GridColumn Field="@nameof(UnitStatusRow.Status)" HeaderText="Status" Width="130">
-                                <Template>
-                                    @{
-                                        var row = context as UnitStatusRow;
-                                    }
-                                    @if (row is not null)
-                                    {
-                                        <span class="badge @StatusBadgeClass(row.Status)">@row.Status</span>
-                                    }
-                                </Template>
-                            </GridColumn>
-                            <GridColumn Field="@nameof(UnitStatusRow.Beds)"
-                                        HeaderText="Beds"
-                                        Width="80"
-                                        TextAlign="TextAlign.Right" />
-                            <GridColumn Field="@nameof(UnitStatusRow.Baths)"
-                                        HeaderText="Baths"
-                                        Width="80"
-                                        TextAlign="TextAlign.Right" />
-                            <GridColumn Field="@nameof(UnitStatusRow.SqFt)"
-                                        HeaderText="Sq ft"
-                                        Width="100"
-                                        Format="N0"
-                                        TextAlign="TextAlign.Right" />
-                        </GridColumns>
-                    </SfGrid>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="payHeat" SizeX="6" SizeY="3" Row="3" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-title">Payments by unit × month (heatmap)</div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px; overflow:auto;">
+                        @if (HeatCells.Count == 0)
+                        {
+                            <p class="text-muted small p-2 mb-0">No payment heatmap data yet.</p>
+                        }
+                        else
+                        {
+                            @* JSON cell binding per Syncfusion HeatMap docs:
+                               https://blazor.syncfusion.com/documentation/heatmap-chart/working-with-data *@
+                            <SfHeatMap DataSource="@HeatCells"
+                                       Height="100%"
+                                       Width="100%"
+                                       Theme="@ChartTheme">
+                                <HeatMapTitleSettings Text="Rent payments ($)" />
+                                <HeatMapDataSourceSettings IsJsonData="true"
+                                                           AdaptorType="AdaptorType.Cell"
+                                                           XDataMapping="Unit"
+                                                           YDataMapping="Month"
+                                                           ValueMapping="Value" />
+                                <HeatMapXAxis Labels="@HeatUnitLabels" LabelRotation="45" />
+                                <HeatMapYAxis Labels="@HeatMonthLabels" />
+                                <HeatMapCellSettings ShowLabel="false" Format="C0" />
+                                <HeatMapTooltipSettings Enable="true" />
+                                <HeatMapLegendSettings Visible="true" Position="Syncfusion.Blazor.HeatMap.LegendPosition.Bottom" />
+                                <HeatMapPaletteSettings Type="PaletteType.Gradient">
+                                    <HeatMapPalettes>
+                                        <HeatMapPalette Value="0" Color="#f3f6f9" />
+                                        <HeatMapPalette Color="#9dc3eb" />
+                                        <HeatMapPalette Color="#0f6cbd" />
+                                    </HeatMapPalettes>
+                                </HeatMapPaletteSettings>
+                            </SfHeatMap>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="exp30" SizeX="3" SizeY="2" Row="6" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Leases expiring (≤30 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ExpiringLeasesWithin30.Count</span>
+                            <a class="panel-view-all" href="leases">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ExpiringLeasesWithin30.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None in window.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var l in Snap.ExpiringLeasesWithin30)
+                                {
+                                    <li class="mb-1">
+                                        <a href="@($"/leases/{l.LeaseId}")">Unit @l.UnitNumber</a>
+                                        — @l.TenantName · @Clock.ToDisplayTime(l.EndUtc).ToString("d")
+                                        (@l.DaysRemaining d)
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="exp60" SizeX="3" SizeY="2" Row="6" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Leases expiring (31–60 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ExpiringLeasesWithin60.Count</span>
+                            <a class="panel-view-all" href="leases">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ExpiringLeasesWithin60.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None in window.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var l in Snap.ExpiringLeasesWithin60)
+                                {
+                                    <li class="mb-1">
+                                        <a href="@($"/leases/{l.LeaseId}")">Unit @l.UnitNumber</a>
+                                        — @l.TenantName · @Clock.ToDisplayTime(l.EndUtc).ToString("d")
+                                        (@l.DaysRemaining d)
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="schedule" SizeX="3" SizeY="2" Row="8" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Schedule reminders (14 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ScheduleReminders.Count</span>
+                            <a class="panel-view-all" href="schedule">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ScheduleReminders.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No upcoming reminders.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var s in Snap.ScheduleReminders)
+                                {
+                                    <li class="mb-1">
+                                        <a href="schedule">Unit @s.UnitNumber</a>
+                                        — @s.Title · @Clock.ToDisplayTime(s.ReminderUtc).ToString("d")
+                                        (@s.Category)
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="wo" SizeX="3" SizeY="2" Row="8" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Open maintenance</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.OpenWorkOrders.Count</span>
+                            <a class="panel-view-all" href="maintenance">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.OpenWorkOrders.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">No open work orders.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var m in Snap.OpenWorkOrders)
+                                {
+                                    <li class="mb-1">
+                                        <a href="maintenance">Unit @m.UnitNumber</a>
+                                        · @m.Priority · @m.Description
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="delinq" SizeX="3" SizeY="2" Row="10" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Delinquencies</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.Delinquencies.Count</span>
+                            <a class="panel-view-all" href="reports/delinquency">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.Delinquencies.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var d in Snap.Delinquencies)
+                                {
+                                    <li class="mb-1">
+                                        <a href="reports/delinquency">Unit @d.UnitNumber</a>
+                                        — @d.TenantName · @d.Balance.ToString("C")
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="warranty" SizeX="3" SizeY="2" Row="10" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-bar">
+                        <div class="panel-header-title">Warranties (90 days)</div>
+                        <div class="panel-header-meta">
+                            <span class="panel-count">@Snap.ExpiringWarranties.Count</span>
+                            <a class="panel-view-all" href="reports/warranty">View all</a>
+                        </div>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div class="p-2" style="overflow:auto; height:100%;">
+                        @if (Snap.ExpiringWarranties.Count == 0)
+                        {
+                            <p class="text-muted small mb-0">None expiring soon.</p>
+                        }
+                        else
+                        {
+                            <ul class="list-unstyled mb-0 small">
+                                @foreach (var w in Snap.ExpiringWarranties)
+                                {
+                                    <li class="mb-1">
+                                        <a href="@($"/units/{w.UnitId}")">Unit @w.UnitNumber</a>
+                                        — @w.AssetLabel · @w.WarrantyEnd.ToString("d")
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="plUnit" SizeX="3" SizeY="3" Row="12" Column="0">
+                <HeaderTemplate>
+                    <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
+                        <span>P/L by unit (YTD, 3D)</span>
+                        <a class="small" href="reports/profit-loss">Full report</a>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        @if (UnitChart.Count == 0)
+                        {
+                            <p class="text-muted small p-2 mb-0">No ledger/ops-cost data yet.</p>
+                        }
+                        else
+                        {
+                            @* 3D column chart per Syncfusion Chart3D docs:
+                               RotationAngle/Depth/EnableRotation — not Tilt/Rotation *@
+                            <SfChart3D Width="100%"
+                                       Height="100%"
+                                       Theme="@ChartTheme"
+                                       EnableRotation="true"
+                                       RotationAngle="22"
+                                       Depth="100"
+                                       TiltAngle="10">
+                                <Chart3DPrimaryXAxis ValueType="Syncfusion.Blazor.Chart3D.ValueType.Category"
+                                                     LabelRotationAngle="-45"
+                                                     LabelIntersectAction="Syncfusion.Blazor.Chart3D.LabelIntersectAction.Rotate45" />
+                                <Chart3DPrimaryYAxis />
+                                <Chart3DTooltipSettings Enable="true" />
+                                <Chart3DLegendSettings Visible="false" />
+                                <Chart3DSeriesCollection>
+                                    <Chart3DSeries DataSource="@UnitChart"
+                                                   XName="Label"
+                                                   YName="Net"
+                                                   Type="Chart3DSeriesType.Column"
+                                                   Name="Net" />
+                                </Chart3DSeriesCollection>
+                            </SfChart3D>
+                        }
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="plSeries" SizeX="3" SizeY="3" Row="12" Column="3">
+                <HeaderTemplate>
+                    <div class="panel-header-title d-flex justify-content-between align-items-center w-100">
+                        <span>Portfolio net (YTD)</span>
+                        <span class="small text-muted">zoom / pan</span>
+                    </div>
+                </HeaderTemplate>
+                <ContentTemplate>
+                    <div style="height:100%; width:100%; padding:4px;">
+                        @if (SeriesChart.Count == 0)
+                        {
+                            <p class="text-muted small p-2 mb-0">No period series yet.</p>
+                        }
+                        else
+                        {
+                            <SfChart @ref="_seriesChart" Width="100%" Height="100%" Theme="@ChartTheme">
+                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
+                                <ChartZoomSettings EnableSelectionZooming="true"
+                                                   EnableMouseWheelZooming="true"
+                                                   Mode="Syncfusion.Blazor.Charts.ZoomMode.X"
+                                                   EnableScrollbar="true" />
+                                <ChartSeriesCollection>
+                                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
+                                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Expense" Type="ChartSeriesType.Line" Name="Expense" />
+                                    <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Net" Type="ChartSeriesType.Column" Name="Net" />
+                                </ChartSeriesCollection>
+                                <ChartLegendSettings Visible="true" />
+                            </SfChart>
+                        }
+                    </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
         </DashboardLayoutPanels>
@@ -330,110 +503,124 @@ else
 }
 
 @code {
-    [Inject] private IDashboardService DashboardService { get; set; } = default!;
-    [Inject] private IDateTimeService DateTimeService { get; set; } = default!;
-    [Inject] private NavigationManager Nav { get; set; } = default!;
+    private SfDashboardLayout? _layout;
+    private SfChart? _collectionChart;
+    private SfChart? _seriesChart;
+    private DashboardSnapshot? Snap { get; set; }
+    private string? ErrorMessage { get; set; }
+    private List<ChartPoint> UnitChart { get; set; } = [];
+    private List<ChartPoint> SeriesChart { get; set; } = [];
+    private List<DashboardStatusSlice> StatusSlices { get; set; } = [];
+    private List<DashboardMonthAmount> CollectionChart { get; set; } = [];
+    private List<SparkPoint> CollectionSparkData { get; set; } = [];
+    private List<DashboardHeatCell> HeatCells { get; set; } = [];
+    private string[] HeatMonthLabels { get; set; } = [];
+    private string[] HeatUnitLabels { get; set; } = [];
+    private Theme ChartTheme { get; set; } = Theme.Fluent2;
+    private string DisplayTime => Clock.ToDisplayTime(Clock.UtcNow).ToString("f");
 
-    private DashboardSnapshot? Snapshot { get; set; }
-    private string? LoadError { get; set; }
-    private bool IsLoading { get; set; } = true;
-    private string? StatusFilter { get; set; }
-    private bool VacantMakeReadyMode { get; set; }
-    private string? LoadedAtDisplay { get; set; }
-
-    private IReadOnlyList<UnitStatusRow> FilteredUnits
+    private string CollectionRateLabel
     {
         get
         {
-            if (Snapshot is null)
+            if (Snap is null || Snap.ExpectedRentThisMonth <= 0)
             {
-                return Array.Empty<UnitStatusRow>();
+                return "no expected rent set";
             }
 
-            if (VacantMakeReadyMode)
-            {
-                return Snapshot.Units
-                    .Where(u => u.Status is "Vacant" or "Make-Ready")
-                    .ToList();
-            }
-
-            if (StatusFilter is null)
-            {
-                return Snapshot.Units;
-            }
-
-            return Snapshot.Units.Where(u => u.Status == StatusFilter).ToList();
+            return $"{Snap.CollectionRatePercent:0.#}% of expected";
         }
     }
-
-    private string FilterLabel => VacantMakeReadyMode
-        ? "Vacant + Make-Ready"
-        : StatusFilter ?? "All";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task RefreshAsync() => await LoadAsync();
-
-    private async Task LoadAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        IsLoading = true;
-        LoadError = null;
-        try
+        if (!firstRender)
         {
-            Snapshot = await DashboardService.GetSnapshotAsync();
-            LoadedAtDisplay = DateTimeService.ToDisplayTime(DateTimeService.UtcNow).ToString("f");
-        }
-        catch (Exception ex)
-        {
-            Snapshot = null;
-            LoadError = "Could not load dashboard. " + ex.Message;
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    private void ToggleStatusFilter(string status)
-    {
-        VacantMakeReadyMode = false;
-        StatusFilter = StatusFilter == status ? null : status;
-    }
-
-    private void ToggleVacantMakeReadyFilter()
-    {
-        if (VacantMakeReadyMode)
-        {
-            VacantMakeReadyMode = false;
-            StatusFilter = null;
             return;
         }
 
-        VacantMakeReadyMode = true;
-        StatusFilter = null;
+        var isDark = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+        var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
+        if (next != ChartTheme)
+        {
+            ChartTheme = next;
+            StateHasChanged();
+        }
     }
 
-    private void ClearFilter()
+    private async Task LoadAsync()
     {
-        StatusFilter = null;
-        VacantMakeReadyMode = false;
+        ErrorMessage = null;
+        try
+        {
+            Snap = await DashboardService.GetSnapshotAsync();
+            StatusSlices = Snap.UnitStatusSlices.ToList();
+            CollectionChart = Snap.CollectionByMonth.ToList();
+            CollectionSparkData = Snap.CollectionByMonth
+                .Select(m => new SparkPoint { Label = m.Label, Amount = (double)m.Amount })
+                .ToList();
+            HeatCells = Snap.PaymentHeatmap.ToList();
+            HeatMonthLabels = Snap.PaymentHeatmap.Select(c => c.Month).Distinct().ToArray();
+            HeatUnitLabels = Snap.PaymentHeatmap.Select(c => c.Unit).Distinct().OrderBy(u => u).ToArray();
+
+            var pl = await ProfitLoss.GetAsync(ProfitLossPeriod.YearToDate);
+            UnitChart = pl.ByUnit
+                .Where(u => u.UnitId is not null)
+                .Select(u => new ChartPoint { Label = u.UnitLabel, Net = (double)u.Net })
+                .ToList();
+            SeriesChart = pl.Series
+                .Select(s => new ChartPoint
+                {
+                    Label = s.Label,
+                    Income = (double)s.Income,
+                    Expense = (double)s.Expense,
+                    Net = (double)s.Net
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
     }
 
-    private static string CssStatusKey(string name) => name switch
+    private async Task ExportChartsAsync()
     {
-        "Occupied" => "occupied",
-        "Vacant" => "vacant",
-        "Make-Ready" => "makeready",
-        "Maintenance" => "maintenance",
-        _ => "other",
-    };
+        if (_collectionChart is not null)
+        {
+            await _collectionChart.ExportAsync(Syncfusion.Blazor.Charts.ExportType.PNG, "clerksuite-rent-collected");
+        }
 
-    private static string StatusBadgeClass(string status) => status switch
+        if (_seriesChart is not null)
+        {
+            await _seriesChart.ExportAsync(Syncfusion.Blazor.Charts.ExportType.PNG, "clerksuite-portfolio-net");
+        }
+    }
+
+    private async Task ResetLayoutAsync()
     {
-        "Occupied" => "text-bg-success",
-        "Vacant" => "text-bg-secondary",
-        "Make-Ready" => "text-bg-info",
-        "Maintenance" => "text-bg-warning",
-        _ => "text-bg-light",
-    };
+        if (_layout is null)
+        {
+            return;
+        }
+
+        await _layout.ResetPersistDataAsync();
+        await _layout.RefreshAsync();
+    }
+
+    private sealed class ChartPoint
+    {
+        public string Label { get; set; } = "";
+        public double Net { get; set; }
+        public double Income { get; set; }
+        public double Expense { get; set; }
+    }
+
+    private sealed class SparkPoint
+    {
+        public string Label { get; set; } = "";
+        public double Amount { get; set; }
+    }
 }

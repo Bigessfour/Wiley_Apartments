@@ -1,56 +1,76 @@
 namespace Wiley.Apartments.Contracts;
 
-/// <summary>Clerk home dashboard snapshot (T6.2).</summary>
 public interface IDashboardService
 {
     Task<DashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RentPivotRow>> GetRentPivotRowsAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class DashboardSnapshot
-{
-    public int TotalUnits { get; init; }
-    public int OccupiedCount { get; init; }
-    public int VacantCount { get; init; }
-    public int MakeReadyCount { get; init; }
-    public int MaintenanceCount { get; init; }
-    public double OccupancyRate { get; init; }
+public sealed record DashboardSnapshot(
+    int TotalUnits,
+    int Occupied,
+    int Vacant,
+    int Maintenance,
+    int MakeReady,
+    IReadOnlyList<DashboardLeaseRow> ExpiringLeasesWithin30,
+    IReadOnlyList<DashboardLeaseRow> ExpiringLeasesWithin60,
+    IReadOnlyList<DashboardMaintenanceRow> OpenWorkOrders,
+    IReadOnlyList<DelinquencyRow> Delinquencies,
+    IReadOnlyList<DashboardWarrantyRow> ExpiringWarranties,
+    IReadOnlyList<DashboardScheduleReminderRow> ScheduleReminders,
+    DateTime GeneratedUtc,
+    double OccupancyPercent,
+    decimal ExpectedRentThisMonth,
+    decimal CollectedThisMonth,
+    decimal OutstandingBalanceTotal,
+    IReadOnlyList<DashboardStatusSlice> UnitStatusSlices,
+    IReadOnlyList<DashboardMonthAmount> CollectionByMonth,
+    double CollectionRatePercent,
+    IReadOnlyList<DashboardHeatCell> PaymentHeatmap);
 
-    /// <summary>Open work orders — 0 until maintenance module exists.</summary>
-    public int OpenWorkOrders { get; init; }
+public sealed record DashboardStatusSlice(string Status, int Count);
 
-    /// <summary>Delinquent unit count — 0 until payments module exists.</summary>
-    public int DelinquentCount { get; init; }
+public sealed record DashboardMonthAmount(string Label, decimal Amount);
 
-    /// <summary>Delinquent balance total — 0 until payments module exists.</summary>
-    public decimal DelinquentAmount { get; init; }
+/// <summary>Unit × month cell for payment-collection heatmap (amount paid, deposits excluded).</summary>
+public sealed record DashboardHeatCell(string Unit, string Month, double Value);
 
-    public IReadOnlyList<WarrantyAlertItem> WarrantyAlerts { get; init; } = Array.Empty<WarrantyAlertItem>();
-    public IReadOnlyList<UnitStatusRow> Units { get; init; } = Array.Empty<UnitStatusRow>();
-    public IReadOnlyList<StatusBreakdownItem> StatusBreakdown { get; init; } = Array.Empty<StatusBreakdownItem>();
-}
+public sealed record RentPivotRow(
+    string Unit,
+    string Year,
+    string Month,
+    decimal Amount,
+    string EntryKind,
+    decimal PaymentAmount,
+    decimal ChargeAmount);
 
-public sealed class WarrantyAlertItem
-{
-    public Guid AssetId { get; init; }
-    public Guid UnitId { get; init; }
-    public string UnitNumber { get; init; } = string.Empty;
-    public string AssetType { get; init; } = string.Empty;
-    public DateOnly WarrantyEnd { get; init; }
-    public int DaysLeft { get; init; }
-}
+public sealed record DashboardScheduleReminderRow(
+    Guid Id,
+    string Title,
+    string UnitNumber,
+    DateTime ReminderUtc,
+    DateTime DueOrStartUtc,
+    string Category);
 
-public sealed class UnitStatusRow
-{
-    public Guid Id { get; init; }
-    public string Number { get; init; } = string.Empty;
-    public string Status { get; init; } = string.Empty;
-    public int Beds { get; init; }
-    public int Baths { get; init; }
-    public decimal SqFt { get; init; }
-}
+public sealed record DashboardLeaseRow(
+    Guid LeaseId,
+    string UnitNumber,
+    string TenantName,
+    DateTime EndUtc,
+    int DaysRemaining);
 
-public sealed class StatusBreakdownItem
-{
-    public string Name { get; init; } = string.Empty;
-    public int Count { get; init; }
-}
+public sealed record DashboardMaintenanceRow(
+    Guid Id,
+    string UnitNumber,
+    string Priority,
+    string Status,
+    string Description);
+
+public sealed record DashboardWarrantyRow(
+    Guid AssetId,
+    Guid UnitId,
+    string UnitNumber,
+    string AssetLabel,
+    DateOnly WarrantyEnd,
+    int DaysRemaining);

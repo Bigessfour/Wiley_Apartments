@@ -4,6 +4,7 @@
 
 ## Access
 
+- **Backup / restore drill (T7.2):** [BACKUP-RESTORE.md](./BACKUP-RESTORE.md)
 - **Production deploy (Option B):** build on Mac → load on NAS — see [DEPLOY.md](./DEPLOY.md)
 - **NAS compose (image-based):** [docker-compose.yml](./docker-compose.yml) at `/volume1/docker/clerksuite` (host port **8082**)
 - **Local Mac compose (build context):** [`deploy/docker-compose.yml`](../docker-compose.yml) for smoke tests

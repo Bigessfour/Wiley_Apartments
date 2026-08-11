@@ -1,0 +1,152 @@
+@namespace Wiley.Apartments.Web.Components.Shared
+@using Syncfusion.Blazor.SfPdfViewer
+
+@* View/print/download-focused PDF viewer for ClerkSuite (lease preview, receipts, vault). *@
+<div class="clerk-pdf-viewer" style="height: @Height; width: 100%; border: 1px solid #d9d9d9; background: #f5f5f5;">
+    @if (string.IsNullOrEmpty(_documentPath))
+    {
+        <p class="text-muted p-3 mb-0">No PDF loaded.</p>
+    }
+    else
+    {
+        <SfPdfViewer2 @ref="_viewer"
+                      @key="_revision"
+                      DocumentPath="@_documentPath"
+                      DownloadFileName="@EffectiveDownloadFileName"
+                      Height="100%"
+                      Width="100%"
+                      EnableToolbar="true"
+                      EnableAnnotation="false"
+                      EnableAnnotationToolbar="false"
+                      EnableFormDesigner="false"
+                      EnableFormFields="false"
+                      IsDesignerMode="false"
+                      EnableCommentPanel="false"
+                      EnablePageOrganizer="false"
+                      EnableNavigationPanel="false"
+                      EnableThumbnailPanel="false"
+                      EnableBookmarkPanel="false"
+                      EnableHandwrittenSignature="false"
+                      EnableFreeText="false"
+                      EnableStickyNotesAnnotation="false"
+                      EnableTextMarkupAnnotation="false"
+                      EnableShapeAnnotation="false"
+                      EnableStampAnnotations="false"
+                      EnableInkAnnotation="false"
+                      EnableMeasureAnnotation="false"
+                      EnableDownload="true"
+                      EnablePrint="true"
+                      EnableTextSearch="true"
+                      EnableMagnification="true"
+                      EnableNavigation="true">
+            <PdfViewerToolbarSettings ShowTooltip="true" ToolbarItems="@ToolbarItems" />
+            <PdfViewerEvents DocumentLoadFailed="OnLoadFailed" DocumentLoaded="OnLoaded" />
+        </SfPdfViewer2>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(LoadError))
+{
+    <div class="alert alert-warning mt-2 mb-0">@LoadError</div>
+}
+
+@code {
+    private static readonly List<Syncfusion.Blazor.SfPdfViewer.ToolbarItem> ToolbarItems =
+    [
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.PageNavigationTool,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.MagnificationTool,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.SearchOption,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.PrintOption,
+        Syncfusion.Blazor.SfPdfViewer.ToolbarItem.DownloadOption
+    ];
+
+    private SfPdfViewer2? _viewer;
+    private string? _documentPath;
+    private byte[]? _boundBytes;
+    private int _revision;
+    private string? LoadError { get; set; }
+    private bool _documentReady;
+
+    [Parameter]
+    public string Height { get; set; } = "680px";
+
+    /// <summary>PDF file bytes. Viewer builds a data-URI DocumentPath when this changes.</summary>
+    [Parameter]
+    public byte[]? PdfBytes { get; set; }
+
+    /// <summary>Required for toolbar Download when DocumentPath is a base64 data URI.</summary>
+    [Parameter]
+    public string? DownloadFileName { get; set; }
+
+    [Parameter]
+    public EventCallback OnDocumentLoaded { get; set; }
+
+    private string EffectiveDownloadFileName =>
+        string.IsNullOrWhiteSpace(DownloadFileName) ? "document.pdf" : DownloadFileName.Trim();
+
+    public bool IsDocumentReady => _documentReady && _viewer is not null;
+
+    public async Task PrintAsync()
+    {
+        if (_viewer is null || !_documentReady)
+        {
+            return;
+        }
+
+        await _viewer.PrintAsync();
+    }
+
+    public async Task DownloadAsync()
+    {
+        if (_viewer is null || !_documentReady)
+        {
+            return;
+        }
+
+        await _viewer.DownloadAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(PdfBytes, _boundBytes))
+        {
+            return;
+        }
+
+        _boundBytes = PdfBytes;
+        LoadError = null;
+        _documentReady = false;
+
+        if (PdfBytes is { Length: > 0 })
+        {
+            _documentPath = "data:application/pdf;base64," + Convert.ToBase64String(PdfBytes);
+            _revision++;
+        }
+        else
+        {
+            _documentPath = null;
+            _revision++;
+        }
+    }
+
+    private async Task OnLoadFailed(LoadFailedEventArgs args)
+    {
+        _documentReady = false;
+        LoadError = args.IsPasswordRequired
+            ? "This PDF is password-protected and cannot be opened here."
+            : "PDF failed to load in the viewer. Try Regenerate PDF or download the file.";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnLoaded(LoadEventArgs args)
+    {
+        LoadError = null;
+        _documentReady = true;
+        if (OnDocumentLoaded.HasDelegate)
+        {
+            await OnDocumentLoaded.InvokeAsync();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+}

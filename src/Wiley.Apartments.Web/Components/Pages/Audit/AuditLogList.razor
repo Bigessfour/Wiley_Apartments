@@ -1,0 +1,86 @@
+@page "/audit"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IAuditQueryService AuditQuery
+@inject IDateTimeService Clock
+
+<PageTitle>Audit log</PageTitle>
+
+<PageHeader Title="Audit log" Subtitle="Append-only mutation history (Constitution III). Newest first." />
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+
+<div class="row g-2 mb-3" style="max-width: 900px;">
+    <div class="col-md-3">
+        <SfTextBox @bind-Value="FilterEntityType" Placeholder="Entity type (e.g. Lease)" />
+    </div>
+    <div class="col-md-3">
+        <SfTextBox @bind-Value="FilterUserId" Placeholder="User contains…" />
+    </div>
+    <div class="col-md-3">
+        <SfDatePicker TValue="DateTime?" @bind-Value="FilterFrom" Placeholder="From (local)" />
+    </div>
+    <div class="col-md-3">
+        <SfButton CssClass="e-primary" Content="Apply" OnClick="ReloadAsync" />
+    </div>
+</div>
+
+<SfGrid TValue="AuditLog" DataSource="@Rows" AllowPaging="true" AllowSorting="true" AllowFiltering="true" Height="480">
+    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+    <GridPageSettings PageSize="25" />
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No audit rows for this filter.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
+    <GridColumns>
+        <GridColumn HeaderText="When (MT)" Width="160">
+            <Template>
+                @{
+                    var row = (AuditLog)context;
+                }
+                <span>@Clock.ToDisplayTime(row.TimestampUtc).ToString("g")</span>
+            </Template>
+        </GridColumn>
+        <GridColumn Field="@nameof(AuditLog.UserId)" HeaderText="User" Width="160" />
+        <GridColumn Field="@nameof(AuditLog.Action)" HeaderText="Action" Width="90" />
+        <GridColumn Field="@nameof(AuditLog.EntityType)" HeaderText="Entity" Width="120" />
+        <GridColumn Field="@nameof(AuditLog.EntityId)" HeaderText="Entity id" Width="220" />
+        <GridColumn Field="@nameof(AuditLog.OldValues)" HeaderText="Before" Width="200" />
+        <GridColumn Field="@nameof(AuditLog.NewValues)" HeaderText="After" Width="200" />
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private List<AuditLog> Rows { get; set; } = [];
+    private string? FilterEntityType { get; set; }
+    private string? FilterUserId { get; set; }
+    private DateTime? FilterFrom { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            DateTime? fromUtc = FilterFrom is null
+                ? null
+                : DateTime.SpecifyKind(FilterFrom.Value.Date, DateTimeKind.Utc);
+            Rows = (await AuditQuery.QueryAsync(
+                entityType: string.IsNullOrWhiteSpace(FilterEntityType) ? null : FilterEntityType.Trim(),
+                userId: string.IsNullOrWhiteSpace(FilterUserId) ? null : FilterUserId.Trim(),
+                fromUtc: fromUtc)).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+}

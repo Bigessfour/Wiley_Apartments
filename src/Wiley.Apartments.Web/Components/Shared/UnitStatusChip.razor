@@ -1,0 +1,28 @@
+@namespace Wiley.Apartments.Web.Components.Shared
+@using Wiley.Apartments.Domain
+
+<SfChip CssClass="cs-status-chip">
+    <ChipItems>
+        <ChipItem Text="@Label" CssClass="@ChipCss" />
+    </ChipItems>
+</SfChip>
+
+@code {
+    [Parameter, EditorRequired]
+    public UnitStatus Status { get; set; }
+
+    private string Label => Status switch
+    {
+        UnitStatus.MakeReady => "Make-Ready",
+        _ => Status.ToString()
+    };
+
+    private string ChipCss => Status switch
+    {
+        UnitStatus.Occupied => "cs-chip cs-chip--occupied",
+        UnitStatus.Vacant => "cs-chip cs-chip--vacant",
+        UnitStatus.Maintenance => "cs-chip cs-chip--maintenance",
+        UnitStatus.MakeReady => "cs-chip cs-chip--makeready",
+        _ => "cs-chip"
+    };
+}

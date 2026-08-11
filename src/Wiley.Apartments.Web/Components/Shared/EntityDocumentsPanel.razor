@@ -1,0 +1,179 @@
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+
+<div class="border rounded p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <h3 class="h6 mb-0">@Title</h3>
+        <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-warning py-2 small">@ErrorMessage</div>
+    }
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success py-2 small">@SuccessMessage</div>
+    }
+
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Category</label>
+            <SfDropDownList TValue="DocumentCategory" TItem="CatOption" DataSource="@CategoryOptions"
+                            @bind-Value="UploadCategory">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">Upload file</label>
+            <SfUploader AutoUpload="false" Multiple="false">
+                <UploaderEvents ValueChange="OnFileSelectedAsync" />
+            </SfUploader>
+            <SfButton CssClass="e-primary e-small mt-2" Content="Attach" Disabled="@(Busy || _pending is null)"
+                      OnClick="UploadAsync" />
+        </div>
+    </div>
+
+    <SfGrid TValue="DocRow" DataSource="@Rows" AllowPaging="true" Height="220">
+        <GridPageSettings PageSize="5" />
+        <GridColumns>
+            <GridColumn Field="@nameof(DocRow.UploadedDisplay)" HeaderText="Uploaded" Width="120" />
+            <GridColumn Field="@nameof(DocRow.Category)" HeaderText="Category" Width="110" />
+            <GridColumn Field="@nameof(DocRow.OriginalFileName)" HeaderText="File" />
+            <GridColumn HeaderText="" Width="160">
+                <Template>
+                    @{
+                        var row = (DocRow)context;
+                    }
+                    <a class="e-btn e-small e-outline" href="@($"/api/documents/{row.Id}/download")" target="_blank">Download</a>
+                </Template>
+            </GridColumn>
+        </GridColumns>
+    </SfGrid>
+    <p class="text-muted small mt-2 mb-0">
+        PDF opens in vault browser; Word and images download in-browser (FR-020 download-only for Office).
+    </p>
+</div>
+
+@code {
+    [Parameter] public DocumentEntityType EntityType { get; set; }
+    [Parameter] public Guid EntityId { get; set; }
+    [Parameter] public string Title { get; set; } = "Documents";
+    [Parameter] public string RelativeDirectory { get; set; } = "misc";
+    [Parameter] public DocumentCategory DefaultCategory { get; set; } = DocumentCategory.Other;
+
+    private List<DocRow> Rows { get; set; } = [];
+    private DocumentCategory UploadCategory { get; set; }
+    private bool Busy { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private (string Name, string ContentType, byte[] Bytes)? _pending;
+
+    private static readonly List<CatOption> CategoryOptions =
+        Enum.GetValues<DocumentCategory>()
+            .Select(c => new CatOption { Value = c, Text = c.ToString() })
+            .ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        UploadCategory = DefaultCategory;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var docs = await DocumentService.ListForEntityAsync(EntityType, EntityId);
+            Rows = docs.Select(d => new DocRow
+            {
+                Id = d.Id,
+                UploadedDisplay = d.UploadedAtUtc.ToString("g"),
+                Category = d.Category.ToString(),
+                OriginalFileName = d.OriginalFileName
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    private async Task OnFileSelectedAsync(UploadChangeEventArgs args)
+    {
+        _pending = null;
+        var file = args.Files?.FirstOrDefault();
+        if (file?.FileInfo is null)
+        {
+            return;
+        }
+
+        await using var stream = file.File.OpenReadStream(25 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        _pending = (file.FileInfo.Name, file.FileInfo.Type ?? "application/octet-stream", ms.ToArray());
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_pending is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        SuccessMessage = null;
+        try
+        {
+            var auth = await AuthState.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name
+                ?? auth.User.FindFirstValue(ClaimTypes.Email)
+                ?? "clerk";
+            await using var stream = new MemoryStream(_pending.Value.Bytes);
+            await DocumentService.UploadAsync(
+                EntityType,
+                EntityId,
+                UploadCategory,
+                _pending.Value.Name,
+                _pending.Value.ContentType,
+                stream,
+                user,
+                $"{RelativeDirectory}/{EntityId:N}");
+            SuccessMessage = "Document attached.";
+            _pending = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private sealed class DocRow
+    {
+        public Guid Id { get; set; }
+        public string UploadedDisplay { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string OriginalFileName { get; set; } = "";
+    }
+
+    private sealed class CatOption
+    {
+        public DocumentCategory Value { get; set; }
+        public string Text { get; set; } = "";
+    }
+}

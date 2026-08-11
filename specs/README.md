@@ -8,7 +8,15 @@
 
 | Spec                                                       | Scope                               | Status               |
 | ---------------------------------------------------------- | ----------------------------------- | -------------------- |
-| [001-wiley-apartment-v1](./001-wiley-apartment-v1/spec.md) | ClerkSuite v1 — 16 units, FR-1–FR-7 | **Plan/tasks ready** |
+| [001-wiley-apartment-v1](./001-wiley-apartment-v1/spec.md) | ClerkSuite v1 — 16 units, FR-1–FR-7 | **Pilot on NAS** (T7 clerk sign-off remaining) |
+
+## Next version (planned — not started)
+
+| Item | Spec home | Status |
+| ---- | --------- | ------ |
+| **NV-1 Payment receipt PDF** (print / email after clerk accepts payment) | [plan.md § Next version](./001-wiley-apartment-v1/plan.md) · [tasks.md](./001-wiley-apartment-v1/tasks.md) | **Done 2026-08-10** |
+| **NV-4 Tenant deposit panel** | same | **Done 2026-08-10** |
+| DocuSign / e-sign · CC reservations | same | Backlog |
 
 ## Task phases (authoritative)
 

@@ -1,33 +1,150 @@
 ﻿@inherits LayoutComponentBase
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.Extensions.Options
 @using Syncfusion.Blazor.Navigations
+@using Wiley.Apartments.Web.Configuration
+@inject AuthenticationStateProvider AuthState
+@inject IJSRuntime JsRuntime
+@inject IOptions<ClerkSuiteOptions> ClerkOptions
+@inject IUnitService UnitService
+@using Wiley.Apartments.Contracts
 
 <div class="clerksuite-shell">
-    <SfSidebar @bind-IsOpen="SidebarOpen" Width="260px" Type="SidebarType.Over" ShowBackdrop="true">
+    <SfSidebar @bind-IsOpen="SidebarOpen"
+               CssClass="clerksuite-sidebar"
+               Width="268px"
+               Type="SidebarType.Auto"
+               MediaQuery="(min-width: 900px)"
+               ShowBackdrop="false"
+               CloseOnDocumentClick="true">
         <ChildContent>
-            <div class="clerksuite-brand px-3 py-3">
+            <div class="clerksuite-sidebar-panel">
+            <div class="clerksuite-brand">
+                <div class="clerksuite-brand-mark" aria-hidden="true">CS</div>
                 <strong>ClerkSuite</strong>
-                <div class="text-muted small">Town of Wiley Apartments</div>
+                <div class="brand-sub">Town of Wiley Apartments</div>
             </div>
-            <nav class="clerksuite-nav px-2">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Dashboard</NavLink>
-                <NavLink class="nav-link" href="units">Units</NavLink>
-                <NavLink class="nav-link" href="tenants">Tenants</NavLink>
-                <NavLink class="nav-link" href="settings">Settings</NavLink>
-                <NavLink class="nav-link" href="Account/Logout">Sign out</NavLink>
+            <nav class="clerksuite-nav" aria-label="Main">
+                <div class="nav-section">Daily work</div>
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-home" aria-hidden="true"></span><span>Dashboard</span>
+                </NavLink>
+                <NavLink class="nav-link" href="units" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-grid-view" aria-hidden="true"></span><span>Units</span>
+                </NavLink>
+                <NavLink class="nav-link" href="tenants" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-people" aria-hidden="true"></span><span>Tenants</span>
+                </NavLink>
+                <NavLink class="nav-link" href="leases" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-file-document" aria-hidden="true"></span><span>Leases</span>
+                </NavLink>
+                <NavLink class="nav-link" href="payments" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-circle-info" aria-hidden="true"></span><span>Payments</span>
+                </NavLink>
+                <NavLink class="nav-link" href="schedule" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-day" aria-hidden="true"></span><span>Schedule</span>
+                </NavLink>
+                <NavLink class="nav-link" href="maintenance" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-edit" aria-hidden="true"></span><span>Maintenance</span>
+                </NavLink>
+                <div class="nav-section">Community Center</div>
+                <NavLink class="nav-link" href="community-center" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-home" aria-hidden="true"></span><span>CC hub</span>
+                </NavLink>
+                @if (CommunityCenterId is Guid ccId)
+                {
+                    <NavLink class="nav-link" href="@($"schedule?unitId={ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-day" aria-hidden="true"></span><span>CC schedule</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="@($"payments?unitId={ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-circle-info" aria-hidden="true"></span><span>CC payments</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="@($"maintenance?unitId={ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-edit" aria-hidden="true"></span><span>CC maintenance</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="@($"units/{ccId}")" @onclick="CloseOnNavigate">
+                        <span class="e-icons e-grid-view" aria-hidden="true"></span><span>CC unit record</span>
+                    </NavLink>
+                }
+                <NavLink class="nav-link" href="documents" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-folder" aria-hidden="true"></span><span>CC documents</span>
+                </NavLink>
+                <div class="nav-section">Records</div>
+                <NavLink class="nav-link" href="documents" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-folder" aria-hidden="true"></span><span>Documents</span>
+                </NavLink>
+                <NavLink class="nav-link" href="reports" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-chart" aria-hidden="true"></span><span>Reports</span>
+                </NavLink>
+                <NavLink class="nav-link" href="audit" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-list-unordered" aria-hidden="true"></span><span>Audit</span>
+                </NavLink>
+                <div class="nav-section">Account</div>
+                <NavLink class="nav-link" href="settings" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-settings" aria-hidden="true"></span><span>Settings</span>
+                </NavLink>
+                <NavLink class="nav-link" href="Account/Logout" @onclick="CloseOnNavigate">
+                    <span class="e-icons e-export" aria-hidden="true"></span><span>Sign out</span>
+                </NavLink>
             </nav>
+            </div>
         </ChildContent>
     </SfSidebar>
 
     <div class="clerksuite-main">
-        <header class="clerksuite-header px-3 py-2 d-flex align-items-center gap-2">
-            <SfButton CssClass="e-flat" IconCss="e-icons e-menu" OnClick="ToggleSidebar" />
-            <span class="fw-semibold">Wiley Apartments</span>
+        <header class="clerksuite-header">
+            <SfButton CssClass="e-flat e-large"
+                      IconCss="e-icons e-menu"
+                      OnClick="ToggleSidebar"
+                      HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Open navigation" })" />
+            <div class="clerksuite-header-brand">
+                <strong>Wiley Apartments</strong>
+                <span>ClerkSuite · Town of Wiley, CO</span>
+            </div>
+            <div class="clerksuite-header-actions">
+                @if (PortalConfigured)
+                {
+                    <a class="clerksuite-header-link" href="@PortalUrl" target="_blank" rel="noopener noreferrer">PayStar</a>
+                }
+                <div class="clerksuite-theme-toggle" title="Theme">
+                    <span class="small text-muted d-none d-md-inline">Light</span>
+                    <SfSwitch @bind-Checked="IsDarkMode"
+                              TChecked="bool"
+                              CssClass="clerksuite-theme-switch"
+                              ValueChange="OnThemeChangedAsync" />
+                    <span class="small text-muted d-none d-md-inline">Dark</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(UserDisplay))
+                {
+                    <div class="clerksuite-user" title="@UserDisplay">
+                        <span class="e-icons e-user" aria-hidden="true"></span>
+                        <span class="clerksuite-user-name">@UserDisplay</span>
+                    </div>
+                }
+            </div>
         </header>
-        <main class="clerksuite-content px-4 py-3">
-            @Body
+        <main class="clerksuite-content">
+            <LoggingErrorBoundary @ref="_boundary" Region="main">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="ex">
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Something went wrong on this page.</strong>
+                        <p class="mb-2 mt-2 small">@ex.GetType().Name: @ex.Message</p>
+                        <p class="mb-2 small text-muted">
+                            Details were written to <code>src/Wiley.Apartments.Web/logs/clerksuite-*.log</code>.
+                        </p>
+                        <SfButton CssClass="e-outline e-small" Content="Dismiss and retry" OnClick="RecoverAsync" />
+                    </div>
+                </ErrorContent>
+            </LoggingErrorBoundary>
         </main>
     </div>
 </div>
+
+<AppToastHost />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -36,7 +153,74 @@
 </div>
 
 @code {
-    private bool SidebarOpen { get; set; }
+    private bool SidebarOpen { get; set; } = true;
+    private Guid? CommunityCenterId { get; set; }
+    private LoggingErrorBoundary? _boundary;
+    private bool IsDarkMode { get; set; }
+    private bool _themeLoaded;
+    private string? UserDisplay { get; set; }
+
+    private bool PortalConfigured =>
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out _, out _);
+
+    private string PortalUrl =>
+        PaymentPortalConfiguration.TryResolve(ClerkOptions.Value.PaymentPortalUrl, out var url, out _)
+            ? url
+            : string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var user = state.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            UserDisplay = user.FindFirstValue(ClaimTypes.Email)
+                ?? user.Identity.Name
+                ?? user.FindFirstValue(ClaimTypes.Name)
+                ?? "Signed in";
+        }
+
+        try
+        {
+            var facility = await UnitService.GetFacilityAsync();
+            CommunityCenterId = facility?.Id;
+        }
+        catch
+        {
+            CommunityCenterId = null;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        IsDarkMode = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+        _themeLoaded = true;
+        StateHasChanged();
+    }
+
+    private async Task OnThemeChangedAsync(Syncfusion.Blazor.Buttons.ChangeEventArgs<bool> args)
+    {
+        if (!_themeLoaded)
+        {
+            return;
+        }
+
+        IsDarkMode = args.Checked;
+        await JsRuntime.InvokeVoidAsync("ClerkSuiteTheme.setDarkMode", IsDarkMode);
+    }
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
+
+    private void CloseOnNavigate() => SidebarOpen = false;
+
+    private Task RecoverAsync()
+    {
+        _boundary?.Recover();
+        return Task.CompletedTask;
+    }
 }

@@ -6,22 +6,28 @@
 
 ## Core Entities (canonical)
 
-| Entity                 | C# type (planned)    | Key fields                                                                                        |
-| ---------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
-| **Unit**               | `Unit`               | Id, Number, SqFt, Beds, Baths, Status, Notes, CurrentTenantId, RowVersion                         |
-| **Asset / Appliance**  | `Asset`              | UnitId, Type, Make, Model, Serial, InstallDate, WarrantyStart, WarrantyEnd, Condition, PhotoPaths |
-| **Flooring**           | `Flooring`           | UnitId, Type, InstallDate, Condition, ReplacedDate, Notes                                         |
-| **Tenant**             | `Tenant`             | Id, Name fields, Contact, Emergency, Notes, IsDeleted, RowVersion                                 |
-| **Occupancy**          | `Occupancy`          | TenantId, UnitId, StartDate, EndDate                                                              |
-| **Lease**              | `Lease`              | Id, UnitId, TenantId, Start, End, Rent, Deposit, Status, TemplateUsed, IsDeleted, RowVersion      |
-| **Charge**             | `LedgerEntry`        | LeaseId?, TenantId, UnitId, Amount, Type=Charge, Date, Notes                                      |
-| **Payment**            | `LedgerEntry`        | LeaseId?, TenantId, UnitId, Amount, Type=Payment, Date, Method, Notes                             |
-| **MaintenanceRequest** | `MaintenanceRequest` | UnitId, AssetId?, Description, Status, Cost, CompletedDate, Priority                              |
-| **Document**           | `Document`           | EntityType, EntityId, FilePathOnNas, Category, UploadedBy, UploadedAt                             |
-| **AuditLog**           | `AuditLog`           | User, Timestamp, Entity, Action, OldValues, NewValues                                             |
-| **User**               | `ApplicationUser`    | Identity user for clerks (Clerk / ReadOnly / Elevated roles)                                      |
+| Entity                 | C# type (planned)    | Key fields                                                                                                                      |
+| ---------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Unit**               | `Unit`               | Id, Number, SqFt, Beds, Baths, Status, Notes, CurrentTenantId, MonthlyRent, SecurityDeposit, IsHandicapAccessible, LeaseTerm, IsFacility, RowVersion |
+| **Asset / Appliance**  | `Asset`              | UnitId, Type, Make, Model, Serial, InstallDate, WarrantyStart, WarrantyEnd, Condition, PhotoPaths                               |
+| **Flooring**           | `Flooring`           | UnitId, Type, InstallDate, Condition, ReplacedDate, Notes                                                                       |
+| **Tenant**             | `Tenant`             | Id, Name fields, Phone, Email, EmergencyContact, MailingAddress, Notes, IsDeleted, RowVersion                               |
+| **Occupancy**          | `Occupancy`          | TenantId, UnitId, StartDate, EndDate                                                                                            |
+| **Lease**              | `Lease`              | Id, UnitId, TenantId, Start, End, Rent, Deposit, Status, TemplateUsed, IsDeleted, RowVersion                                    |
+| **Charge**             | `LedgerEntry`        | LeaseId?, TenantId, UnitId, Amount, Type=Charge, Date, Notes                                                                    |
+| **Payment**            | `LedgerEntry`        | LeaseId?, TenantId, UnitId, Amount, Type=Payment, Date, Method, Notes                                                           |
+| **UnitOperatingCost**  | `UnitOperatingCost`  | UnitId?, Category (Utility/Repair/Replace/CommonUpkeep), Amount, IncurredUtc, Vendor?, Notes?, MaintenanceRequestId?, IsDeleted |
+| **ScheduledItem**      | `ScheduledItem`      | Title, Category, UnitId?, TenantId?, LeaseId?, StartUtc, EndUtc?, DueUtc?, ReminderOffset, IsCompleted, IsDeleted               |
+| **MaintenanceRequest** | `MaintenanceRequest` | UnitId, AssetId?, Description, Status, Cost, CompletedDate, Priority                                                            |
+| **Document**           | `Document`           | EntityType, EntityId, FilePathOnNas, Category, UploadedBy, UploadedAt                                                           |
+| **AuditLog**           | `AuditLog`           | User, Timestamp, Entity, Action, OldValues, NewValues                                                                           |
+| **User**               | `ApplicationUser`    | Identity user for clerks (Clerk / ReadOnly / Elevated roles)                                                                    |
 
 Supporting types: `HouseholdMember`, `Vehicle`, `Pet`, `LateFeeRule` (from spec FR-2 / FR-4).
+
+**UnitOperatingCost** is landlord expense tracking (T4.5). It MUST NOT share storage with tenant `LedgerEntry` balances. `UnitId` may be null only when Category is `CommonUpkeep` (building-wide).
+
+**Portfolio P/L (computed, T6.4):** No separate entity. Aggregate **income** from tenant `LedgerEntry` payments (and rent charges as billed income per report rule) minus **expense** from `UnitOperatingCost` (+ optional maintenance costs when Phase 5 links). CommonUpkeep without `UnitId` allocated evenly across 16 units for per-apt charts unless a unit is specified. Monthly/yearly series for city council packets.
 
 ---
 
@@ -53,6 +59,7 @@ erDiagram
         string Status
         string Notes
         guid CurrentTenantId FK
+        bool IsFacility
         rowversion RowVersion
     }
 
@@ -210,7 +217,7 @@ erDiagram
 ├── uploads/{unitNumber}/{category}/{filename}
 ├── leases/{unitNumber}/{leaseId}.pdf
 ├── appliances/{unitNumber}/{assetId}/{filename}
-├── templates/leases/{templateName}.sfdt
+├── templates/brookside-*.docx|.pdf   (legal masters + fillable AcroForm)
 └── photos/units/{unitNumber}/{filename}
 ```
 
@@ -222,6 +229,7 @@ erDiagram
 
 - **PaymentPortalUrl** — deep link only (v1)
 - **E-sign** — export PDF; integration post-v1
+- **Payment receipt PDF** — v1.1 (NV-1): generate from `LedgerEntry` Payment for print/email; optional Document vault copy
 
 ---
 

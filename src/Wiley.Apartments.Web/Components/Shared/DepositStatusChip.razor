@@ -1,0 +1,29 @@
+@namespace Wiley.Apartments.Web.Components.Shared
+@using Syncfusion.Blazor.Buttons
+
+<SfChip CssClass="cs-status-chip">
+    <ChipItems>
+        <ChipItem Text="@(string.IsNullOrWhiteSpace(Status) ? "—" : Status)" CssClass="@ChipCss" />
+    </ChipItems>
+</SfChip>
+
+@code {
+    [Parameter]
+    public string? Status { get; set; }
+
+    private string ChipCss
+    {
+        get
+        {
+            var key = (Status ?? string.Empty).Trim();
+            return key.ToUpperInvariant() switch
+            {
+                "HELD" => "cs-chip cs-chip--occupied",
+                "PARTIAL" => "cs-chip cs-chip--warn",
+                "DUE" => "cs-chip cs-chip--danger",
+                "NONE" => "cs-chip cs-chip--vacant",
+                _ => "cs-chip cs-chip--info"
+            };
+        }
+    }
+}

@@ -1,0 +1,82 @@
+@page "/reports/rent-pivot"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.PivotView
+@using Wiley.Apartments.Contracts
+@inject IDashboardService Dashboard
+@inject NavigationManager Navigation
+@inject ILogger<RentPivot> Logger
+
+<PageTitle>Rent pivot</PageTitle>
+
+<PageHeader Title="Rent / ledger pivot"
+            Subtitle="Ad-hoc unit × year × month analysis (charges and payments).">
+    <SfButton CssClass="e-outline e-small" Content="← Reports"
+              OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+else if (Rows.Count == 0)
+{
+    <p class="text-muted">No ledger rows yet.</p>
+}
+else
+{
+    <p class="small text-muted mb-2">Drag fields between rows/columns/values. Export via the toolbar.</p>
+    <SfPivotView TValue="RentPivotRow"
+                 Height="640"
+                 Width="100%"
+                 ShowFieldList="true"
+                 ShowToolbar="true"
+                 AllowExcelExport="true"
+                 AllowPdfExport="true"
+                 Toolbar="@Toolbar">
+        <PivotViewDataSourceSettings DataSource="@Rows" EnableSorting="true">
+            <PivotViewColumns>
+                <PivotViewColumn Name="Year" />
+                <PivotViewColumn Name="Month" />
+            </PivotViewColumns>
+            <PivotViewRows>
+                <PivotViewRow Name="Unit" />
+                <PivotViewRow Name="EntryKind" />
+            </PivotViewRows>
+            <PivotViewValues>
+                <PivotViewValue Name="PaymentAmount" Caption="Payments" />
+                <PivotViewValue Name="ChargeAmount" Caption="Charges" />
+            </PivotViewValues>
+        </PivotViewDataSourceSettings>
+        <PivotViewGridSettings ColumnWidth="120" />
+    </SfPivotView>
+}
+
+@code {
+    private List<RentPivotRow> Rows { get; set; } = [];
+    private string? ErrorMessage { get; set; }
+
+    private static readonly List<Syncfusion.Blazor.PivotView.ToolbarItems> Toolbar =
+    [
+        Syncfusion.Blazor.PivotView.ToolbarItems.Grid,
+        Syncfusion.Blazor.PivotView.ToolbarItems.FieldList,
+        Syncfusion.Blazor.PivotView.ToolbarItems.Export,
+        Syncfusion.Blazor.PivotView.ToolbarItems.SubTotal,
+        Syncfusion.Blazor.PivotView.ToolbarItems.GrandTotal
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Rows = (await Dashboard.GetRentPivotRowsAsync()).ToList();
+            Logger.LogInformation("Loaded rent pivot with {Count} ledger rows.", Rows.Count);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Rent pivot load failed.");
+        }
+    }
+}

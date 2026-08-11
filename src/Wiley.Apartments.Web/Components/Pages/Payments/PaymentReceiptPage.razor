@@ -1,0 +1,135 @@
+@page "/payments/receipt/{EntryId:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
+@using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Web.Components.Shared
+@inject IPaymentReceiptService ReceiptService
+@inject NavigationManager Navigation
+@inject ILogger<PaymentReceiptPage> Logger
+
+<PageTitle>Payment receipt</PageTitle>
+
+<PageHeader Title="Payment receipt"
+            Subtitle="@Subtitle">
+    <SfButton CssClass="e-outline e-small" Content="← Ledger"
+              OnClick="@(() => Navigation.NavigateTo(BackHref))" />
+    <SfButton CssClass="e-primary e-small" Content="Print"
+              Disabled="@(!_viewerReady)" OnClick="PrintAsync" />
+    <SfButton CssClass="e-outline e-small" Content="Save PDF"
+              Disabled="@(!_viewerReady)" OnClick="SaveAsync" />
+    <SfButton CssClass="e-outline e-small" Content="Regenerate" Disabled="@Busy" OnClick="LoadAsync" />
+</PageHeader>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-warning">@ErrorMessage</div>
+}
+else if (Busy && _pdfBytes is null)
+{
+    <p class="text-muted">Generating receipt…</p>
+}
+else if (_pdfBytes is { Length: > 0 })
+{
+    <p class="small text-muted mb-2">
+        Receipt <strong>@_receiptNumber</strong> — preview below.
+        Use <strong>Print</strong> or <strong>Save PDF</strong>, or the printer / download icons in the viewer toolbar.
+        @if (_documentId is Guid)
+        {
+            <span> Also saved to tenant documents (Receipt).</span>
+        }
+    </p>
+    <ClerkPdfViewer @ref="_viewer"
+                    PdfBytes="@_pdfBytes"
+                    DownloadFileName="@_fileName"
+                    Height="780px"
+                    OnDocumentLoaded="OnViewerLoaded" />
+}
+
+@code {
+    [Parameter]
+    public Guid EntryId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    public Guid? QueryTenantId { get; set; }
+
+    private ClerkPdfViewer? _viewer;
+    private byte[]? _pdfBytes;
+    private string _fileName = "receipt.pdf";
+    private string? _receiptNumber;
+    private Guid? _documentId;
+    private string? ErrorMessage { get; set; }
+    private bool Busy { get; set; }
+    private Guid? _loadedId;
+    private bool _vaultSaved;
+    private bool _viewerReady;
+
+    private string Subtitle =>
+        string.IsNullOrEmpty(_receiptNumber)
+            ? "Preview, print, or save for the tenant."
+            : $"Receipt {_receiptNumber}";
+
+    private string BackHref =>
+        QueryTenantId is Guid tid
+            ? $"/payments?tenantId={tid}"
+            : "/payments";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId != EntryId)
+        {
+            _vaultSaved = false;
+            await LoadAsync();
+        }
+    }
+
+    private Task OnViewerLoaded()
+    {
+        _viewerReady = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task PrintAsync()
+    {
+        if (_viewer is not null)
+        {
+            await _viewer.PrintAsync();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_viewer is not null)
+        {
+            await _viewer.DownloadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        _viewerReady = false;
+        try
+        {
+            var result = await ReceiptService.GenerateAsync(EntryId, saveToVault: true);
+            _pdfBytes = result.PdfBytes;
+            _fileName = result.FileName;
+            _receiptNumber = result.ReceiptNumber;
+            _documentId = result.DocumentId;
+            _vaultSaved = result.DocumentId is Guid;
+
+            _loadedId = EntryId;
+            Logger.LogInformation("Opened receipt page for payment {EntryId} ({ReceiptNumber}).", EntryId, _receiptNumber);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Logger.LogError(ex, "Receipt generation failed for {EntryId}.", EntryId);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}
