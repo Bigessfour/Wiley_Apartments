@@ -3,11 +3,24 @@ name: CI
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "specs/**"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
     branches: [main, master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "specs/**"
+      - "LICENSE"
+      - ".gitignore"
   # No workflow_dispatch inputs (CKV_GHA_7). Self-hosted / model via repo vars:
   #   CI_USE_SELF_HOSTED=true  → runners labeled self-hosted,linux,clerksuite-ci
   #   OLLAMA_MODEL             → e.g. qwen2.5-coder:3b (default 1.5b)
+  #   CI_FORCE_OLLAMA=true     → run Ollama review even when tests are green (dispatch only)
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +31,10 @@ env:
   DOTNET_VERSION: 9.0.x
   SOLUTION: Wiley.Apartments.slnx
   OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'qwen2.5-coder:1.5b' }}
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  NUGET_XMLDOC_MODE: skip
 
 permissions:
   contents: read
@@ -31,7 +48,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -41,28 +58,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-
-      - name: Cache NuGet HTTP
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/NuGet/http-cache
-          key: nuget-http-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-http-${{ runner.os }}-
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/packages.lock.json
 
       - name: Restore
-        run: dotnet restore ${{ env.SOLUTION }}
+        run: dotnet restore ${{ env.SOLUTION }} --verbosity minimal
 
       - name: Build
-        run: dotnet build ${{ env.SOLUTION }} -c Release --no-restore -warnaserror
+        run: dotnet build ${{ env.SOLUTION }} -c Release --no-restore -warnaserror --verbosity minimal
 
       - name: Unit tests
         id: unit
@@ -71,7 +76,7 @@ jobs:
             -c Release --no-build \
             --logger "trx;LogFileName=unit.trx" \
             --results-directory TestResults \
-            --verbosity normal
+            --verbosity minimal
 
       - name: Integration tests
         id: integration
@@ -80,7 +85,7 @@ jobs:
             -c Release --no-build \
             --logger "trx;LogFileName=integration.trx" \
             --results-directory TestResults \
-            --verbosity normal
+            --verbosity minimal
 
       - name: Upload test results
         if: always()
@@ -90,6 +95,7 @@ jobs:
           path: TestResults/**
           retention-days: 7
           if-no-files-found: warn
+          compression-level: 6
 
       - name: Upload build logs on failure
         if: failure()
@@ -103,14 +109,14 @@ jobs:
           if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
-  # 2. E2E (Playwright) – isolated so unit/integration stay fast
+  # 2. E2E (Playwright) – only after unit/integration pass
   # ---------------------------------------------------------------------------
   e2e:
     name: E2E (Playwright)
     runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
     needs: build-and-test
     if: success()
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
       ASPNETCORE_ENVIRONMENT: Development
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
@@ -123,14 +129,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/packages.lock.json
 
       - name: Cache Playwright browsers
         id: playwright-cache
@@ -148,10 +150,12 @@ jobs:
         with:
           Version: latest
 
-      - name: Restore & Build
+      # Build only the E2E project graph (not the full solution a second time).
+      - name: Restore & build E2E project
         run: |
-          dotnet restore ${{ env.SOLUTION }}
-          dotnet build ${{ env.SOLUTION }} -c Release --no-restore
+          dotnet restore tests/Wiley.Apartments.E2ETests/Wiley.Apartments.E2ETests.csproj --verbosity minimal
+          dotnet build tests/Wiley.Apartments.E2ETests/Wiley.Apartments.E2ETests.csproj \
+            -c Release --no-restore --verbosity minimal
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -171,7 +175,7 @@ jobs:
             -c Release --no-build \
             --logger "trx;LogFileName=e2e.trx" \
             --results-directory TestResults \
-            --verbosity normal
+            --verbosity minimal
 
       - name: Upload E2E artifacts
         if: always()
@@ -185,16 +189,24 @@ jobs:
             **/screenshots/**
           retention-days: 7
           if-no-files-found: warn
+          compression-level: 6
 
   # ---------------------------------------------------------------------------
-  # 3. Ollama CI Findings Review Agent
+  # 3. Ollama CI Findings Review — failures (or forced dispatch) only
   # ---------------------------------------------------------------------------
+  # Skipped on green PRs/pushes (~1.5–2 min saved). Still runs when Build & Test
+  # or E2E fails, or on workflow_dispatch when vars.CI_FORCE_OLLAMA == 'true'.
   ollama-ci-review:
     name: Ollama CI Review Agent
     runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
     needs: [build-and-test, e2e]
-    if: always()
-    timeout-minutes: 25
+    if: |
+      always() && (
+        needs.build-and-test.result == 'failure' ||
+        needs.e2e.result == 'failure' ||
+        (github.event_name == 'workflow_dispatch' && vars.CI_FORCE_OLLAMA == 'true')
+      )
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -279,7 +291,7 @@ jobs:
           None — no failing tests or job failures in the evidence.
 
           ## Next
-          No CI follow-up required. Continue Spec Kit Phase 2 (tenants) when product work resumes.
+          No CI follow-up required.
 
           Hard rules:
           - Do NOT invent coverage gaps, refactors, audit logging, or secret-handling tasks.
