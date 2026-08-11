@@ -144,3 +144,58 @@ h1:focus {
 .unit-summary-card .e-card-content {
   min-height: 4.5rem;
 }
+
+
+/* ClerkSuite dashboard KPI panels (T6.2 + unit detail strip) */
+.clerksuite-dashboard .e-panel-header,
+.unit-detail-kpis .e-panel-header {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bs-secondary-color, #6c757d);
+  padding: 0.65rem 0.85rem 0.25rem;
+  border-bottom: none;
+}
+
+.clerksuite-dashboard .e-panel-content,
+.unit-detail-kpis .e-panel-content {
+  padding: 0.35rem 0.85rem 0.85rem;
+}
+
+.kpi-panel {
+  min-height: 4.5rem;
+}
+
+.kpi-metric {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-metric-sm {
+  font-size: 1.35rem;
+}
+
+.kpi-sub {
+  font-size: 0.8125rem;
+  color: var(--bs-secondary-color, #6c757d);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.notes-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.status-mix li:last-child {
+  border-bottom: none !important;
+}

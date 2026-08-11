@@ -31,6 +31,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IUnitService, UnitService>();
         builder.Services.AddScoped<IAssetService, AssetService>();
         builder.Services.AddScoped<IFlooringService, FlooringService>();
+        builder.Services.AddScoped<IDashboardService, DashboardService>();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";

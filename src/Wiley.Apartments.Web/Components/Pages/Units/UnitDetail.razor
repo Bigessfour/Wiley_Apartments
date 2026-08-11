@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Layouts
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Navigations
 @using Wiley.Apartments.Contracts
@@ -37,55 +38,63 @@ else
         <div class="alert alert-warning">@GridError</div>
     }
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-3">
-            <SfCard CssClass="unit-summary-card h-100">
-                <CardHeader Title="Status & layout" />
-                <CardContent>
-                    <p class="mb-2">
-                        <span class="badge @StatusBadgeClass(Unit.Status)">@FormatStatus(Unit.Status)</span>
-                    </p>
-                    <p class="mb-1">@Unit.Beds bed · @Unit.Baths bath</p>
-                    <p class="mb-0 text-muted">@Unit.SqFt.ToString("N0") sq ft</p>
-                </CardContent>
-            </SfCard>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <SfCard CssClass="unit-summary-card h-100">
-                <CardHeader Title="Assets & appliances" />
-                <CardContent>
-                    <p class="unit-summary-value mb-1">@UnitAssets.Count</p>
-                    <p class="mb-0 text-muted">
-                        @if (ExpiringWarrantyCount > 0)
-                        {
-                            <span>@ExpiringWarrantyCount warranty@(ExpiringWarrantyCount == 1 ? "" : "ies") expiring within 90 days</span>
-                        }
-                        else
-                        {
-                            <span>No warranties expiring soon</span>
-                        }
-                    </p>
-                </CardContent>
-            </SfCard>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <SfCard CssClass="unit-summary-card h-100">
-                <CardHeader Title="Flooring & carpet" />
-                <CardContent>
-                    <p class="unit-summary-value mb-1">@UnitFloorings.Count</p>
-                    <p class="mb-0 text-muted">@CurrentFlooringSummary</p>
-                </CardContent>
-            </SfCard>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <SfCard CssClass="unit-summary-card h-100">
-                <CardHeader Title="Notes" />
-                <CardContent>
-                    <p class="mb-0">@(string.IsNullOrWhiteSpace(Unit.Notes) ? "No unit notes recorded." : Unit.Notes)</p>
-                </CardContent>
-            </SfCard>
-        </div>
-    </div>
+    <SfDashboardLayout Columns="12"
+                       CellSpacing="@(new double[] { 12, 12 })"
+                       CellAspectRatio="0.9"
+                       MediaQuery="max-width: 768px"
+                       AllowDragging="false"
+                       AllowResizing="false"
+                       CssClass="unit-detail-kpis mb-4">
+        <DashboardLayoutPanels>
+            <DashboardLayoutPanel Id="ud-status" SizeX="3" SizeY="1" Row="0" Column="0">
+                <HeaderTemplate><div>Status & layout</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="mb-2">
+                            <span class="badge @StatusBadgeClass(Unit.Status)">@FormatStatus(Unit.Status)</span>
+                        </p>
+                        <p class="kpi-metric kpi-metric-sm">@Unit.Beds / @Unit.Baths</p>
+                        <p class="kpi-sub">@Unit.SqFt.ToString("N0") sq ft · beds / baths</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="ud-assets" SizeX="3" SizeY="1" Row="0" Column="3">
+                <HeaderTemplate><div>Assets & appliances</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-metric">@UnitAssets.Count</p>
+                        <p class="kpi-sub">
+                            @if (ExpiringWarrantyCount > 0)
+                            {
+                                <span>@ExpiringWarrantyCount warranty@(ExpiringWarrantyCount == 1 ? "" : "ies") expiring within 90 days</span>
+                            }
+                            else
+                            {
+                                <span>No warranties expiring soon</span>
+                            }
+                        </p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="ud-flooring" SizeX="3" SizeY="1" Row="0" Column="6">
+                <HeaderTemplate><div>Flooring & carpet</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-metric">@UnitFloorings.Count</p>
+                        <p class="kpi-sub">@CurrentFlooringSummary</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+            <DashboardLayoutPanel Id="ud-notes" SizeX="3" SizeY="1" Row="0" Column="9">
+                <HeaderTemplate><div>Notes</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="kpi-panel">
+                        <p class="kpi-sub notes-clamp">@(string.IsNullOrWhiteSpace(Unit.Notes) ? "No unit notes recorded." : Unit.Notes)</p>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+        </DashboardLayoutPanels>
+    </SfDashboardLayout>
 
     <SfTab>
         <TabItems>
