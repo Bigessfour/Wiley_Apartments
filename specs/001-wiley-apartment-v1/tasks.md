@@ -160,7 +160,7 @@
 - [x] **T6.2** Clerk home dashboard (occupancy, expirations, open work orders, delinquencies, warranties).
   - **Done when:** SfDashboardLayout default landing page; live accurate data for 16 units; loads **< 3 s** on LAN; widgets clickable to detail.
   - **Paths:** `Components/Pages/Home.razor`, `Services/DashboardService.cs`, `Contracts/IDashboardService.cs`
-  - **Notes (2026-08-11):** Occupancy, status mix, unit portfolio, and warranty alerts live from domain. Work orders / delinquencies / lease expirations show 0 with deferred copy until those modules exist. Unit detail KPI strip uses `SfDashboardLayout`. See `docs/CODE_REVIEW-t6.2-dashboard.md`.
+  - **Notes (2026-08-11):** Occupancy, status mix, unit portfolio, and warranty alerts live from domain. Work orders / delinquencies / lease expirations blocked until Phase 2–4 entities exist (see `docs/dashboard-full-repo-audit.md`). Finish pass: SfGrid portfolio/warranties, occupancy+mix bars, maintenance unit KPI, coming-modules strip. Unit detail KPI strip uses `SfDashboardLayout`.
 
 - [ ] **T6.3** Basic exportable reports (rent roll, occupancy, warranty list).
   - **Done when:** Rent roll printable/downloadable; occupancy and warranty status reports available.

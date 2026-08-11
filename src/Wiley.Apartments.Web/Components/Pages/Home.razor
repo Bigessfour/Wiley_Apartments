@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Layouts
 @using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Grids
 @using Wiley.Apartments.Contracts
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
@@ -10,19 +11,20 @@
 <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
     <div>
         <h1 class="h3 mb-1">Dashboard</h1>
-        <p class="text-muted mb-0">Portfolio health for Town of Wiley units</p>
+        <p class="text-muted mb-0">Portfolio health — Town of Wiley Apartments</p>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">
-        <p class="text-muted small mb-0 tabular-nums">
-            @if (LoadedAtDisplay is not null)
-            {
-                <span>As of @LoadedAtDisplay</span>
-            }
-        </p>
+        @if (LoadedAtDisplay is not null)
+        {
+            <p class="text-muted small mb-0 tabular-nums">As of @LoadedAtDisplay</p>
+        }
         <SfButton CssClass="e-outline e-small"
                   Content="Refresh"
-                  Disabled="@(IsLoading)"
+                  Disabled="@IsLoading"
                   OnClick="RefreshAsync" />
+        <SfButton CssClass="e-flat e-small"
+                  Content="All units"
+                  OnClick='() => Nav.NavigateTo("/units")' />
     </div>
 </div>
 
@@ -73,8 +75,11 @@ else
                             class="kpi-panel kpi-panel-btn @(StatusFilter == "Occupied" ? "is-active" : null)"
                             @onclick='() => ToggleStatusFilter("Occupied")'>
                         <p class="kpi-metric">@Snapshot.OccupancyRate.ToString("0.#")%</p>
+                        <div class="occupancy-bar" aria-hidden="true">
+                            <div class="occupancy-bar-fill" style="width: @($"{Math.Clamp(Snapshot.OccupancyRate, 0, 100):0.#}%")"></div>
+                        </div>
                         <p class="kpi-sub">@Snapshot.OccupiedCount of @Snapshot.TotalUnits units occupied</p>
-                        <p class="kpi-hint">Filter portfolio: Occupied</p>
+                        <p class="kpi-hint">Filter portfolio · Occupied</p>
                     </button>
                 </ContentTemplate>
             </DashboardLayoutPanel>
@@ -83,37 +88,35 @@ else
                 <HeaderTemplate><div>Vacant / Make-Ready</div></HeaderTemplate>
                 <ContentTemplate>
                     <button type="button"
-                            class="kpi-panel kpi-panel-btn @(StatusFilter is "Vacant" or "Make-Ready" ? "is-active" : null)"
+                            class="kpi-panel kpi-panel-btn @(VacantMakeReadyMode ? "is-active" : null)"
                             @onclick="ToggleVacantMakeReadyFilter">
                         <p class="kpi-metric">@(Snapshot.VacantCount + Snapshot.MakeReadyCount)</p>
                         <p class="kpi-sub">@Snapshot.VacantCount vacant · @Snapshot.MakeReadyCount make-ready</p>
-                        <p class="kpi-hint">Filter portfolio: Vacant + Make-Ready</p>
+                        <p class="kpi-hint">Filter portfolio · Vacant + Make-Ready</p>
                     </button>
                 </ContentTemplate>
             </DashboardLayoutPanel>
 
-            <DashboardLayoutPanel Id="kpi-workorders" SizeX="3" SizeY="1" Row="0" Column="6">
-                <HeaderTemplate><div>Open work orders</div></HeaderTemplate>
+            <DashboardLayoutPanel Id="kpi-maintenance" SizeX="3" SizeY="1" Row="0" Column="6">
+                <HeaderTemplate><div>Maintenance</div></HeaderTemplate>
                 <ContentTemplate>
-                    <div class="kpi-panel">
-                        <p class="kpi-metric">@Snapshot.OpenWorkOrders</p>
-                        <p class="kpi-sub">
-                            <span class="badge text-bg-secondary fw-normal">Deferred</span>
-                            Maintenance module not yet active
-                        </p>
-                    </div>
+                    <button type="button"
+                            class="kpi-panel kpi-panel-btn @(StatusFilter == "Maintenance" ? "is-active" : null)"
+                            @onclick='() => ToggleStatusFilter("Maintenance")'>
+                        <p class="kpi-metric">@Snapshot.MaintenanceCount</p>
+                        <p class="kpi-sub">Units marked maintenance</p>
+                        <p class="kpi-hint">Filter portfolio · Maintenance</p>
+                    </button>
                 </ContentTemplate>
             </DashboardLayoutPanel>
 
-            <DashboardLayoutPanel Id="kpi-delinquent" SizeX="3" SizeY="1" Row="0" Column="9">
-                <HeaderTemplate><div>Delinquent</div></HeaderTemplate>
+            <DashboardLayoutPanel Id="kpi-warranties" SizeX="3" SizeY="1" Row="0" Column="9">
+                <HeaderTemplate><div>Warranty alerts</div></HeaderTemplate>
                 <ContentTemplate>
                     <div class="kpi-panel">
-                        <p class="kpi-metric">@Snapshot.DelinquentAmount.ToString("C0")</p>
-                        <p class="kpi-sub">
-                            <span class="badge text-bg-secondary fw-normal">Deferred</span>
-                            Payments module not yet active
-                        </p>
+                        <p class="kpi-metric">@Snapshot.WarrantyAlerts.Count</p>
+                        <p class="kpi-sub">Assets ending in next 90 days</p>
+                        <p class="kpi-hint">Live from asset records</p>
                     </div>
                 </ContentTemplate>
             </DashboardLayoutPanel>
@@ -121,20 +124,33 @@ else
             <DashboardLayoutPanel Id="status-mix" SizeX="4" SizeY="2" Row="1" Column="0">
                 <HeaderTemplate><div>Portfolio mix</div></HeaderTemplate>
                 <ContentTemplate>
-                    <ul class="status-mix list-unstyled mb-0">
+                    @if (Snapshot.TotalUnits > 0)
+                    {
+                        <div class="mix-bar" role="img" aria-label="Portfolio status mix">
+                            @foreach (var s in Snapshot.StatusBreakdown)
+                            {
+                                var pct = 100.0 * s.Count / Snapshot.TotalUnits;
+                                <div class="mix-seg mix-@CssStatusKey(s.Name)"
+                                     style="width: @($"{pct:0.#}%")"
+                                     title="@($"{s.Name}: {s.Count}")"></div>
+                            }
+                        </div>
+                    }
+                    <ul class="status-mix list-unstyled mb-0 mt-2">
                         @foreach (var s in Snapshot.StatusBreakdown)
                         {
                             <li>
                                 <button type="button"
                                         class="status-mix-btn @(StatusFilter == s.Name ? "is-active" : null)"
                                         @onclick="() => ToggleStatusFilter(s.Name)">
+                                    <span class="status-dot mix-@CssStatusKey(s.Name)"></span>
                                     <span>@s.Name</span>
-                                    <strong class="tabular-nums">@s.Count</strong>
+                                    <strong class="tabular-nums ms-auto">@s.Count</strong>
                                 </button>
                             </li>
                         }
                     </ul>
-                    @if (StatusFilter is not null)
+                    @if (StatusFilter is not null || VacantMakeReadyMode)
                     {
                         <button type="button" class="btn btn-link btn-sm px-0 mt-2" @onclick="ClearFilter">Clear filter</button>
                     }
@@ -150,49 +166,108 @@ else
                     }
                     else
                     {
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Unit</th>
-                                        <th>Asset</th>
-                                        <th>Ends</th>
-                                        <th class="text-end">Days</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var row in Snapshot.WarrantyAlerts)
-                                    {
-                                        <tr>
-                                            <td><a href="@($"/units/{row.UnitId}")">@row.UnitNumber</a></td>
-                                            <td>@row.AssetType</td>
-                                            <td class="tabular-nums">@row.WarrantyEnd.ToString("MM/dd/yyyy")</td>
-                                            <td class="text-end tabular-nums">
-                                                <span class="@(row.DaysLeft <= 30 ? "text-warning fw-semibold" : null)">@row.DaysLeft</span>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <SfGrid TValue="WarrantyAlertItem"
+                                DataSource="@Snapshot.WarrantyAlerts"
+                                AllowSorting="true"
+                                AllowPaging="true"
+                                Height="220"
+                                GridLines="GridLine.Horizontal">
+                            <GridPageSettings PageSize="6" />
+                            <GridColumns>
+                                <GridColumn Field="@nameof(WarrantyAlertItem.UnitNumber)" HeaderText="Unit" Width="90">
+                                    <Template>
+                                        @{
+                                            var row = context as WarrantyAlertItem;
+                                        }
+                                        @if (row is not null)
+                                        {
+                                            <a href="@($"/units/{row.UnitId}")">@row.UnitNumber</a>
+                                        }
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(WarrantyAlertItem.AssetType)" HeaderText="Asset" Width="140" />
+                                <GridColumn Field="@nameof(WarrantyAlertItem.WarrantyEnd)"
+                                            HeaderText="Ends"
+                                            Width="110"
+                                            TextAlign="TextAlign.Right">
+                                    <Template>
+                                        @{
+                                            var row = context as WarrantyAlertItem;
+                                        }
+                                        @if (row is not null)
+                                        {
+                                            <span class="tabular-nums">@row.WarrantyEnd.ToString("MM/dd/yyyy")</span>
+                                        }
+                                    </Template>
+                                </GridColumn>
+                                <GridColumn Field="@nameof(WarrantyAlertItem.DaysLeft)"
+                                            HeaderText="Days"
+                                            Width="80"
+                                            TextAlign="TextAlign.Right">
+                                    <Template>
+                                        @{
+                                            var row = context as WarrantyAlertItem;
+                                        }
+                                        @if (row is not null)
+                                        {
+                                            <span class="tabular-nums @(row.DaysLeft <= 30 ? "text-warning fw-semibold" : null)">@row.DaysLeft</span>
+                                        }
+                                    </Template>
+                                </GridColumn>
+                            </GridColumns>
+                        </SfGrid>
                     }
                 </ContentTemplate>
             </DashboardLayoutPanel>
 
-            <DashboardLayoutPanel Id="rent-roll" SizeX="12" SizeY="3" Row="3" Column="0">
+            <DashboardLayoutPanel Id="pipeline" SizeX="12" SizeY="1" Row="3" Column="0">
+                <HeaderTemplate><div>Coming modules</div></HeaderTemplate>
+                <ContentTemplate>
+                    <div class="pipeline-row">
+                        <div class="pipeline-card">
+                            <strong>Lease expirations</strong>
+                            <span class="badge text-bg-secondary fw-normal">Phase 3</span>
+                            <p class="small text-muted mb-0">Needs Lease entity (T3.x) — not in domain yet.</p>
+                        </div>
+                        <div class="pipeline-card">
+                            <strong>Work orders</strong>
+                            <span class="badge text-bg-secondary fw-normal">Phase 4</span>
+                            <p class="small text-muted mb-0">Needs MaintenanceRequest — open WO KPI will wire here.</p>
+                        </div>
+                        <div class="pipeline-card">
+                            <strong>Delinquencies</strong>
+                            <span class="badge text-bg-secondary fw-normal">Phase 3</span>
+                            <p class="small text-muted mb-0">Needs LedgerEntry payments — balance KPIs deferred.</p>
+                        </div>
+                        <div class="pipeline-card">
+                            <strong>Tenants</strong>
+                            <span class="badge text-bg-secondary fw-normal">Phase 2</span>
+                            <p class="small text-muted mb-0">
+                                <a href="/tenants">Tenants page</a> stub — Unit.CurrentTenantId reserved, no Tenant table yet.
+                            </p>
+                        </div>
+                    </div>
+                </ContentTemplate>
+            </DashboardLayoutPanel>
+
+            <DashboardLayoutPanel Id="rent-roll" SizeX="12" SizeY="3" Row="4" Column="0">
                 <HeaderTemplate>
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 w-100">
                         <span>Unit portfolio</span>
-                        @if (StatusFilter is not null)
+                        @if (StatusFilter is not null || VacantMakeReadyMode)
                         {
-                            <span class="badge text-bg-primary fw-normal">@FilterLabel</span>
+                            <span class="badge text-bg-primary fw-normal">@FilterLabel · @FilteredUnits.Count</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">@Snapshot.TotalUnits units</span>
                         }
                     </div>
                 </HeaderTemplate>
                 <ContentTemplate>
                     <div class="portfolio-filters mb-2" role="group" aria-label="Status filter">
                         <button type="button"
-                                class="filter-chip @(StatusFilter is null ? "is-active" : null)"
+                                class="filter-chip @(StatusFilter is null && !VacantMakeReadyMode ? "is-active" : null)"
                                 @onclick="ClearFilter">All (@Snapshot.TotalUnits)</button>
                         @foreach (var s in Snapshot.StatusBreakdown)
                         {
@@ -203,40 +278,51 @@ else
                             </button>
                         }
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Unit</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Beds</th>
-                                    <th class="text-end">Baths</th>
-                                    <th class="text-end">Sq ft</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @if (FilteredUnits.Count == 0)
-                                {
-                                    <tr>
-                                        <td colspan="5" class="text-muted small">No units match this filter.</td>
-                                    </tr>
-                                }
-                                else
-                                {
-                                    @foreach (var row in FilteredUnits)
-                                    {
-                                        <tr>
-                                            <td><a href="@($"/units/{row.Id}")">@row.Number</a></td>
-                                            <td>@row.Status</td>
-                                            <td class="text-end tabular-nums">@row.Beds</td>
-                                            <td class="text-end tabular-nums">@row.Baths</td>
-                                            <td class="text-end tabular-nums">@row.SqFt.ToString("N0")</td>
-                                        </tr>
+                    <SfGrid TValue="UnitStatusRow"
+                            DataSource="@FilteredUnits"
+                            AllowSorting="true"
+                            AllowPaging="true"
+                            Height="280"
+                            GridLines="GridLine.Horizontal">
+                        <GridPageSettings PageSize="10" />
+                        <GridColumns>
+                            <GridColumn Field="@nameof(UnitStatusRow.Number)" HeaderText="Unit" Width="100">
+                                <Template>
+                                    @{
+                                        var row = context as UnitStatusRow;
                                     }
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                                    @if (row is not null)
+                                    {
+                                        <a href="@($"/units/{row.Id}")">@row.Number</a>
+                                    }
+                                </Template>
+                            </GridColumn>
+                            <GridColumn Field="@nameof(UnitStatusRow.Status)" HeaderText="Status" Width="130">
+                                <Template>
+                                    @{
+                                        var row = context as UnitStatusRow;
+                                    }
+                                    @if (row is not null)
+                                    {
+                                        <span class="badge @StatusBadgeClass(row.Status)">@row.Status</span>
+                                    }
+                                </Template>
+                            </GridColumn>
+                            <GridColumn Field="@nameof(UnitStatusRow.Beds)"
+                                        HeaderText="Beds"
+                                        Width="80"
+                                        TextAlign="TextAlign.Right" />
+                            <GridColumn Field="@nameof(UnitStatusRow.Baths)"
+                                        HeaderText="Baths"
+                                        Width="80"
+                                        TextAlign="TextAlign.Right" />
+                            <GridColumn Field="@nameof(UnitStatusRow.SqFt)"
+                                        HeaderText="Sq ft"
+                                        Width="100"
+                                        Format="N0"
+                                        TextAlign="TextAlign.Right" />
+                        </GridColumns>
+                    </SfGrid>
                 </ContentTemplate>
             </DashboardLayoutPanel>
         </DashboardLayoutPanels>
@@ -246,6 +332,7 @@ else
 @code {
     [Inject] private IDashboardService DashboardService { get; set; } = default!;
     [Inject] private IDateTimeService DateTimeService { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
 
     private DashboardSnapshot? Snapshot { get; set; }
     private string? LoadError { get; set; }
@@ -331,4 +418,22 @@ else
         StatusFilter = null;
         VacantMakeReadyMode = false;
     }
+
+    private static string CssStatusKey(string name) => name switch
+    {
+        "Occupied" => "occupied",
+        "Vacant" => "vacant",
+        "Make-Ready" => "makeready",
+        "Maintenance" => "maintenance",
+        _ => "other",
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Occupied" => "text-bg-success",
+        "Vacant" => "text-bg-secondary",
+        "Make-Ready" => "text-bg-info",
+        "Maintenance" => "text-bg-warning",
+        _ => "text-bg-light",
+    };
 }

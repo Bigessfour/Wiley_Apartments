@@ -16,6 +16,11 @@
 | Deferred badges for WO / delinquencies | Done |
 | Warranty urgency highlight (≤30 days) | Done |
 | E2E: unauthenticated `/` → login | Done |
+| SfGrid portfolio + warranty grids | Done (finish pass) |
+| Occupancy / mix visual bars | Done (finish pass) |
+| Maintenance unit KPI (live status) | Done (finish pass) |
+| Coming-modules strip (honest phase map) | Done (finish pass) |
+| Full-repo audit | `docs/dashboard-full-repo-audit.md` |
 | Faster CI (Ollama on failure) | Done (merged) |
 
 ## Explicitly deferred (domain-gated)
