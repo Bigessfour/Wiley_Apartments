@@ -38,3 +38,7 @@ test-docs/
 # Syncfusion theme studio downloads (CSS extracted to wwwroot/css/themes)
 fluent2*.zip
 fluent2-dark*.zip
+
+# E2E isolated SQLite
+**/Data/clerksuite-e2e.db
+**/Data/clerksuite-e2e.db-*

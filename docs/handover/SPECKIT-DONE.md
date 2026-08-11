@@ -39,3 +39,9 @@ _None._
 1. Optional: confirm T7.2 with IT and tick the BACKUP-RESTORE table.
 2. Open / merge PR from `feature/phase2-tenants-t2.1` when ready.
 3. Day-to-day: clerks use `http://mr-storage:8082`.
+
+## Post D2 surface pass (2026-08-11)
+
+- Surface inventory closed: see `docs/CLERK-SURFACE-COMPLETION.md`
+- Remaining ops residual: [NAS-CLERK-SMOKE.md](./NAS-CLERK-SMOKE.md)
+- Effort roll-up: [COMPLETION-ESTIMATE.md](./COMPLETION-ESTIMATE.md)
