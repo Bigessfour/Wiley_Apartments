@@ -47,8 +47,8 @@
 Checkboxes are for the completion pass. Status starts **Unchecked** until a full session below is recorded.
 
 ### A. Access & shell
-- [ ] **A1** Login `/Account/Login`
-- [ ] **A2** Shell: sidebar, header, theme, PayStar link, toast host, logout
+- [x] **A1** Login `/Account/Login`
+- [x] **A2** Shell: sidebar, header, theme, PayStar link, toast host, logout
 - [ ] **A3** Error `/Error` (rare path)
 
 ### B. Command center
@@ -56,15 +56,15 @@ Checkboxes are for the completion pass. Status starts **Unchecked** until a full
 - [ ] **B2** Reports hub `/reports` + each report (see H)
 
 ### C. Portfolio master data
-- [ ] **C1** Units list `/units` (+ `?status=`)
-- [ ] **C2** Unit detail `/units/{id}` (assets, flooring, occupancy, ops costs, WO snippet)
-- [ ] **C3** Tenants list `/tenants`
-- [ ] **C4** Tenant detail `/tenants/{id}` (household, vehicles, pets, deposits, history)
+- [x] **C1** Units list `/units` (+ `?status=`)
+- [x] **C2** Unit detail `/units/{id}` (assets, flooring, occupancy, ops costs, WO snippet)
+- [x] **C3** Tenants list `/tenants`
+- [x] **C4** Tenant detail `/tenants/{id}` (household, vehicles, pets, deposits, history)
 
 ### D. Lease lifecycle
-- [ ] **D1** Leases list `/leases`
-- [ ] **D2** New lease wizard `/leases/new`
-- [ ] **D3** Lease preview/lifecycle `/leases/{id}` (PDF, amend/renew/terminate, signed vault, e-sign hook messaging)
+- [x] **D1** Leases list `/leases`
+- [x] **D2** New lease wizard `/leases/new`
+- [x] **D3** Lease preview/lifecycle `/leases/{id}` (PDF, amend/renew/terminate, signed vault, e-sign hook messaging)
 
 ### E. Money
 - [ ] **E1** Ledger / payments `/payments` (+ `?unitId=`)
@@ -216,7 +216,9 @@ Not “uses a Syncfusion control,” but:
 
 | Date | Surface | Verdict | PR / notes |
 |------|---------|---------|------------|
-| | | | |
+| 2026-08-11 | A1–A2, C1–C4, D1, I1 guard | PASS WITH NOTES | See `docs/handover/surface-logs/2026-08-11-d2-pass-batch1.md`; unit cap + WO link + prod demo wipe fixes |
+| 2026-08-11 | D2–D3 leases | PASS WITH NOTES | Wizard excludes facility; preview lifecycle OK |
+| | E1 next | | `/payments` |
 
 When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 

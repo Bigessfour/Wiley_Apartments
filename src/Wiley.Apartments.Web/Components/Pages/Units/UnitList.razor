@@ -14,6 +14,14 @@
 <PageHeader Title="Units"
             Subtitle="@Subtitle" />
 
+@if (!string.IsNullOrWhiteSpace(StatusFilter))
+{
+    <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 py-2" role="status">
+        <span>Showing units with status <strong>@StatusFilter</strong> (@Units.Count of @AllUnits.Count).</span>
+        <SfButton CssClass="e-small e-outline" Content="Clear filter" OnClick="ClearStatusFilter" />
+    </div>
+}
+
 @if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
@@ -159,8 +167,9 @@
 
     [SupplyParameterFromQuery(Name = "status")]
     public string? StatusFilter { get; set; }
-    private int ResidentialCount => Units.Count(u => !u.IsFacility);
-    private int FacilityCount => Units.Count(u => u.IsFacility);
+    // Cap and portfolio counts must use the full set, not the status-filtered grid.
+    private int ResidentialCount => AllUnits.Count(u => !u.IsFacility);
+    private int FacilityCount => AllUnits.Count(u => u.IsFacility);
     private bool CanAddUnit => UnitService.MaxUnits <= 0 || ResidentialCount < UnitService.MaxUnits;
     private string Subtitle
     {
@@ -169,9 +178,15 @@
             var residential = UnitService.MaxUnits > 0
                 ? $"{ResidentialCount} of {UnitService.MaxUnits} residential"
                 : $"{ResidentialCount} residential";
-            return FacilityCount > 0
+            var baseText = FacilityCount > 0
                 ? $"Town of Wiley — {residential} + {FacilityCount} facility. Edit layout inline, or Open for inventory."
                 : $"Town of Wiley — {residential} units. Edit layout inline, or Open for inventory.";
+            if (!string.IsNullOrWhiteSpace(StatusFilter))
+            {
+                return $"{baseText} Filter: {StatusFilter}.";
+            }
+
+            return baseText;
         }
     }
 
@@ -217,6 +232,13 @@
     }
 
     private void OpenUnit(Guid unitId) => Navigation.NavigateTo($"/units/{unitId}");
+
+    private void ClearStatusFilter()
+    {
+        StatusFilter = null;
+        ApplyStatusFilter();
+        Navigation.NavigateTo("/units");
+    }
 
     private async Task OnActionBeginAsync(ActionEventArgs<Unit> args)
     {

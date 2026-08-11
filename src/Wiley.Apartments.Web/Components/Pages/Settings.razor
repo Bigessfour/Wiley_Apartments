@@ -14,6 +14,8 @@
 @inject IClerkToast Toast
 @inject AuthenticationStateProvider AuthState
 @inject Microsoft.Extensions.Options.IOptions<ClerkSuiteOptions> ClerkOptions
+@inject IHostEnvironment HostEnvironment
+@using Microsoft.Extensions.Hosting
 
 <PageTitle>Settings</PageTitle>
 
@@ -136,9 +138,19 @@
         event renters</strong> with agreements, deposits, PayStar-style payments, and schedule.
         Marked with <code>[DEMO]</code> / <code>[DEMO-CC]</code> so they can be wiped safely.
     </p>
+    @if (HostEnvironment.IsProduction())
+    {
+        <div class="alert alert-warning py-2">
+            Production environment: demo load is available for recovery training only.
+            <strong>Force reseed (wipe)</strong> is disabled here to protect live portfolio data.
+        </div>
+    }
     <div class="d-flex gap-2 flex-wrap mb-3">
         <SfButton CssClass="e-primary e-small" Content="Load demo data" Disabled="@Busy" OnClick="@(() => RunDemoAsync(false))" />
-        <SfButton CssClass="e-outline e-small" Content="Force reseed (wipe demo first)" Disabled="@Busy" OnClick="@(() => RunDemoAsync(true))" />
+        @if (!HostEnvironment.IsProduction())
+        {
+            <SfButton CssClass="e-outline e-small" Content="Force reseed (wipe demo first)" Disabled="@Busy" OnClick="@(() => RunDemoAsync(true))" />
+        }
         <SfButton CssClass="e-outline e-small" Content="Validate demo against backend" Disabled="@Busy" OnClick="ValidateDemoAsync" />
     </div>
     @if (LastSeed is not null)
@@ -322,6 +334,13 @@
 
     private async Task RunDemoAsync(bool force)
     {
+        if (force && HostEnvironment.IsProduction())
+        {
+            ErrorMessage = "Force reseed is disabled in Production.";
+            await Toast.ShowErrorAsync("Force reseed is disabled in Production.");
+            return;
+        }
+
         Busy = true;
         ErrorMessage = null;
         SuccessMessage = null;
