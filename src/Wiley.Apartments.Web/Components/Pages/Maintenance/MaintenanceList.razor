@@ -179,6 +179,15 @@
         await LoadAsync();
     }
 
+    private async Task ClearUnitFilterAsync()
+    {
+        FilterUnitId = null;
+        FilterUnitLabel = null;
+        FormUnitId = null;
+        Navigation.NavigateTo("/maintenance");
+        await LoadAsync();
+    }
+
     private async Task LoadAsync()
     {
         ErrorMessage = null;
