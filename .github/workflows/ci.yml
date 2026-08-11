@@ -29,7 +29,7 @@ concurrency:
 
 env:
   DOTNET_VERSION: 9.0.x
-  SOLUTION: Wiley.Apartments.slnx
+  SOLUTION: Wiley.Apartments.sln
   OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'qwen2.5-coder:1.5b' }}
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
