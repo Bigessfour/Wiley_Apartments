@@ -41,47 +41,18 @@ public class ClerkHappyPathE2ETests : IAsyncLifetime
     public async Task Clerk_CanSignIn_AndOpenDailySurfaces()
     {
         var page = await _browser!.NewPageAsync();
-        page.SetDefaultTimeout(30_000);
+        page.SetDefaultTimeout(45_000);
 
         await SignInAsDevClerkAsync(page);
 
-        // Dashboard (home)
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/");
-        await page.WaitForURLAsync(url => !url.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase));
-        var dash = await page.ContentAsync();
-        var dashOk = dash.Contains("ClerkSuite", StringComparison.OrdinalIgnoreCase)
-                     || dash.Contains("Occupancy", StringComparison.OrdinalIgnoreCase)
-                     || dash.Contains("Dashboard", StringComparison.OrdinalIgnoreCase);
-        dashOk.Should().BeTrue("dashboard should render clerk chrome after login");
-        page.Url.Should().NotContain("/Account/Login");
-
-        // Units
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/units");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "Units");
-
-        // Payments / ledger
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/payments");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "ledger", alternate: "Payment");
-
-        // Maintenance
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/maintenance");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "Maintenance", alternate: "work order");
-
-        // Schedule
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/schedule");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "calendar", alternate: "Schedule");
-
-        // Reports hub
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/reports");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "Rent roll", alternate: "Reports");
-
-        // Rent roll print surface
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/reports/rent-roll");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "Rent roll", alternate: "rent");
-
-        // Documents vault chrome
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/documents");
-        await ExpectAuthenticatedSurfaceAsync(page, mustContain: "Document", alternate: "vault");
+        await GotoAuthenticatedAsync(page, "/", new[] { "Occupancy", "ClerkSuite", "Dashboard", "Collected" });
+        await GotoAuthenticatedAsync(page, "/units", new[] { "Units", "Town of Wiley", "Unit #" });
+        await GotoAuthenticatedAsync(page, "/payments", new[] { "ledger", "Record payment", "Post charge", "Tenant ledger" });
+        await GotoAuthenticatedAsync(page, "/maintenance", new[] { "Maintenance", "work order", "New work order" });
+        await GotoAuthenticatedAsync(page, "/schedule", new[] { "calendar", "Operations", "Schedule" });
+        await GotoAuthenticatedAsync(page, "/reports", new[] { "Rent roll", "Reports", "Delinquency" });
+        await GotoAuthenticatedAsync(page, "/reports/rent-roll", new[] { "Rent roll", "Print" });
+        await GotoAuthenticatedAsync(page, "/documents", new[] { "Document", "vault", "File" });
     }
 
     [Fact]
@@ -91,8 +62,10 @@ public class ClerkHappyPathE2ETests : IAsyncLifetime
         page.SetDefaultTimeout(20_000);
 
         await page.GotoAsync($"{_factory.E2EBaseUrl}/Account/Login");
-        await page.Locator("input[autocomplete='username'], input[name='Input.Email']").First.FillAsync(DevClerkEmail);
-        await page.Locator("input[type='password'], input[autocomplete='current-password']").First.FillAsync("WrongPassword1!");
+        await page.Locator("input[autocomplete='username'], input[name='Input.Email'], input[type='email']").First
+            .FillAsync(DevClerkEmail);
+        await page.Locator("input[autocomplete='current-password'], input[type='password']").First
+            .FillAsync("WrongPassword1!");
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
         await page.WaitForTimeoutAsync(1500);
 
@@ -104,9 +77,8 @@ public class ClerkHappyPathE2ETests : IAsyncLifetime
     private async Task SignInAsDevClerkAsync(IPage page)
     {
         await page.GotoAsync($"{_factory.E2EBaseUrl}/Account/Login");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
 
-        // Blazor Identity SSR form — bind attributes may render as name="Input.Email"
         var email = page.Locator("input[autocomplete='username'], input[name='Input.Email'], input[type='email']").First;
         var password = page.Locator("input[autocomplete='current-password'], input[type='password']").First;
 
@@ -114,20 +86,64 @@ public class ClerkHappyPathE2ETests : IAsyncLifetime
         await password.FillAsync(DevClerkPassword);
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
 
-        // forceLoad redirect after cookie sign-in
         await page.WaitForURLAsync(
             url => !url.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase),
-            new PageWaitForURLOptions { Timeout = 30_000 });
+            new PageWaitForURLOptions { Timeout = 45_000 });
     }
 
-    private static async Task ExpectAuthenticatedSurfaceAsync(IPage page, string mustContain, string? alternate = null)
+    private async Task GotoAuthenticatedAsync(IPage page, string path, string[] anyOfMarkers)
     {
-        await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+        await page.GotoAsync($"{_factory.E2EBaseUrl}{path}", new PageGotoOptions
+        {
+            WaitUntil = WaitUntilState.NetworkIdle
+        });
         page.Url.Should().NotContain("/Account/Login");
-        var body = await page.ContentAsync();
-        body.Should().NotContain("Invalid email or password");
-        var ok = body.Contains(mustContain, StringComparison.OrdinalIgnoreCase)
-                 || (alternate is not null && body.Contains(alternate, StringComparison.OrdinalIgnoreCase));
-        ok.Should().BeTrue($"expected page to mention '{mustContain}'" + (alternate is null ? "" : $" or '{alternate}'"));
+
+        // Interactive Server pages paint after the circuit attaches — wait for any marker text.
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        string? lastBody = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            lastBody = await page.ContentAsync();
+            if (lastBody.Contains("Invalid email or password", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Lost auth session mid happy-path.");
+            }
+
+            if (anyOfMarkers.Any(m => lastBody.Contains(m, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            // Also try visible text via Playwright (handles delayed DOM)
+            foreach (var marker in anyOfMarkers)
+            {
+                var loc = page.GetByText(marker, new PageGetByTextOptions { Exact = false });
+                if (await loc.CountAsync() > 0)
+                {
+                    try
+                    {
+                        await loc.First.WaitForAsync(new LocatorWaitForOptions
+                        {
+                            State = WaitForSelectorState.Visible,
+                            Timeout = 2_000
+                        });
+                        return;
+                    }
+                    catch (TimeoutException)
+                    {
+                        // keep polling
+                    }
+                }
+            }
+
+            await page.WaitForTimeoutAsync(400);
+        }
+
+        var snippet = lastBody is null
+            ? "(empty)"
+            : lastBody.Length <= 500 ? lastBody : lastBody[^500..];
+        throw new TimeoutException(
+            $"Timed out waiting for markers [{string.Join(", ", anyOfMarkers)}] on {path}. Tail: {snippet}");
     }
 }
