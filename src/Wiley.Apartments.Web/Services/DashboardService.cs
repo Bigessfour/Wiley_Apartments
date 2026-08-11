@@ -32,6 +32,8 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<DashboardSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
+        // DbContext is not thread-safe: keep awaits sequential on this instance.
+        // Payment ledger is fetched once for month series + heatmap + current-month total.
         var units = await _db.Units.AsNoTracking()
             .Where(u => !u.IsFacility)
             .ToListAsync(cancellationToken);
@@ -64,17 +66,14 @@ public sealed class DashboardService : IDashboardService
             .Where(l => (l.EndUtc.Date - now.Date).TotalDays > 30)
             .ToList();
 
-        var expiringWithin30 = expiring30
-            .Select(l => ToLeaseRow(l, now))
-            .ToList();
-        var expiringWithin60 = expiring31To60
-            .Select(l => ToLeaseRow(l, now))
-            .ToList();
+        var expiringWithin30 = expiring30.Select(l => ToLeaseRow(l, now)).ToList();
+        var expiringWithin60 = expiring31To60.Select(l => ToLeaseRow(l, now)).ToList();
 
         var openWo = (await _maintenance.GetAllAsync(openOnly: true, cancellationToken))
             .Take(12)
             .Select(m => new DashboardMaintenanceRow(
                 m.Id,
+                m.UnitId,
                 m.Unit?.Number ?? "",
                 m.Priority.ToString(),
                 m.Status.ToString(),
@@ -93,31 +92,24 @@ public sealed class DashboardService : IDashboardService
                         && r.Rent is > 0)
             .Sum(r => r.Rent!.Value);
 
-        var (monthStartUtc, monthEndUtc) = CurrentLocalMonthUtcRange(now);
-        var collectedThisMonth = await _db.LedgerEntries.AsNoTracking()
-            .Where(e => !e.IsDeleted
-                        && e.EntryType == LedgerEntryType.Payment
-                        && !e.IsDeposit
-                        && e.DateUtc >= monthStartUtc
-                        && e.DateUtc < monthEndUtc)
-            .SumAsync(e => (decimal?)e.Amount, cancellationToken) ?? 0m;
+        var (collectionByMonth, heatmap, collectedThisMonth) =
+            await BuildPaymentAggregatesAsync(units, now, cancellationToken);
 
-        var collectionByMonth = await BuildCollectionByMonthAsync(now, cancellationToken);
-        var heatmap = await BuildPaymentHeatmapAsync(units, now, cancellationToken);
         var collectionRate = expectedRent <= 0m
             ? 0d
             : Math.Round((double)(100m * collectedThisMonth / expectedRent), 1);
 
         var warrantyCutoff = DateOnly.FromDateTime(now.AddDays(90));
         var today = DateOnly.FromDateTime(now);
-        var assets = await _db.Assets.AsNoTracking()
+        var warrantyAssets = await _db.Assets.AsNoTracking()
             .Include(a => a.Unit)
-            .Where(a => a.WarrantyEnd != null)
-            .ToListAsync(cancellationToken);
-        var warranties = assets
-            .Where(a => a.WarrantyEnd >= today && a.WarrantyEnd <= warrantyCutoff)
+            .Where(a => a.WarrantyEnd != null
+                        && a.WarrantyEnd >= today
+                        && a.WarrantyEnd <= warrantyCutoff)
             .OrderBy(a => a.WarrantyEnd)
             .Take(12)
+            .ToListAsync(cancellationToken);
+        var warranties = warrantyAssets
             .Select(a => new DashboardWarrantyRow(
                 a.Id,
                 a.UnitId,
@@ -181,7 +173,15 @@ public sealed class DashboardService : IDashboardService
         return (_clock.ToUtc(startLocal), _clock.ToUtc(endLocal));
     }
 
-    private async Task<IReadOnlyList<DashboardMonthAmount>> BuildCollectionByMonthAsync(
+    /// <summary>
+    /// Single ledger read for 12-month collection series, unit×month heatmap, and current-month total.
+    /// Avoids three separate payment queries against the same DbContext.
+    /// </summary>
+    private async Task<(
+        IReadOnlyList<DashboardMonthAmount> CollectionByMonth,
+        IReadOnlyList<DashboardHeatCell> Heatmap,
+        decimal CollectedThisMonth)> BuildPaymentAggregatesAsync(
+        List<Unit> residentialUnits,
         DateTime utcNow,
         CancellationToken cancellationToken)
     {
@@ -192,15 +192,21 @@ public sealed class DashboardService : IDashboardService
             .AddMonths(1);
         var startUtc = _clock.ToUtc(startLocal);
         var endUtc = _clock.ToUtc(endLocal);
+        var (monthStartUtc, monthEndUtc) = CurrentLocalMonthUtcRange(utcNow);
 
+        var unitIds = residentialUnits.Select(u => u.Id).ToList();
         var payments = await _db.LedgerEntries.AsNoTracking()
             .Where(e => !e.IsDeleted
                         && e.EntryType == LedgerEntryType.Payment
                         && !e.IsDeposit
                         && e.DateUtc >= startUtc
                         && e.DateUtc < endUtc)
-            .Select(e => new { e.DateUtc, e.Amount })
+            .Select(e => new { e.UnitId, e.DateUtc, e.Amount })
             .ToListAsync(cancellationToken);
+
+        var collectedThisMonth = payments
+            .Where(p => p.DateUtc >= monthStartUtc && p.DateUtc < monthEndUtc)
+            .Sum(p => p.Amount);
 
         var byMonth = payments
             .GroupBy(p =>
@@ -218,33 +224,8 @@ public sealed class DashboardService : IDashboardService
             series.Add(new DashboardMonthAmount(month.ToString("MMM yy"), amount));
         }
 
-        return series;
-    }
-
-    private async Task<IReadOnlyList<DashboardHeatCell>> BuildPaymentHeatmapAsync(
-        List<Unit> residentialUnits,
-        DateTime utcNow,
-        CancellationToken cancellationToken)
-    {
-        var localNow = _clock.ToDisplayTime(utcNow);
-        var startLocal = new DateTime(localNow.Year, localNow.Month, 1, 0, 0, 0, DateTimeKind.Unspecified)
-            .AddMonths(-11);
-        var endLocal = startLocal.AddMonths(12);
-        var startUtc = _clock.ToUtc(startLocal);
-        var endUtc = _clock.ToUtc(endLocal);
-
-        var unitIds = residentialUnits.Select(u => u.Id).ToList();
-        var payments = await _db.LedgerEntries.AsNoTracking()
-            .Where(e => !e.IsDeleted
-                        && e.EntryType == LedgerEntryType.Payment
-                        && !e.IsDeposit
-                        && unitIds.Contains(e.UnitId)
-                        && e.DateUtc >= startUtc
-                        && e.DateUtc < endUtc)
-            .Select(e => new { e.UnitId, e.DateUtc, e.Amount })
-            .ToListAsync(cancellationToken);
-
-        var keyed = payments
+        var residentialPayments = payments.Where(p => unitIds.Contains(p.UnitId));
+        var keyed = residentialPayments
             .GroupBy(p =>
             {
                 var local = _clock.ToDisplayTime(p.DateUtc);
@@ -265,7 +246,7 @@ public sealed class DashboardService : IDashboardService
             }
         }
 
-        return cells;
+        return (series, cells, collectedThisMonth);
     }
 
     public async Task<IReadOnlyList<RentPivotRow>> GetRentPivotRowsAsync(
