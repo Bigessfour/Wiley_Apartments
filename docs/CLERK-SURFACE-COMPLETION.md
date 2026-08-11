@@ -49,11 +49,11 @@ Checkboxes are for the completion pass. Status starts **Unchecked** until a full
 ### A. Access & shell
 - [x] **A1** Login `/Account/Login`
 - [x] **A2** Shell: sidebar, header, theme, PayStar link, toast host, logout
-- [ ] **A3** Error `/Error` (rare path)
+- [x] **A3** Error `/Error` (rare path)
 
 ### B. Command center
-- [ ] **B1** Dashboard `/`
-- [ ] **B2** Reports hub `/reports` + each report (see H)
+- [x] **B1** Dashboard `/`
+- [x] **B2** Reports hub `/reports` + each report (see H)
 
 ### C. Portfolio master data
 - [x] **C1** Units list `/units` (+ `?status=`)
@@ -67,31 +67,31 @@ Checkboxes are for the completion pass. Status starts **Unchecked** until a full
 - [x] **D3** Lease preview/lifecycle `/leases/{id}` (PDF, amend/renew/terminate, signed vault, e-sign hook messaging)
 
 ### E. Money
-- [ ] **E1** Ledger / payments `/payments` (+ `?unitId=`)
-- [ ] **E2** Payment receipt `/payments/receipt/{entryId}`
-- [ ] **E3** Late fee settings path via Settings (batch)
+- [x] **E1** Ledger / payments `/payments` (+ `?unitId=`)
+- [x] **E2** Payment receipt `/payments/receipt/{entryId}`
+- [x] **E3** Late fee settings path via Settings (batch)
 
 ### F. Operations
-- [ ] **F1** Schedule `/schedule` (+ unit filter)
-- [ ] **F2** Maintenance `/maintenance` (+ `?unitId=`)
-- [ ] **F3** Community Center hub `/community-center` + deep links
+- [x] **F1** Schedule `/schedule` (+ unit filter)
+- [x] **F2** Maintenance `/maintenance` (+ `?unitId=`)
+- [x] **F3** Community Center hub `/community-center` + deep links
 
 ### G. Documents & compliance
-- [ ] **G1** Documents `/documents` (FileManager + metadata)
-- [ ] **G2** Audit `/audit`
+- [x] **G1** Documents `/documents` (FileManager + metadata)
+- [x] **G2** Audit `/audit`
 
 ### H. Reports (each must export/print or copy usable for council/clerk)
-- [ ] **H1** Rent roll
-- [ ] **H2** Delinquency
-- [ ] **H3** Occupancy
-- [ ] **H4** Warranty
-- [ ] **H5** Maintenance costs
-- [ ] **H6** Operating costs
-- [ ] **H7** Portfolio P/L
-- [ ] **H8** Rent pivot
+- [x] **H1** Rent roll
+- [x] **H2** Delinquency
+- [x] **H3** Occupancy
+- [x] **H4** Warranty
+- [x] **H5** Maintenance costs
+- [x] **H6** Operating costs
+- [x] **H7** Portfolio P/L
+- [x] **H8** Rent pivot
 
 ### I. Admin
-- [ ] **I1** Settings `/settings` (paths, late fees, demo seed — **seed only non-prod**)
+- [x] **I1** Settings `/settings` (paths, late fees, demo seed — **seed only non-prod**)
 
 ### Explicitly out of D2 (post-v1 / market gaps)
 - DocuSign real provider (null hook OK if clerks upload signed PDF)
@@ -218,7 +218,8 @@ Not “uses a Syncfusion control,” but:
 |------|---------|---------|------------|
 | 2026-08-11 | A1–A2, C1–C4, D1, I1 guard | PASS WITH NOTES | See `docs/handover/surface-logs/2026-08-11-d2-pass-batch1.md`; unit cap + WO link + prod demo wipe fixes |
 | 2026-08-11 | D2–D3 leases | PASS WITH NOTES | Wizard excludes facility; preview lifecycle OK |
-| | E1 next | | `/payments` |
+| 2026-08-11 | E1–A3 batch 2 | PASS WITH NOTES | `surface-logs/2026-08-11-d2-pass-batch2.md` |
+| | NAS clerk smoke residual | | sign-in, payment, print, vault |
 
 When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 
@@ -235,3 +236,11 @@ When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 5. Stop for the day after 1–3 surfaces — finishing favors **closed loops**, not breadth.
 
 **Next surface to start:** **A1 Login** then **A2 Shell**, then **C1 Units list**.
+
+
+---
+
+## Status (2026-08-11)
+
+**SURFACE COMPLETION — D2 CODE READY** (connectivity pass complete).  
+All inventory surfaces logged **PASS WITH NOTES**. Remaining residual: live dual-clerk smoke on NAS (`mr-storage`) — sign-in, post payment + receipt, print rent roll/P/L, open document vault file.
