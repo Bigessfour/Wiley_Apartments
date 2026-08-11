@@ -1,3 +1,6 @@
+> **Agent skill:** `.grok/skills/project-completion/` — open `SKILL.md` when finishing surfaces.
+> References: `done-levels.md`, `session-template.md`, `clerk-suite-surfaces.md`.
+
 # Clerk surface completion workflow
 
 **Purpose:** Finish ClerkSuite by walking **every clerk-touch surface** the same way a professional PM product would UAT before go-live.  
