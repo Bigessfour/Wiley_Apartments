@@ -49,6 +49,7 @@ public class DashboardServiceTests
                 UnitId = unitId,
                 Type = "Water heater",
                 Make = "Rheem",
+                Serial = "WH-TEST-001",
                 WarrantyEnd = new DateOnly(2026, 9, 1),
             },
             new Asset
@@ -57,6 +58,7 @@ public class DashboardServiceTests
                 UnitId = unitId,
                 Type = "Old fridge",
                 Make = "GE",
+                Serial = "RF-TEST-002",
                 WarrantyEnd = new DateOnly(2027, 12, 1),
             });
         await db.SaveChangesAsync();
