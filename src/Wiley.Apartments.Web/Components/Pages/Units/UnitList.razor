@@ -233,6 +233,13 @@
 
     private void OpenUnit(Guid unitId) => Navigation.NavigateTo($"/units/{unitId}");
 
+    private void ClearStatusFilter()
+    {
+        StatusFilter = null;
+        ApplyStatusFilter();
+        Navigation.NavigateTo("/units");
+    }
+
     private async Task OnActionBeginAsync(ActionEventArgs<Unit> args)
     {
         ErrorMessage = null;
