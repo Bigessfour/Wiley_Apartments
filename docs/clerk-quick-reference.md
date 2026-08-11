@@ -56,12 +56,13 @@ Captured from Development Mac smoke (2026-08-10). Live NAS uses the same layout 
 
 1. Sidebar → **Community Center** → **CC hub**.
 2. **CC renters** — add/search hall hirers (not residential tenants).
-3. **CC reservations** — book dates, Confirm (appears on shared schedule), generate agreement PDF, post deposit/fee, record payment, receipt from CC payments.
-4. **CC inspections** — post-rental satisfactory (or damage notes).
-5. **CC inventory** — chairs, tables, kitchen, appliances, fixtures.
-6. **CC maintenance** — work orders; complete with **Completed by** name.
-7. Shared **Schedule** / **CC schedule** shows FacilityRental + prep/maintenance for unit CC.
-8. Do **not** delete unit CC (facility guard). Documents vault is NAS-wide; link uploads to CC entities when metadata allows.
+3. **CC reservations** — book dates, **Confirm** (appears on shared schedule).
+4. On a reservation: **Generate agreement** → **Preview agreement** (SfPdfViewer) → **Attach signed PDF** when returned (keeps the generated draft). Then post deposit/fee charges, record payment, **Open receipt**.
+5. **CC inspections** — pre/post-rental; unsatisfactory requires damage notes; attach photo/PDF on the reservation detail. Post-rental unlocks **Mark completed**.
+6. **CC inventory** — chairs, tables, kitchen, appliances, fixtures; use **Include zero quantity** + Refresh when retired items should show.
+7. **CC maintenance** — work orders on unit CC; optional link to a reservation; complete with **Completed by** name (Completer shows in the list). Date From/To filters history.
+8. Shared **Schedule** / **CC schedule** shows FacilityRental + prep/maintenance for unit CC.
+9. Do **not** delete unit CC (facility guard). Documents vault is NAS-wide; CC entity types are available for uploads.
 
 ---
 

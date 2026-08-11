@@ -83,6 +83,77 @@ public class FacilityReservationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*overlaps*");
     }
+
+    [Theory]
+    [InlineData(FacilityReservationStatus.Completed, FacilityReservationStatus.Confirmed)]
+    [InlineData(FacilityReservationStatus.Cancelled, FacilityReservationStatus.Confirmed)]
+    [InlineData(FacilityReservationStatus.Draft, FacilityReservationStatus.Completed)]
+    [InlineData(FacilityReservationStatus.Request, FacilityReservationStatus.Completed)]
+    public void EnsureTransitionAllowed_RejectsIllegalMoves(
+        FacilityReservationStatus from,
+        FacilityReservationStatus to)
+    {
+        var act = () => FacilityReservationService.EnsureTransitionAllowed(from, to);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Cannot change*");
+    }
+
+    [Theory]
+    [InlineData(FacilityReservationStatus.Draft, FacilityReservationStatus.Confirmed)]
+    [InlineData(FacilityReservationStatus.Request, FacilityReservationStatus.Confirmed)]
+    [InlineData(FacilityReservationStatus.Confirmed, FacilityReservationStatus.Cancelled)]
+    [InlineData(FacilityReservationStatus.Confirmed, FacilityReservationStatus.Completed)]
+    [InlineData(FacilityReservationStatus.Completed, FacilityReservationStatus.Completed)]
+    public void EnsureTransitionAllowed_AllowsLegalMoves(
+        FacilityReservationStatus from,
+        FacilityReservationStatus to)
+    {
+        var act = () => FacilityReservationService.EnsureTransitionAllowed(from, to);
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public async Task SetStatusAsync_RejectsConfirmAfterCompleted()
+    {
+        await using var db = CreateDb();
+        var unit = new Unit
+        {
+            Id = Guid.NewGuid(),
+            Number = "CC",
+            IsFacility = true,
+            Status = UnitStatus.Vacant,
+            RowVersion = Guid.NewGuid()
+        };
+        var renter = new FacilityRenter
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "A",
+            LastName = "B",
+            Phone = "1",
+            Email = "a@b.c",
+            MailingAddress = "1 Main",
+            RowVersion = Guid.NewGuid()
+        };
+        var reservation = new FacilityReservation
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = DateTime.UtcNow.Date.AddDays(2),
+            EndUtc = DateTime.UtcNow.Date.AddDays(2).AddHours(4),
+            Status = FacilityReservationStatus.Completed,
+            RentalFee = 100,
+            DepositAmount = 50,
+            RowVersion = Guid.NewGuid()
+        };
+        db.Units.Add(unit);
+        db.FacilityRenters.Add(renter);
+        db.FacilityReservations.Add(reservation);
+        await db.SaveChangesAsync();
+
+        var service = new FacilityReservationService(db, new FixedClock(), NullLogger<FacilityReservationService>.Instance);
+        var act = async () => await service.SetStatusAsync(reservation.Id, FacilityReservationStatus.Confirmed);
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Cannot change*");
+    }
 }
 
 public class FacilityRentalAgreementGeneratorTests

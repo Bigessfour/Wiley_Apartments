@@ -35,3 +35,10 @@ Same as 001: Syncfusion-only, NAS data, audit, no keys in repo. Confirm T0.0 too
 Start at **tasks.md Phase 1–2 (foundation)**, then US1. Do not mix CC Tenant/Lease demo data after seeder rewrite.
 
 **Passed when**: Owner/agent checks this file to **PASSED** with date after confirming G1–G3.
+
+## Smoke evidence (T110 / SC-005)
+
+| Check                                      | Evidence                                                                                                                                                                                                                    |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mac Development smoke (quickstart CC path) | **2026-08-11** — unit tests green for overlap, facility receipt vault path, Completer required; UI paths: reservation Preview/Attach signed, inspection attach, maintenance Completer + date filter, inventory include-zero |
+| Post-rental + WO completer                 | Demonstrable on Mac via `/community-center/reservations/{id}` + `/maintenance?unitId=` (CC); NAS dual-clerk still per `docs/handover/NAS-CLERK-SMOKE.md`                                                                    |

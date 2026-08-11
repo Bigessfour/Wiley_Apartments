@@ -142,3 +142,18 @@ US5–US7 may proceed in parallel after T018 if staffing allows, but agreement/m
 - T021 // T022 after T020
 - T031 // T032 after T030
 - T061 // T062 after T060
+
+---
+
+## Phase 12: Convergence
+
+- [x] T104 Add reservation agreement Preview (`ClerkPdfViewer` / SfPdfViewer) and Attach signed upload UI on `FacilityReservationDetail` wiring `IFacilityRentalAgreementService.AttachSignedAsync` without clearing generated path per FR-005 / US3/AC1–AC2 (`partial`)
+- [x] T105 Show Completer (+ cost) on maintenance history grid and enable date-range filter for CC history views per FR-009 / US7/AC3 (`partial`)
+- [x] T106 Add unit test covering facility payment receipt generation / CC rental labels per T052 / US4 Independent Test (`partial`)
+- [x] T107 Add unit test that `MaintenanceService.CompleteAsync` rejects missing `CompletedByDisplay` per T082 / edge case Completer required (`partial`)
+- [x] T108 Add inspection document/photo attach path from reservation or inspections UI (FacilityInspection vault entity) per FR-007 / T063 (`partial`)
+- [x] T109 Update `clerk-suite-surfaces.md` inventory with CC renters, reservations, inspections, inventory routes per T100 (`partial`)
+- [x] T110 Record Mac Development smoke evidence date for post-rental inspection + WO completer in READINESS or handover per T102 / SC-005 / plan proven path (`partial`)
+- [x] T111 Expose optional FacilityReservation link on maintenance create (CC) per T083 / US7 (`partial`)
+- [x] T112 Add inventory “include zero quantity” filter per edge case Inventory quantity zero (`partial`)
+- [x] T113 Document CC agreement preview / signed-upload steps in `docs/clerk-quick-reference.md` per plan proven agreement path (`partial`)

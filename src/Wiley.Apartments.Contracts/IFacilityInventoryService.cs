@@ -7,6 +7,7 @@ public interface IFacilityInventoryService
     Task<IReadOnlyList<FacilityInventoryItem>> ListAsync(
         Guid unitId,
         FacilityInventoryCategory? category = null,
+        bool includeZeroQuantity = true,
         CancellationToken cancellationToken = default);
 
     Task<FacilityInventoryItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

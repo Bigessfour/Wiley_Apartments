@@ -15,6 +15,7 @@ public sealed class FacilityInventoryService(
     public async Task<IReadOnlyList<FacilityInventoryItem>> ListAsync(
         Guid unitId,
         FacilityInventoryCategory? category = null,
+        bool includeZeroQuantity = true,
         CancellationToken cancellationToken = default)
     {
         var q = _db.FacilityInventoryItems.AsNoTracking()
@@ -22,6 +23,11 @@ public sealed class FacilityInventoryService(
         if (category is FacilityInventoryCategory cat)
         {
             q = q.Where(i => i.Category == cat);
+        }
+
+        if (!includeZeroQuantity)
+        {
+            q = q.Where(i => i.Quantity > 0);
         }
 
         return await q

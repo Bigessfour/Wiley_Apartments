@@ -7,18 +7,27 @@
 @using Wiley.Apartments.Web.Components.Shared
 @inject IFacilityRenterService RenterService
 @inject IFacilityReservationService ReservationService
+@inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject ILogger<FacilityRenterDetail> Logger
 
 <PageTitle>CC Renter</PageTitle>
 
-@if (LoadError is not null)
+@if (!string.IsNullOrEmpty(LoadError))
 {
     <div class="alert alert-warning">@LoadError</div>
 }
-else if (Renter is null)
+
+@if (Renter is null && string.IsNullOrEmpty(LoadError))
 {
     <PageHeader Title="Renter" Subtitle="Loading…" />
+}
+else if (Renter is null)
+{
+    <PageHeader Title="Renter" Subtitle="Not found">
+        <SfButton CssClass="e-outline e-small" Content="All renters"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/renters"))" />
+    </PageHeader>
 }
 else
 {
@@ -35,22 +44,24 @@ else
         <p class="mb-1"><strong>Email</strong> @Renter.Email</p>
         <p class="mb-1"><strong>Address</strong> @Renter.MailingAddress</p>
         <p class="mb-1"><strong>Alternate</strong> @(Renter.AlternateContact ?? "—")</p>
-        <p class="mb-0"><strong>ID</strong> @(Renter.IdType ?? "—") @(Renter.IdReference)</p>
+        <p class="mb-1"><strong>ID</strong> @(Renter.IdType ?? "—") @(Renter.IdReference)</p>
+        <p class="mb-0"><strong>Notes</strong> @(string.IsNullOrWhiteSpace(Renter.Notes) ? "—" : Renter.Notes)</p>
     </div>
 
     <h2 class="h6">Reservations</h2>
     @if (Reservations.Count == 0)
     {
-        <p class="text-muted">No reservations yet.</p>
+        <p class="text-muted">No reservations yet — use New reservation to book the hall.</p>
     }
     else
     {
-        <ul>
+        <ul class="list-unstyled mb-0">
             @foreach (var r in Reservations)
             {
-                <li>
+                <li class="mb-1">
                     <a href="@($"/community-center/reservations/{r.Id}")">
-                        @r.StartUtc.ToString("u") → @r.EndUtc.ToString("u") · @r.Status · @r.RentalFee.ToString("C")
+                        @Clock.ToDisplayTime(r.StartUtc).ToString("g") → @Clock.ToDisplayTime(r.EndUtc).ToString("g")
+                        · @r.Status · @r.RentalFee.ToString("C")
                     </a>
                 </li>
             }
@@ -66,12 +77,14 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        LoadError = null;
         try
         {
             Renter = await RenterService.GetByIdAsync(Id);
             if (Renter is null || Renter.IsDeleted)
             {
                 Logger.LogWarning("FacilityRenterDetail: renter {RenterId} not found or deleted.", Id);
+                Renter = null;
                 LoadError = "Renter not found.";
                 return;
             }
@@ -84,6 +97,7 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "FacilityRenterDetail load failed for {RenterId}.", Id);
+            Renter = null;
             LoadError = ex.Message;
         }
     }

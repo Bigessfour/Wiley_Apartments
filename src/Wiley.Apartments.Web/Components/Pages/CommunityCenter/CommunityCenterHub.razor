@@ -15,6 +15,10 @@
 {
     <div class="alert alert-warning">@LoadError</div>
 }
+else if (!_loaded)
+{
+    <PageHeader Title="Community Center" Subtitle="Loading…" />
+}
 else if (Facility is null)
 {
     <PageHeader Title="Community Center"
@@ -81,11 +85,15 @@ else
         <SfButton CssClass="e-outline" Content="Documents"
                   OnClick="@(() => Navigation.NavigateTo("/documents"))" />
     </div>
+    <p class="small text-muted mt-2 mb-0">
+        Documents opens the shared vault — pick entity type CC renter / reservation / inspection / inventory when uploading.
+    </p>
 }
 
 @code {
     private Unit? Facility { get; set; }
     private string? LoadError { get; set; }
+    private bool _loaded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -107,6 +115,10 @@ else
         {
             Logger.LogError(ex, "CommunityCenterHub load failed.");
             LoadError = ex.Message;
+        }
+        finally
+        {
+            _loaded = true;
         }
     }
 }

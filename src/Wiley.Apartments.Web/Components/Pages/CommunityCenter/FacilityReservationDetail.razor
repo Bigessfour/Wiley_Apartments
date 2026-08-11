@@ -1,6 +1,7 @@
 @page "/community-center/reservations/{Id:guid}"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using System.Security.Claims
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.DropDowns
@@ -10,20 +11,30 @@
 @inject IFacilityReservationService ReservationService
 @inject IFacilityRentalAgreementService AgreementService
 @inject IFacilityInspectionService InspectionService
+@inject IDocumentService DocumentService
 @inject ILedgerService LedgerService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
 @inject ILogger<FacilityReservationDetail> Logger
 
 <PageTitle>CC Reservation</PageTitle>
 
-@if (ErrorMessage is not null)
+@if (!string.IsNullOrEmpty(ErrorMessage))
 {
     <div class="alert alert-warning">@ErrorMessage</div>
 }
-else if (Reservation is null)
+
+@if (Reservation is null && string.IsNullOrEmpty(ErrorMessage))
 {
     <PageHeader Title="Reservation" Subtitle="Loading…" />
+}
+else if (Reservation is null)
+{
+    <PageHeader Title="Reservation" Subtitle="Not found">
+        <SfButton CssClass="e-outline e-small" Content="All reservations"
+                  OnClick="@(() => Navigation.NavigateTo("/community-center/reservations"))" />
+    </PageHeader>
 }
 else
 {
@@ -46,15 +57,22 @@ else
     <p class="text-muted">@(Reservation.Notes ?? "No notes.")</p>
 
     <div class="d-flex flex-wrap gap-2 mb-3">
-        <SfButton CssClass="e-primary e-small" Content="Confirm" Disabled="@(Busy || Reservation.Status == FacilityReservationStatus.Confirmed)"
+        <SfButton CssClass="e-primary e-small" Content="Confirm"
+                  Disabled="@(Busy || !CanConfirm)"
+                  Title="@(CanConfirm ? "Confirm booking (adds to schedule)" : "Already confirmed or closed")"
                   OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Confirmed))" />
-        <SfButton CssClass="e-outline e-small" Content="Cancel booking" Disabled="@Busy"
+        <SfButton CssClass="e-outline e-small" Content="Cancel booking"
+                  Disabled="@(Busy || !CanCancel)"
+                  Title="@(CanCancel ? "Cancel this booking" : "Already cancelled or completed")"
                   OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Cancelled))" />
         <SfButton CssClass="e-success e-small" Content="Mark completed"
-                  Disabled="@(Busy || !CanComplete)"
-                  Title="@(CanComplete ? "Complete reservation" : "Record a PostRental inspection first")"
+                  Disabled="@(Busy || !CanMarkComplete)"
+                  Title="@(CanMarkComplete ? "Complete reservation" : (!CanComplete ? "Record a PostRental inspection first" : "Confirm booking first, or already closed"))"
                   OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Completed))" />
         <SfButton CssClass="e-outline e-small" Content="Generate agreement" Disabled="@Busy" OnClick="GenerateAgreementAsync" />
+        <SfButton CssClass="e-outline e-small" Content="Preview agreement"
+                  Disabled="@(Busy || (_agreementPdfBytes is null && string.IsNullOrEmpty(Reservation.GeneratedPdfRelativePath) && Reservation.SignedDocumentId is null))"
+                  OnClick="PreviewAgreementAsync" />
         <SfButton CssClass="e-outline e-small" Content="Post deposit + fee charges"
                   Disabled="@(Busy || HasCharges)"
                   Title="@(HasCharges ? "Charges already posted" : "Post deposit and fee charges")"
@@ -70,7 +88,8 @@ else
         }
     </div>
 
-    @if (!CanComplete && Reservation.Status is not FacilityReservationStatus.Completed and not FacilityReservationStatus.Cancelled)
+    @if (Reservation.Status is not FacilityReservationStatus.Completed and not FacilityReservationStatus.Cancelled
+         && !CanComplete)
     {
         <p class="small text-muted">Mark completed unlocks after a PostRental inspection is saved below.</p>
     }
@@ -79,6 +98,43 @@ else
     {
         <div class="alert alert-info">@AgreementMessage</div>
     }
+
+    <h2 class="h6">Agreement</h2>
+    <div class="card p-3 mb-3">
+        <p class="small text-muted mb-2">
+            @if (!string.IsNullOrEmpty(Reservation.GeneratedPdfRelativePath))
+            {
+                <span>Generated: @Reservation.GeneratedPdfRelativePath</span>
+            }
+            else
+            {
+                <span>No generated agreement yet.</span>
+            }
+            @if (Reservation.SignedDocumentId is Guid signedId)
+            {
+                <span> · Signed document @signedId.ToString("N")[..8]…</span>
+            }
+        </p>
+        <div style="max-width: 480px;" class="mb-3">
+            <label class="form-label">Attach signed PDF (keeps generated draft)</label>
+            <SfUploader AllowedExtensions=".pdf"
+                        MaxFileSize="25000000"
+                        AutoUpload="false"
+                        Multiple="false">
+                <UploaderEvents ValueChange="OnSignedSelectedAsync" />
+            </SfUploader>
+            <SfButton CssClass="e-primary e-small mt-2"
+                      Content="@(Busy ? "Uploading…" : "Attach signed PDF")"
+                      Disabled="@(Busy || _pendingSigned is null)"
+                      OnClick="AttachSignedAsync" />
+        </div>
+        @if (_agreementPdfBytes is { Length: > 0 })
+        {
+            <ClerkPdfViewer PdfBytes="@_agreementPdfBytes"
+                            DownloadFileName="@AgreementDownloadName"
+                            Height="520px" />
+        }
+    </div>
 
     <h2 class="h6">Inspections</h2>
     <div class="card p-3 mb-3">
@@ -108,7 +164,21 @@ else
         <ul class="mt-3 mb-0">
             @foreach (var i in Inspections)
             {
-                <li>@i.Type · @(i.IsSatisfactory ? "OK" : "Issues") · @i.InspectorDisplay · @Clock.ToDisplayTime(i.InspectedUtc).ToString("g")</li>
+                <li class="mb-2">
+                    @i.Type · @(i.IsSatisfactory ? "OK" : "Issues") · @i.InspectorDisplay · @Clock.ToDisplayTime(i.InspectedUtc).ToString("g")
+                    <div class="mt-1" style="max-width: 360px;">
+                        <SfUploader AllowedExtensions=".pdf,.jpg,.jpeg,.png"
+                                    MaxFileSize="25000000"
+                                    AutoUpload="false"
+                                    Multiple="false">
+                            <UploaderEvents ValueChange="@(args => OnInspectionPhotoSelectedAsync(i.Id, args))" />
+                        </SfUploader>
+                        <SfButton CssClass="e-flat e-small mt-1"
+                                  Content="Attach photo / PDF"
+                                  Disabled="@(Busy || !_pendingInspectionUploads.ContainsKey(i.Id))"
+                                  OnClick="@(() => AttachInspectionDocumentAsync(i.Id))" />
+                    </div>
+                </li>
             }
         </ul>
     </div>
@@ -125,15 +195,28 @@ else
     private bool HasPayments { get; set; }
     private Guid? LatestPaymentId { get; set; }
     private bool CanComplete => Inspections.Any(i => i.Type == FacilityInspectionType.PostRental);
+    private bool CanConfirm =>
+        Reservation?.Status is FacilityReservationStatus.Draft or FacilityReservationStatus.Request;
+    private bool CanCancel =>
+        Reservation?.Status is FacilityReservationStatus.Draft or FacilityReservationStatus.Request
+            or FacilityReservationStatus.Confirmed;
+    private bool CanMarkComplete =>
+        Reservation?.Status == FacilityReservationStatus.Confirmed && CanComplete;
     private FacilityInspectionType InspectType { get; set; } = FacilityInspectionType.PostRental;
     private bool InspectOk { get; set; } = true;
     private string InspectBy { get; set; } = "Clerk";
     private string? InspectNotes { get; set; }
+    private byte[]? _agreementPdfBytes;
+    private (string Name, byte[] Bytes)? _pendingSigned;
+    private readonly Dictionary<Guid, (string Name, string ContentType, byte[] Bytes)> _pendingInspectionUploads = new();
     private List<FacilityInspectionType> InspectionTypeValues { get; } =
     [
         FacilityInspectionType.PreRental,
         FacilityInspectionType.PostRental
     ];
+
+    private string AgreementDownloadName =>
+        Path.GetFileName(Reservation?.GeneratedPdfRelativePath ?? "cc-rental-agreement.pdf");
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -141,6 +224,7 @@ else
     {
         try
         {
+            ErrorMessage = null;
             Reservation = await ReservationService.GetByIdAsync(Id);
             if (Reservation is null)
             {
@@ -217,6 +301,7 @@ else
         {
             Logger.LogInformation("FacilityReservationDetail generating agreement for {ReservationId}.", Id);
             var result = await AgreementService.GenerateAsync(Id);
+            _agreementPdfBytes = result.PdfBytes;
             AgreementMessage = $"Agreement generated ({result.FileName}). Path: {result.RelativePath}";
             Logger.LogInformation(
                 "FacilityReservationDetail agreement generated reservation={ReservationId} document={DocumentId} path={Path}.",
@@ -229,6 +314,161 @@ else
             ErrorMessage = ex.Message;
         }
         finally { Busy = false; }
+    }
+
+    private async Task PreviewAgreementAsync()
+    {
+        if (Reservation is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            if (Reservation.SignedDocumentId is Guid signedId)
+            {
+                _agreementPdfBytes = await DocumentService.ReadBytesAsync(signedId);
+                AgreementMessage = "Showing signed agreement.";
+                return;
+            }
+
+            if (_agreementPdfBytes is { Length: > 0 })
+            {
+                AgreementMessage = "Showing generated agreement.";
+                return;
+            }
+
+            // Regenerate into viewer when bytes were lost after navigation (vault path still recorded).
+            if (!string.IsNullOrEmpty(Reservation.GeneratedPdfRelativePath))
+            {
+                Logger.LogInformation(
+                    "FacilityReservationDetail regenerating agreement bytes for preview reservation={ReservationId}.",
+                    Id);
+                var result = await AgreementService.GenerateAsync(Id);
+                _agreementPdfBytes = result.PdfBytes;
+                AgreementMessage = "Agreement regenerated for preview (audited).";
+                await LoadAsync();
+                return;
+            }
+
+            ErrorMessage = "Generate an agreement first.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail preview failed for {ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task OnSignedSelectedAsync(UploadChangeEventArgs args)
+    {
+        _pendingSigned = null;
+        var file = args.Files?.FirstOrDefault();
+        if (file?.FileInfo is null)
+        {
+            return;
+        }
+
+        await using var stream = file.File.OpenReadStream(25 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        _pendingSigned = (file.FileInfo.Name, ms.ToArray());
+    }
+
+    private async Task AttachSignedAsync()
+    {
+        if (_pendingSigned is null || Reservation is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var user = await CurrentUserAsync();
+            await using var stream = new MemoryStream(_pendingSigned.Value.Bytes);
+            await AgreementService.AttachSignedAsync(Id, stream, _pendingSigned.Value.Name, user);
+            _pendingSigned = null;
+            AgreementMessage = "Signed agreement attached. Generated draft path was kept.";
+            Logger.LogInformation("FacilityReservationDetail signed agreement attached reservation={ReservationId}.", Id);
+            await LoadAsync();
+            if (Reservation?.SignedDocumentId is Guid sid)
+            {
+                _agreementPdfBytes = await DocumentService.ReadBytesAsync(sid);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail attach signed failed reservation={ReservationId}.", Id);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task OnInspectionPhotoSelectedAsync(Guid inspectionId, UploadChangeEventArgs args)
+    {
+        _pendingInspectionUploads.Remove(inspectionId);
+        var file = args.Files?.FirstOrDefault();
+        if (file?.FileInfo is null)
+        {
+            return;
+        }
+
+        await using var stream = file.File.OpenReadStream(25 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        _pendingInspectionUploads[inspectionId] = (
+            file.FileInfo.Name,
+            file.FileInfo.Type ?? "application/octet-stream",
+            ms.ToArray());
+    }
+
+    private async Task AttachInspectionDocumentAsync(Guid inspectionId)
+    {
+        if (!_pendingInspectionUploads.TryGetValue(inspectionId, out var pending))
+        {
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            var user = await CurrentUserAsync();
+            await using var stream = new MemoryStream(pending.Bytes);
+            var doc = await DocumentService.UploadAsync(
+                DocumentEntityType.FacilityInspection,
+                inspectionId,
+                DocumentCategory.InspectionPhoto,
+                pending.Name,
+                pending.ContentType,
+                stream,
+                user,
+                $"community-center/inspections/{inspectionId:N}");
+            _pendingInspectionUploads.Remove(inspectionId);
+            AgreementMessage = $"Inspection document saved ({doc.OriginalFileName}).";
+            Logger.LogInformation(
+                "FacilityReservationDetail inspection doc {DocumentId} attached inspection={InspectionId}.",
+                doc.Id, inspectionId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "FacilityReservationDetail inspection upload failed inspection={InspectionId}.", inspectionId);
+            ErrorMessage = ex.Message;
+        }
+        finally { Busy = false; }
+    }
+
+    private async Task<string> CurrentUserAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        return auth.User.Identity?.Name
+               ?? auth.User.FindFirstValue(ClaimTypes.Email)
+               ?? "clerk";
     }
 
     private async Task PostChargesAsync()

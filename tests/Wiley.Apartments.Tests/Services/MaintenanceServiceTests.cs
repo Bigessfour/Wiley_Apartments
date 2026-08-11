@@ -102,4 +102,19 @@ public class MaintenanceServiceTests
             (await db.UnitOperatingCosts.CountAsync()).Should().Be(0);
         }
     }
+
+    [Fact]
+    public async Task CompleteAsync_RequiresCompletedByDisplay()
+    {
+        var (db, service) = Create();
+        await using (db)
+        {
+            var (unit, _) = await SeedAsync(db);
+            var wo = await service.CreateAsync(unit.Id, "Fix sink");
+
+            var act = async () => await service.CompleteAsync(wo.Id, cost: 10m, completedByDisplay: "  ");
+
+            await act.Should().ThrowAsync<ArgumentException>().WithMessage("*Completed by*");
+        }
+    }
 }

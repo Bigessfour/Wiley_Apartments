@@ -3,19 +3,19 @@
 
 # Clerk surface completion workflow
 
-**Purpose:** Finish ClerkSuite by walking **every clerk-touch surface** the same way a professional PM product would UAT before go-live.  
-**Audience:** Builder + clerk (or dual-clerk).  
+**Purpose:** Finish ClerkSuite by walking **every clerk-touch surface** the same way a professional PM product would UAT before go-live.
+**Audience:** Builder + clerk (or dual-clerk).
 **Definition of Done (this pass):** not “code exists,” but **a clerk can complete the job on that page without dead ends, wrong data, or Syncfusion chrome that fights them.**
 
 ---
 
 ## 1. Three levels of “Done” (pick which bar you mean)
 
-| Level | Meaning | ClerkSuite today (honest) |
-|-------|---------|---------------------------|
-| **D1 — Spec Done** | FR/tasks accepted; deployable; dual-clerk signed T7 | **Yes** (SPECKIT-DONE 2026-08-10) |
-| **D2 — Daily ops Ready** | Every nav surface works end-to-end with live links, empty states, no console errors, data matches clerk mental model | **Mostly** — needs this surface pass |
-| **D3 — Market-polished** | Matches AppFolio/Buildium-class UX density, guided workflows, bulk ops, mobile-first, audit-grade E2E | **No** — not the goal for 16-unit town portfolio |
+| Level                    | Meaning                                                                                                              | ClerkSuite today (honest)                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **D1 — Spec Done**       | FR/tasks accepted; deployable; dual-clerk signed T7                                                                  | **Yes** (SPECKIT-DONE 2026-08-10)                |
+| **D2 — Daily ops Ready** | Every nav surface works end-to-end with live links, empty states, no console errors, data matches clerk mental model | **Mostly** — needs this surface pass             |
+| **D3 — Market-polished** | Matches AppFolio/Buildium-class UX density, guided workflows, bulk ops, mobile-first, audit-grade E2E                | **No** — not the goal for 16-unit town portfolio |
 
 **This workflow targets D2.** D1 is already signed. D3 is optional product ambition, not required for town ops.
 
@@ -23,20 +23,20 @@
 
 ## 2. How we compare to professional market products
 
-| Dimension | Typical market (AppFolio, Buildium, Yardi Breeze, DoorLoop) | ClerkSuite (Wiley) | Verdict |
-|-----------|--------------------------------------------------------------|--------------------|---------|
-| **Scope** | Full PM: online pay, tenant portal, listings, accounting GL, bulk comms | Town clerk ops for **~16 units + CC**: occupancy, leases, ledger, WO, schedule, vault, reports | Intentional smaller scope |
-| **Stack / UI kit** | Proprietary design systems | **Syncfusion Blazor** end-to-end | Aligned with *your* constitution |
-| **Auth** | SaaS identity | Cookie/local auth for NAS | Fine for intranet |
-| **Data model** | Multi-property, multi-entity | Single portfolio, facility unit (CC) | Right-sized |
-| **Workflow depth** | Wizards, bulk post rent, online ACH | Lease wizard, rent post, receipts, deposits | Competitive for size |
-| **Reporting** | Packaged + custom | Rent roll, delinq, warranty, P/L, pivot, occupancy | Good for council/clerk |
-| **Documents** | Cloud DMS | NAS FileManager + metadata | Fits DS225+ reality |
-| **E-sign** | Built-in or DocuSign | **Null hook** (post-v1) | Gap vs market; accepted deferral |
-| **Tenant self-serve** | Portal + pay | PayStar link only | Gap vs market; OK if clerks post payments |
-| **Mobile** | First-class apps | Responsive Blazor | Weaker than market apps |
-| **QA automation** | Broad E2E | Mostly **auth-gate** E2E + solid unit tests | Below market engineering bar |
-| **Polish / empty states / deep links** | Consistent product language | Strong on dashboard; **variable** page-to-page | This pass closes the gap |
+| Dimension                              | Typical market (AppFolio, Buildium, Yardi Breeze, DoorLoop)             | ClerkSuite (Wiley)                                                                             | Verdict                                   |
+| -------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **Scope**                              | Full PM: online pay, tenant portal, listings, accounting GL, bulk comms | Town clerk ops for **~16 units + CC**: occupancy, leases, ledger, WO, schedule, vault, reports | Intentional smaller scope                 |
+| **Stack / UI kit**                     | Proprietary design systems                                              | **Syncfusion Blazor** end-to-end                                                               | Aligned with *your* constitution          |
+| **Auth**                               | SaaS identity                                                           | Cookie/local auth for NAS                                                                      | Fine for intranet                         |
+| **Data model**                         | Multi-property, multi-entity                                            | Single portfolio, facility unit (CC)                                                           | Right-sized                               |
+| **Workflow depth**                     | Wizards, bulk post rent, online ACH                                     | Lease wizard, rent post, receipts, deposits                                                    | Competitive for size                      |
+| **Reporting**                          | Packaged + custom                                                       | Rent roll, delinq, warranty, P/L, pivot, occupancy                                             | Good for council/clerk                    |
+| **Documents**                          | Cloud DMS                                                               | NAS FileManager + metadata                                                                     | Fits DS225+ reality                       |
+| **E-sign**                             | Built-in or DocuSign                                                    | **Null hook** (post-v1)                                                                        | Gap vs market; accepted deferral          |
+| **Tenant self-serve**                  | Portal + pay                                                            | PayStar link only                                                                              | Gap vs market; OK if clerks post payments |
+| **Mobile**                             | First-class apps                                                        | Responsive Blazor                                                                              | Weaker than market apps                   |
+| **QA automation**                      | Broad E2E                                                               | Mostly **auth-gate** E2E + solid unit tests                                                    | Below market engineering bar              |
+| **Polish / empty states / deep links** | Consistent product language                                             | Strong on dashboard; **variable** page-to-page                                                 | This pass closes the gap                  |
 
 **Bottom line:** For a **single small town portfolio on self-hosted NAS**, ClerkSuite is closer to a **custom vertical tool** than a SaaS PM suite. Against AppFolio on features, we lose on portal/pay/e-sign/mobile. Against “can two clerks run Wiley apartments day-to-day without Excel,” we can win **if D2 surface pass is clean**.
 
@@ -72,9 +72,15 @@ Checkboxes are for the completion pass. Status starts **Unchecked** until a full
 - [x] **E3** Late fee settings path via Settings (batch)
 
 ### F. Operations
-- [x] **F1** Schedule `/schedule` (+ unit filter)
-- [x] **F2** Maintenance `/maintenance` (+ `?unitId=`)
-- [x] **F3** Community Center hub `/community-center` + deep links
+- [x] **F1** Schedule `/schedule` (+ unit filter) — *PASS WITH NOTES* (2026-08-11 batch 2)
+- [x] **F2** Maintenance `/maintenance` (+ `?unitId=`) — *PASS WITH NOTES*; Completer + date filter + optional CC reservation added 2026-08-11 (re-smoke residual)
+- [x] **F3** Community Center hub `/community-center` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F3-community-center.md`)
+- [x] **F4** CC renters `/community-center/renters` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F4-cc-renters.md`)
+- [x] **F5** CC renter detail `/community-center/renters/{id}` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F5-cc-renter-detail.md`)
+- [x] **F6** CC reservations `/community-center/reservations` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F6-cc-reservations.md`)
+- [x] **F7** CC reservation detail `/community-center/reservations/{id}` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F7-cc-reservation-detail.md`)
+- [x] **F8** CC inspections `/community-center/inspections` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F8-cc-inspections.md`)
+- [x] **F9** CC inventory `/community-center/inventory` — *PASS WITH NOTES* (`surface-logs/2026-08-11-F9-cc-inventory.md`)
 
 ### G. Documents & compliance
 - [x] **G1** Documents `/documents` (FileManager + metadata)
@@ -95,9 +101,9 @@ Checkboxes are for the completion pass. Status starts **Unchecked** until a full
 
 ### Explicitly out of D2 (post-v1 / market gaps)
 - DocuSign real provider (null hook OK if clerks upload signed PDF)
-- CC reservation PDF
 - Tenant portal / ACH inside app
 - Multi-property
+- Public CC booking portal / e-sign (Spec 002 non-goals)
 
 ---
 
@@ -107,10 +113,10 @@ Copy this block into `docs/handover/surface-logs/YYYY-MM-DD-<id>.md` or a runnin
 
 ```markdown
 ## Surface: <ID> <route>
-**Date:**  
-**Reviewer:** builder / clerk A / clerk B  
-**Environment:** local | NAS mr-storage:8082  
-**Build/image:**  
+**Date:**
+**Reviewer:** builder / clerk A / clerk B
+**Environment:** local | NAS mr-storage:8082
+**Build/image:**
 
 ### 1. Arrive
 - [ ] Nav or deep link reaches page (no 404 / auth loop)
@@ -153,12 +159,12 @@ Write the job story, then do it:
 ```
 
 ### Severity rubric
-| Sev | Meaning |
-|-----|---------|
-| **S0** | Data loss, wrong money, security |
+| Sev    | Meaning                                         |
+| ------ | ----------------------------------------------- |
+| **S0** | Data loss, wrong money, security                |
 | **S1** | Job blocked (can't post rent, open lease, etc.) |
-| **S2** | Workaround exists (extra clicks, wrong label) |
-| **S3** | Polish only |
+| **S2** | Workaround exists (extra clicks, wrong label)   |
+| **S3** | Polish only                                     |
 
 **D2 pass rule:** no open S0/S1 on that surface.
 
@@ -168,35 +174,37 @@ Write the job story, then do it:
 
 Do **not** jump by curiosity. Order by **clerk daily path**:
 
-1. **A1–A2** Login + shell  
-2. **C1–C2** Units (portfolio truth)  
-3. **C3–C4** Tenants  
-4. **D1–D3** Leases (including one full wizard → PDF → status)  
-5. **E1–E2** Payments + receipt  
-6. **F2** Maintenance  
-7. **F1** Schedule  
-8. **B1** Dashboard (verify links land on data you just created)  
-9. **H*** Reports that council/clerk actually use (rent roll, delinq, P/L, warranty)  
-10. **G1–G2** Documents + audit  
-11. **F3** Community Center  
+1. **A1–A2** Login + shell
+2. **C1–C2** Units (portfolio truth)
+3. **C3–C4** Tenants
+4. **D1–D3** Leases (including one full wizard → PDF → status)
+5. **E1–E2** Payments + receipt
+6. **F2** Maintenance
+7. **F1** Schedule
+8. **B1** Dashboard (verify links land on data you just created)
+9. **H*** Reports that council/clerk actually use (rent roll, delinq, P/L, warranty)
+10. **G1–G2** Documents + audit
+11. **F3–F9** Community Center (hub → renters → reservations → inspections → inventory)
 12. **I1** Settings (careful with demo seed on NAS)
 
-**Cadence:** one surface per focused session (25–45 min). Log → fix S0/S1 same day → re-verify → check box.  
+**Cadence:** one surface per focused session (25–45 min). Log → fix S0/S1 same day → re-verify → check box.
 Avoid implementing new features during this pass unless required to clear S0/S1.
 
 ---
 
 ## 6. Cross-cutting “connected” checks (run once after core path)
 
-| Check | How |
-|-------|-----|
-| Dashboard → list → detail round-trip | Click each home KPI/list row; confirm filter or entity |
-| Post rent → dashboard collection / delinq update | Post payment; refresh home + delinquency report |
-| Lease expire windows | Fixture or demo lease ends in ≤30 and 31–60; home lists match |
-| WO open → home count | Create WO; dashboard count increments |
-| Soft-delete tenant/unit rules | Soft-deleted hidden from default lists; no FK crash |
-| CC excluded from occupancy | Occupancy counts ignore facility |
-| Deposit never in rent totals | Payment marked deposit; collection KPIs unchanged |
+| Check                                            | How                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| Dashboard → list → detail round-trip             | Click each home KPI/list row; confirm filter or entity        |
+| Post rent → dashboard collection / delinq update | Post payment; refresh home + delinquency report               |
+| Lease expire windows                             | Fixture or demo lease ends in ≤30 and 31–60; home lists match |
+| WO open → home count                             | Create WO; dashboard count increments                         |
+| Soft-delete tenant/unit rules                    | Soft-deleted hidden from default lists; no FK crash           |
+| CC excluded from occupancy                       | Occupancy counts ignore facility                              |
+| Deposit never in rent totals                     | Payment marked deposit; collection KPIs unchanged             |
+| CC rental → schedule                             | Confirm reservation; appears on `/schedule?unitId=` CC        |
+| CC payment ≠ residential rent                    | Receipt type Community Center rental / CC damage deposit      |
 
 ---
 
@@ -204,22 +212,30 @@ Avoid implementing new features during this pass unless required to clear S0/S1.
 
 Not “uses a Syncfusion control,” but:
 
-1. **Right control for the job** (Grid for tabular edit, Schedule for calendar, FileManager for vault, Charts for viz).  
-2. **Documented props** for that package version (see `docs/dashboard-syncfusion-review.md` pattern).  
-3. **Theme** Fluent2 / Fluent2Dark consistent.  
-4. **No raw Bootstrap-only islands** where the rest of the app is Syncfusion (login may stay simple).  
+1. **Right control for the job** (Grid for tabular edit, Schedule for calendar, FileManager for vault, Charts for viz).
+2. **Documented props** for that package version (see `docs/dashboard-syncfusion-review.md` pattern).
+3. **Theme** Fluent2 / Fluent2Dark consistent.
+4. **No raw Bootstrap-only islands** where the rest of the app is Syncfusion (login may stay simple).
 5. **Toolbar/action patterns** match adjacent pages (PageHeader + SfButton outline primary actions).
 
 ---
 
 ## 8. Progress log
 
-| Date | Surface | Verdict | PR / notes |
-|------|---------|---------|------------|
-| 2026-08-11 | A1–A2, C1–C4, D1, I1 guard | PASS WITH NOTES | See `docs/handover/surface-logs/2026-08-11-d2-pass-batch1.md`; unit cap + WO link + prod demo wipe fixes |
-| 2026-08-11 | D2–D3 leases | PASS WITH NOTES | Wizard excludes facility; preview lifecycle OK |
-| 2026-08-11 | E1–A3 batch 2 | PASS WITH NOTES | `surface-logs/2026-08-11-d2-pass-batch2.md` |
-| | NAS clerk smoke residual | | sign-in, payment, print, vault |
+| Date       | Surface                      | Verdict         | PR / notes                                                                                                                  |
+| ---------- | ---------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | A1–A2, C1–C4, D1, I1 guard   | PASS WITH NOTES | See `docs/handover/surface-logs/2026-08-11-d2-pass-batch1.md`; unit cap + WO link + prod demo wipe fixes                    |
+| 2026-08-11 | D2–D3 leases                 | PASS WITH NOTES | Wizard excludes facility; preview lifecycle OK                                                                              |
+| 2026-08-11 | E1–A3 batch 2                | PASS WITH NOTES | `surface-logs/2026-08-11-d2-pass-batch2.md`                                                                                 |
+| 2026-08-11 | Inventory sync Spec 002      | —               | Added F4–F9; F3 re-opened; removed “CC PDF post-v1” from out-of-scope. See `surface-logs/2026-08-11-cc-inventory-status.md` |
+| 2026-08-11 | **F3** CC hub                | PASS WITH NOTES | Loading gate + Documents tip; live deep-link check. `surface-logs/2026-08-11-F3-community-center.md`                        |
+| 2026-08-11 | **F4** CC renters            | PASS WITH NOTES | Live Add→detail; empty-state + error reload. `surface-logs/2026-08-11-F4-cc-renters.md`                                     |
+| 2026-08-11 | **F5** CC renter detail      | PASS WITH NOTES | Display times + Notes; New reservation preselect. `surface-logs/2026-08-11-F5-cc-renter-detail.md`                          |
+| 2026-08-11 | **F6** CC reservations       | PASS WITH NOTES | List/Open/CC schedule; validation; create via service. `surface-logs/2026-08-11-F6-cc-reservations.md`                      |
+| 2026-08-11 | **F7** CC reservation detail | PASS WITH NOTES | Full money+agreement+complete path; ErrorMessage UI fix. `surface-logs/2026-08-11-F7-cc-reservation-detail.md`              |
+| 2026-08-11 | **F8** CC inspections        | PASS WITH NOTES | List + Reservation deep link; empty template. `surface-logs/2026-08-11-F8-cc-inspections.md`                                |
+| 2026-08-11 | **F9** CC inventory          | PASS WITH NOTES | OnActionComplete CRUD (no UI dupes); include-zero reload. `surface-logs/2026-08-11-F9-cc-inventory.md`                      |
+|            | NAS clerk smoke residual     |                 | sign-in, payment, print, vault                                                                                              |
 
 When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 
@@ -229,22 +245,20 @@ When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 
 ## 9. How to run this with an agent (Grok Build)
 
-1. Pick next unchecked surface from §5.  
-2. Agent opens page code + service + tests; builder or agent exercises live NAS/local.  
-3. Fill session template; file S0/S1 fixes immediately.  
-4. Re-verify; check inventory; commit log row.  
+1. Pick next unchecked surface from §5.
+2. Agent opens page code + service + tests; builder or agent exercises live NAS/local.
+3. Fill session template; file S0/S1 fixes immediately.
+4. Re-verify; check inventory; commit log row.
 5. Stop for the day after 1–3 surfaces — finishing favors **closed loops**, not breadth.
 
-**Next surface to start:** **A1 Login** then **A2 Shell**, then **C1 Units list**.
-
+**Next surface to start:** NAS clerk smoke residual — [NAS-CLERK-SMOKE.md](./handover/NAS-CLERK-SMOKE.md) — or revisit any FAIL / S2 notes.
 
 ---
 
-## Status (2026-08-11)
+## Status (2026-08-11 evening)
 
-**SURFACE COMPLETION — D2 CODE READY** (connectivity pass complete).  
-All inventory surfaces logged **PASS WITH NOTES**.
+**Spec 002 CC surfaces F3–F9: PASS WITH NOTES (D2 for this track).** Prior A–E / G–I / F1–F2 PASS WITH NOTES.
+**Unchecked for this board:** none in F3–F9.
+NAS residual: [NAS-CLERK-SMOKE.md](./handover/NAS-CLERK-SMOKE.md).
 
-- Auth E2E happy-path: `ClerkHappyPathE2ETests` (dev clerk login + daily surfaces).  
-- NAS residual checklist: [NAS-CLERK-SMOKE.md](./handover/NAS-CLERK-SMOKE.md) (~0.5 day).  
-- Full estimate: [COMPLETION-ESTIMATE.md](./handover/COMPLETION-ESTIMATE.md).
+**Open follow-ups (non-blocking):** reservation status button guards (Confirm after Completed); FacilityRenterDetail error layout parity; optional Cancel confirm.

@@ -135,6 +135,8 @@ public sealed class FacilityReservationService(
                            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted, cancellationToken)
                        ?? throw new InvalidOperationException($"Facility reservation {id} was not found.");
 
+        EnsureTransitionAllowed(existing.Status, status);
+
         if (status == FacilityReservationStatus.Confirmed)
         {
             await EnsureNoConfirmedOverlapAsync(
@@ -178,6 +180,53 @@ public sealed class FacilityReservationService(
 
         _logger.LogInformation("Facility reservation {Id} status -> {Status}.", id, status);
         return (await GetByIdAsync(id, cancellationToken))!;
+    }
+
+    /// <summary>
+    /// Allowed: Draft|Request → Confirmed|Cancelled; Confirmed → Cancelled|Completed;
+    /// same-status is a no-op. Terminal Completed/Cancelled cannot leave.
+    /// </summary>
+    internal static void EnsureTransitionAllowed(
+        FacilityReservationStatus from,
+        FacilityReservationStatus to)
+    {
+        if (from == to)
+        {
+            return;
+        }
+
+        if (from is FacilityReservationStatus.Cancelled or FacilityReservationStatus.Completed)
+        {
+            throw new InvalidOperationException(
+                $"Cannot change facility reservation status from {from} to {to}.");
+        }
+
+        var allowed = to switch
+        {
+            FacilityReservationStatus.Confirmed
+                when from is FacilityReservationStatus.Draft or FacilityReservationStatus.Request
+                => true,
+            FacilityReservationStatus.Cancelled
+                when from is FacilityReservationStatus.Draft or FacilityReservationStatus.Request
+                    or FacilityReservationStatus.Confirmed
+                => true,
+            FacilityReservationStatus.Completed
+                when from == FacilityReservationStatus.Confirmed
+                => true,
+            FacilityReservationStatus.Draft
+                when from == FacilityReservationStatus.Request
+                => true,
+            FacilityReservationStatus.Request
+                when from == FacilityReservationStatus.Draft
+                => true,
+            _ => false
+        };
+
+        if (!allowed)
+        {
+            throw new InvalidOperationException(
+                $"Cannot change facility reservation status from {from} to {to}.");
+        }
     }
 
     public async Task EnsureNoConfirmedOverlapAsync(

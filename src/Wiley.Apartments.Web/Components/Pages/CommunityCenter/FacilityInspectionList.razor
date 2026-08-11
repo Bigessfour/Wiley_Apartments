@@ -25,6 +25,11 @@
 }
 
 <SfGrid TValue="Row" DataSource="@Rows" AllowPaging="true" AllowSorting="true" Height="420">
+    <GridTemplates>
+        <EmptyRecordTemplate>
+            <div class="grid-empty-hint">No inspections yet — record Pre/PostRental on a reservation detail.</div>
+        </EmptyRecordTemplate>
+    </GridTemplates>
     <GridColumns>
         <GridColumn Field="@nameof(Row.InspectedDisplay)" HeaderText="When" Width="140" />
         <GridColumn Field="@nameof(Row.Type)" HeaderText="Type" Width="110" />
