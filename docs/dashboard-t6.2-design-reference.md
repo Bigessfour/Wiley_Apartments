@@ -30,3 +30,11 @@ Professional data-viz landing page for 16-unit Town of Wiley portfolio using **S
 
 ## Interactive React prototype (Grok App Builder)
 Visual IA prototype (not production stack): KPI hierarchy, charts, rent roll, unit detail strip. Use for UX sign-off; production remains Blazor Interactive Server on Synology.
+
+
+## Closeout UX (post-merge)
+
+- Clickable KPIs and portfolio mix rows filter the unit portfolio
+- Skeleton loading + Refresh
+- Deferred metrics show badges (not fake data)
+- See `docs/dashboard-closeout.md`
