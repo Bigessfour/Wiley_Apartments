@@ -243,4 +243,8 @@ When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 ## Status (2026-08-11)
 
 **SURFACE COMPLETION — D2 CODE READY** (connectivity pass complete).  
-All inventory surfaces logged **PASS WITH NOTES**. Remaining residual: live dual-clerk smoke on NAS (`mr-storage`) — sign-in, post payment + receipt, print rent roll/P/L, open document vault file.
+All inventory surfaces logged **PASS WITH NOTES**.
+
+- Auth E2E happy-path: `ClerkHappyPathE2ETests` (dev clerk login + daily surfaces).  
+- NAS residual checklist: [NAS-CLERK-SMOKE.md](./handover/NAS-CLERK-SMOKE.md) (~0.5 day).  
+- Full estimate: [COMPLETION-ESTIMATE.md](./handover/COMPLETION-ESTIMATE.md).

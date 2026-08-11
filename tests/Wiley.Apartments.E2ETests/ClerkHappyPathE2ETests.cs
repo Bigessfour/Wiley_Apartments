@@ -1,0 +1,149 @@
+using Microsoft.Playwright;
+
+namespace Wiley.Apartments.E2ETests;
+
+/// <summary>
+/// Authenticated clerk smoke: login (dev seed) then land on daily surfaces.
+/// Development host seeds <c>clerk@dev.local</c> / <c>Password1!</c> via IdentitySeeder.
+/// </summary>
+[Collection("E2E")]
+public class ClerkHappyPathE2ETests : IAsyncLifetime
+{
+    public const string DevClerkEmail = "clerk@dev.local";
+    public const string DevClerkPassword = "Password1!";
+
+    private readonly E2EWebApplicationFactory _factory;
+    private IPlaywright? _playwright;
+    private IBrowser? _browser;
+
+    public ClerkHappyPathE2ETests(E2EWebApplicationFactory factory)
+    {
+        _factory = factory;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _playwright = await Playwright.CreateAsync();
+        _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_browser is not null)
+        {
+            await _browser.DisposeAsync();
+        }
+
+        _playwright?.Dispose();
+    }
+
+    [Fact]
+    public async Task Clerk_CanSignIn_AndOpenDailySurfaces()
+    {
+        var page = await _browser!.NewPageAsync();
+        page.SetDefaultTimeout(45_000);
+
+        await SignInAsDevClerkAsync(page);
+
+        await GotoAuthenticatedAsync(page, "/", new[] { "Occupancy", "ClerkSuite", "Dashboard", "Collected" });
+        await GotoAuthenticatedAsync(page, "/units", new[] { "Units", "Town of Wiley", "Unit #" });
+        await GotoAuthenticatedAsync(page, "/payments", new[] { "ledger", "Record payment", "Post charge", "Tenant ledger" });
+        await GotoAuthenticatedAsync(page, "/maintenance", new[] { "Maintenance", "work order", "New work order" });
+        await GotoAuthenticatedAsync(page, "/schedule", new[] { "calendar", "Operations", "Schedule" });
+        await GotoAuthenticatedAsync(page, "/reports", new[] { "Rent roll", "Reports", "Delinquency" });
+        await GotoAuthenticatedAsync(page, "/reports/rent-roll", new[] { "Rent roll", "Print" });
+        await GotoAuthenticatedAsync(page, "/documents", new[] { "Document", "vault", "File" });
+    }
+
+    [Fact]
+    public async Task Clerk_InvalidPassword_ShowsError_StaysOnLogin()
+    {
+        var page = await _browser!.NewPageAsync();
+        page.SetDefaultTimeout(20_000);
+
+        await page.GotoAsync($"{_factory.E2EBaseUrl}/Account/Login");
+        await page.Locator("input[autocomplete='username'], input[name='Input.Email'], input[type='email']").First
+            .FillAsync(DevClerkEmail);
+        await page.Locator("input[autocomplete='current-password'], input[type='password']").First
+            .FillAsync("WrongPassword1!");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
+        await page.WaitForTimeoutAsync(1500);
+
+        page.Url.Should().Contain("/Account/Login");
+        var body = await page.ContentAsync();
+        body.Should().Contain("Invalid email or password");
+    }
+
+    private async Task SignInAsDevClerkAsync(IPage page)
+    {
+        await page.GotoAsync($"{_factory.E2EBaseUrl}/Account/Login");
+        await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+
+        var email = page.Locator("input[autocomplete='username'], input[name='Input.Email'], input[type='email']").First;
+        var password = page.Locator("input[autocomplete='current-password'], input[type='password']").First;
+
+        await email.FillAsync(DevClerkEmail);
+        await password.FillAsync(DevClerkPassword);
+        await page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
+
+        await page.WaitForURLAsync(
+            url => !url.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase),
+            new PageWaitForURLOptions { Timeout = 45_000 });
+    }
+
+    private async Task GotoAuthenticatedAsync(IPage page, string path, string[] anyOfMarkers)
+    {
+        await page.GotoAsync($"{_factory.E2EBaseUrl}{path}", new PageGotoOptions
+        {
+            WaitUntil = WaitUntilState.NetworkIdle
+        });
+        page.Url.Should().NotContain("/Account/Login");
+
+        // Interactive Server pages paint after the circuit attaches — wait for any marker text.
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        string? lastBody = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            lastBody = await page.ContentAsync();
+            if (lastBody.Contains("Invalid email or password", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Lost auth session mid happy-path.");
+            }
+
+            if (anyOfMarkers.Any(m => lastBody.Contains(m, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            // Also try visible text via Playwright (handles delayed DOM)
+            foreach (var marker in anyOfMarkers)
+            {
+                var loc = page.GetByText(marker, new PageGetByTextOptions { Exact = false });
+                if (await loc.CountAsync() > 0)
+                {
+                    try
+                    {
+                        await loc.First.WaitForAsync(new LocatorWaitForOptions
+                        {
+                            State = WaitForSelectorState.Visible,
+                            Timeout = 2_000
+                        });
+                        return;
+                    }
+                    catch (TimeoutException)
+                    {
+                        // keep polling
+                    }
+                }
+            }
+
+            await page.WaitForTimeoutAsync(400);
+        }
+
+        var snippet = lastBody is null
+            ? "(empty)"
+            : lastBody.Length <= 500 ? lastBody : lastBody[^500..];
+        throw new TimeoutException(
+            $"Timed out waiting for markers [{string.Join(", ", anyOfMarkers)}] on {path}. Tail: {snippet}");
+    }
+}

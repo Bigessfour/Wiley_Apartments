@@ -41,6 +41,21 @@ public sealed class E2EWebApplicationFactory : IAsyncLifetime, IDisposable
         // Empty placeholder is enough for Development (bootstrap warns, does not throw).
         _process.StartInfo.Environment["SYNCFUSION_LICENSE_KEY"] =
             Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY") ?? "";
+        // Isolated SQLite so E2E never mutates a developer's local clerksuite.db
+        var e2eDb = Path.Combine(repoRoot, "src", "Wiley.Apartments.Web", "Data", "clerksuite-e2e.db");
+        try
+        {
+            if (File.Exists(e2eDb))
+            {
+                File.Delete(e2eDb);
+            }
+        }
+        catch
+        {
+            // best-effort clean slate
+        }
+
+        _process.StartInfo.Environment["ConnectionStrings__DefaultConnection"] = $"Data Source={e2eDb}";
 
         // Ensure child sees the same SDK as the test host.
         var path = Environment.GetEnvironmentVariable("PATH") ?? "";
