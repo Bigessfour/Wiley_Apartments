@@ -80,5 +80,9 @@ public interface ILeaseService
         string? note = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Hide a lease from lists. Active/Amended leases must be Terminated first.
+    /// Deleting a Draft ends occupancy started from generating that draft.
+    /// </summary>
     Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

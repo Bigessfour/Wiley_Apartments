@@ -473,6 +473,201 @@ public class LeaseServiceTests
     }
 
     [Fact]
+    public async Task SoftDeleteAsync_Throws_WhenActive()
+    {
+        var yearSrc = ResolveTemplatesDir();
+        if (yearSrc is null)
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-lease-del-active-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        File.Copy(
+            Path.Combine(yearSrc, "templates", "brookside-year-lease.docx"),
+            Path.Combine(root, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "1", SqFt = 500, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "A", LastName = "B" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.docx",
+                DateTime.UtcNow,
+                DateTime.UtcNow.AddMonths(12),
+                100m,
+                100m);
+
+            var tracked = await db.Leases.FirstAsync(l => l.Id == draft.Id);
+            tracked.Status = LeaseStatus.Active;
+            await db.SaveChangesAsync();
+
+            var act = () => service.SoftDeleteAsync(draft.Id);
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*Terminate*");
+
+            (await service.GetByIdAsync(draft.Id)).Should().NotBeNull();
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task SoftDeleteAsync_DraftAfterGenerate_EndsOccupancy()
+    {
+        var yearSrc = ResolveTemplatesDir();
+        if (yearSrc is null)
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-lease-del-occ-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        File.Copy(
+            Path.Combine(yearSrc, "templates", "brookside-year-lease.docx"),
+            Path.Combine(root, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "4", SqFt = 500, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Pat", LastName = "Nguyen" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.docx",
+                new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2027, 8, 31, 0, 0, 0, DateTimeKind.Utc),
+                100m,
+                100m);
+
+            await service.GenerateDocumentsAsync(draft.Id);
+            (await db.Occupancies.CountAsync(o => o.UnitId == unit.Id && o.EndUtc == null)).Should().Be(1);
+
+            await service.SoftDeleteAsync(draft.Id);
+
+            (await service.GetByIdAsync(draft.Id)).Should().BeNull();
+            (await db.Occupancies.CountAsync(o => o.UnitId == unit.Id && o.EndUtc == null)).Should().Be(0);
+            var unitAfter = await db.Units.FindAsync(unit.Id);
+            unitAfter!.Status.Should().Be(UnitStatus.MakeReady);
+            unitAfter.CurrentTenantId.Should().BeNull();
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task GenerateDocumentsAsync_DoesNotDemoteActive()
+    {
+        var yearSrc = ResolveTemplatesDir();
+        if (yearSrc is null)
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-lease-keep-active-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        File.Copy(
+            Path.Combine(yearSrc, "templates", "brookside-year-lease.docx"),
+            Path.Combine(root, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "8", SqFt = 500, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Pat", LastName = "Nguyen" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.docx",
+                new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2027, 8, 31, 0, 0, 0, DateTimeKind.Utc),
+                100m,
+                100m);
+
+            await using var stream = new MemoryStream("%PDF-1.4 signed stub"u8.ToArray());
+            var active = await service.AttachSignedDocumentAsync(
+                draft.Id,
+                "signed-lease.pdf",
+                "application/pdf",
+                stream,
+                "clerk@test");
+            active.Status.Should().Be(LeaseStatus.Active);
+
+            var again = await service.GenerateDocumentsAsync(active.Id);
+            again.Status.Should().Be(LeaseStatus.Active);
+            again.SignedDocumentId.Should().Be(active.SignedDocumentId);
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task UpdateDraftAsync_Throws_WhenNotDraft()
+    {
+        var yearSrc = ResolveTemplatesDir();
+        if (yearSrc is null)
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-lease-upd-active-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        File.Copy(
+            Path.Combine(yearSrc, "templates", "brookside-year-lease.docx"),
+            Path.Combine(root, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "1", SqFt = 500, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "A", LastName = "B" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.docx",
+                DateTime.UtcNow,
+                DateTime.UtcNow.AddMonths(12),
+                100m,
+                100m);
+
+            var tracked = await db.Leases.FirstAsync(l => l.Id == draft.Id);
+            tracked.Status = LeaseStatus.Active;
+            await db.SaveChangesAsync();
+
+            var act = () => service.UpdateDraftAsync(
+                draft.Id,
+                DateTime.UtcNow,
+                DateTime.UtcNow.AddMonths(12),
+                100m,
+                100m);
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*Draft*");
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
     public async Task UpdateDraftAsync_ChangesTerms_OnDraftOnly()
     {
         var yearSrc = ResolveTemplatesDir();

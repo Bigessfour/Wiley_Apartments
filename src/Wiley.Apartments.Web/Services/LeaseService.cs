@@ -334,9 +334,9 @@ public sealed class LeaseService(
             TryDeleteRelativeFile(oldDocx);
         }
 
-        // Stay Draft until signed upload / activate workflow (T3.3 / T3.4).
         // Reload after file write so a stale circuit-tracked Unit/Lease RowVersion
         // cannot fail this SaveChanges (same error clerks saw on Generate PDF).
+        // Do not force Draft — regenerating a signed lease must stay Active.
         ConcurrencyHelper.DiscardTrackedEntities(_db);
         lease = await _db.Leases
             .Include(l => l.Unit)
@@ -349,7 +349,6 @@ public sealed class LeaseService(
         lease.GeneratedPdfRelativePath = pdfRel;
         lease.GeneratedDocxRelativePath = docxRel ?? lease.GeneratedDocxRelativePath;
 
-        lease.Status = LeaseStatus.Draft;
         ConcurrencyHelper.BumpRowVersion(lease);
         ApplyUnitFinancials(lease);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
@@ -562,8 +561,22 @@ public sealed class LeaseService(
 
     public async Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var lease = await _db.Leases.FindAsync([id], cancellationToken)
+        var lease = await _db.Leases
+            .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted, cancellationToken)
             ?? throw new InvalidOperationException($"Lease {id} was not found.");
+
+        if (lease.Status is LeaseStatus.Active or LeaseStatus.Amended)
+        {
+            throw new InvalidOperationException(
+                "Active leases cannot be removed. Use Terminate on the lease page first.");
+        }
+
+        if (lease.Status == LeaseStatus.Draft)
+        {
+            await TryReverseOccupancyFromDraftAsync(lease, cancellationToken);
+        }
+
+        lease = await _db.Leases.FirstAsync(l => l.Id == id, cancellationToken);
         lease.IsDeleted = true;
         ConcurrencyHelper.BumpRowVersion(lease);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
@@ -606,6 +619,45 @@ public sealed class LeaseService(
         unit.MonthlyRent = lease.Rent;
         unit.SecurityDeposit = lease.Deposit;
         ConcurrencyHelper.BumpRowVersion(unit);
+    }
+
+    private async Task TryReverseOccupancyFromDraftAsync(Lease lease, CancellationToken cancellationToken)
+    {
+        var current = await _occupancy.GetCurrentForUnitAsync(lease.UnitId, cancellationToken);
+        if (current is null || current.TenantId != lease.TenantId)
+        {
+            return;
+        }
+
+        if (current.StartUtc < lease.StartUtc.AddDays(-1))
+        {
+            return;
+        }
+
+        var otherLive = await _db.Leases.AnyAsync(
+            l => !l.IsDeleted
+                && l.Id != lease.Id
+                && l.UnitId == lease.UnitId
+                && (l.Status == LeaseStatus.Active || l.Status == LeaseStatus.Amended),
+            cancellationToken);
+        if (otherLive)
+        {
+            return;
+        }
+
+        try
+        {
+            var endUtc = _clock.UtcNow < current.StartUtc ? current.StartUtc : _clock.UtcNow;
+            await _occupancy.EndAsync(lease.UnitId, endUtc, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Draft lease {LeaseId} will still be removed; occupancy was not ended for unit {UnitId}.",
+                lease.Id,
+                lease.UnitId);
+        }
     }
 
     private async Task TryStartOccupancyFromLeaseAsync(Lease lease, CancellationToken cancellationToken)

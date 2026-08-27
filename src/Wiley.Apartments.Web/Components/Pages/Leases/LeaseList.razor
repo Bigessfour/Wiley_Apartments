@@ -30,6 +30,7 @@
         AllowFiltering="true"
         Height="420">
     <GridEvents TValue="Lease"
+                OnActionBegin="OnActionBegin"
                 OnActionComplete="OnActionCompleteAsync"
                 OnRecordDoubleClick="OnLeaseDoubleClick" />
     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
@@ -98,11 +99,36 @@
         }
     }
 
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LeaseList operation failed.");
+            ErrorMessage = ex.Message;
+        }
+    }
 
     private async Task ReloadAsync()
     {
         Leases = (await LeaseService.GetAllAsync()).ToList();
+    }
+
+    private void OnActionBegin(ActionEventArgs<Lease> args)
+    {
+        if (args.RequestType != Syncfusion.Blazor.Grids.Action.Delete || args.Data is null)
+        {
+            return;
+        }
+
+        if (args.Data.Status is LeaseStatus.Active or LeaseStatus.Amended)
+        {
+            args.Cancel = true;
+            ErrorMessage = "Active leases cannot be removed. Open the lease and use Terminate first.";
+        }
     }
 
     private async Task OnActionCompleteAsync(ActionEventArgs<Lease> args)

@@ -44,8 +44,11 @@ else
             <SfButton CssClass="e-outline" Content="Edit" Disabled="@Busy"
                       OnClick="@(() => ShowPanel = "edit")" />
         }
-        <SfButton CssClass="e-outline e-danger" Content="Delete" Disabled="@Busy"
-                  OnClick="@(() => ShowPanel = "delete")" />
+        @if (CanDelete)
+        {
+            <SfButton CssClass="e-outline e-danger" Content="Delete" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "delete")" />
+        }
         <SfButton CssClass="e-primary" Content="@(string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) ? "Generate PDF" : "Regenerate PDF")"
                   Disabled="@Busy" OnClick="GenerateAsync" />
         @if (_pdfBytes is { Length: > 0 })
@@ -81,11 +84,13 @@ else
         </p>
     }
 
-    @if (ShowPanel == "delete")
+    @if (ShowPanel == "delete" && CanDelete)
     {
         <div class="mb-4" style="max-width: 520px;">
             <p class="mb-2">
-                Remove this lease from the list? Occupancy and the ledger are not changed.
+                @(Lease.Status == LeaseStatus.Draft
+                    ? "Remove this draft? If generating it started occupancy, the unit will go to make-ready."
+                    : "Remove this lease from the list? Occupancy and the ledger are not changed.")
             </p>
             <div class="d-flex gap-2">
                 <SfButton CssClass="e-danger e-small" Content="Delete lease" Disabled="@Busy" OnClick="DeleteAsync" />
@@ -316,6 +321,9 @@ else
                 Clock.ToDisplayTime(Lease.StartUtc).Date);
         }
     }
+
+    private bool CanDelete =>
+        Lease is not null && Lease.Status is not (LeaseStatus.Active or LeaseStatus.Amended);
 
     private string PdfDownloadHref =>
         _pdfBytes is { Length: > 0 }
