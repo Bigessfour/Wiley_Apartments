@@ -116,22 +116,27 @@ public sealed class FacilityReservationService(
         existing.RentalFee = decimal.Round(reservation.RentalFee, 2, MidpointRounding.AwayFromZero);
         existing.DepositAmount = decimal.Round(reservation.DepositAmount, 2, MidpointRounding.AwayFromZero);
         existing.Notes = Trim(reservation.Notes, 2000);
-        if (existing.InventoryHeld)
+
+        // Keep a confirmed hold across notes/fee edits. Release+re-hold only when
+        // equipment or confirmed status actually changes, and only persist once.
+        var keepHold = existing.InventoryHeld
+            && existing.Status == FacilityReservationStatus.Confirmed
+            && EquipmentEquals(existing.Equipment, reservation.Equipment);
+        if (existing.InventoryHeld && !keepHold)
         {
             await ReleaseInventoryAsync(existing, cancellationToken);
         }
 
         ReplaceEquipment(existing, reservation.Equipment);
 
+        if (existing.Status == FacilityReservationStatus.Confirmed && !keepHold)
+        {
+            await HoldInventoryAsync(existing, cancellationToken);
+        }
+
         _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = reservation.RowVersion;
         ConcurrencyHelper.BumpRowVersion(existing);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "FacilityReservation", cancellationToken);
-
-        if (existing.Status == FacilityReservationStatus.Confirmed)
-        {
-            await HoldInventoryAsync(existing, cancellationToken);
-            await _db.SaveChangesAsync(cancellationToken);
-        }
 
         if (existing.Status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
@@ -427,6 +432,21 @@ public sealed class FacilityReservationService(
             })
             .ToList();
         reservation.Equipment = cleaned;
+    }
+
+    private static bool EquipmentEquals(
+        ICollection<FacilityReservationEquipment> left,
+        ICollection<FacilityReservationEquipment> right)
+    {
+        static Dictionary<Guid, int> Totals(IEnumerable<FacilityReservationEquipment> lines) =>
+            lines
+                .Where(e => e.InventoryItemId != Guid.Empty && e.Quantity > 0)
+                .GroupBy(e => e.InventoryItemId)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        var a = Totals(left);
+        var b = Totals(right);
+        return a.Count == b.Count && a.All(kv => b.TryGetValue(kv.Key, out var qty) && qty == kv.Value);
     }
 
     private static void ReplaceEquipment(
