@@ -101,10 +101,21 @@ public class DashboardServiceTests
             snap.OccupancyPercent.Should().Be(50);
             snap.UnitStatusSlices.Should().Contain(s => s.Status == "Occupied" && s.Count == 1);
             snap.CollectionByMonth.Should().HaveCount(12);
-            snap.PaymentHeatmap.Should().NotBeNull();
             snap.CollectionRatePercent.Should().BeGreaterThanOrEqualTo(0);
             snap.ExpiringWarranties.Should().ContainSingle(w => w.AssetLabel.Contains("Fridge"));
             snap.OpenWorkOrders.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_NoUnits_AddsPlaceholderStatusSlice()
+    {
+        var (db, service) = Create();
+        await using (db)
+        {
+            var snap = await service.GetSnapshotAsync();
+            snap.TotalUnits.Should().Be(0);
+            snap.UnitStatusSlices.Should().ContainSingle(s => s.Status == "No units" && s.Count == 1);
         }
     }
 
@@ -131,8 +142,17 @@ public class DashboardServiceTests
                 LastName = "Clerk",
                 IsDeleted = false
             };
+            unit.CurrentTenantId = tenant.Id;
             db.Units.Add(unit);
             db.Tenants.Add(tenant);
+            db.Occupancies.Add(new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                TenantId = tenant.Id,
+                StartUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                EndUtc = null
+            });
             db.LedgerEntries.AddRange(
                 new LedgerEntry
                 {
@@ -184,7 +204,6 @@ public class DashboardServiceTests
             snap.CollectionByMonth.Should().Contain(m => m.Label.Contains("Aug") && m.Amount == 900m);
             snap.CollectionByMonth.Should().Contain(m => m.Label.Contains("Jul") && m.Amount == 0m);
             snap.CollectionRatePercent.Should().Be(100);
-            snap.PaymentHeatmap.Should().Contain(c => c.Unit == "301" && c.Month.Contains("Aug") && c.Value == 900);
         }
     }
 
@@ -297,6 +316,84 @@ public class DashboardServiceTests
             snap.ExpiringLeasesWithin60.Should().ContainSingle(l => l.DaysRemaining > 30 && l.DaysRemaining <= 60);
             snap.OpenWorkOrders.Should().ContainSingle(w => w.Description.Contains("faucet") && w.UnitId == unit.Id);
             snap.ScheduleReminders.Should().NotBeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task GetSnapshotAsync_Outstanding_ExcludesFormerOccupants()
+    {
+        var (db, service) = Create();
+        await using (db)
+        {
+            var unit = new Unit
+            {
+                Id = Guid.NewGuid(),
+                Number = "301",
+                SqFt = 700,
+                Beds = 2,
+                Baths = 1,
+                Status = UnitStatus.Occupied,
+                MonthlyRent = 900m
+            };
+            var current = new Tenant
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Ada",
+                LastName = "Clerk",
+                IsDeleted = false
+            };
+            var former = new Tenant
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Pat",
+                LastName = "Gone",
+                IsDeleted = false
+            };
+            unit.CurrentTenantId = current.Id;
+            db.Units.Add(unit);
+            db.Tenants.AddRange(current, former);
+            db.Occupancies.AddRange(
+                new Occupancy
+                {
+                    Id = Guid.NewGuid(),
+                    UnitId = unit.Id,
+                    TenantId = former.Id,
+                    StartUtc = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EndUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new Occupancy
+                {
+                    Id = Guid.NewGuid(),
+                    UnitId = unit.Id,
+                    TenantId = current.Id,
+                    StartUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+                    EndUtc = null
+                });
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = former.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Charge,
+                    Amount = 5000m,
+                    DateUtc = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = current.Id,
+                    UnitId = unit.Id,
+                    EntryType = LedgerEntryType.Charge,
+                    Amount = 100m,
+                    DateUtc = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc)
+                });
+            await db.SaveChangesAsync();
+
+            var snap = await service.GetSnapshotAsync();
+            snap.OutstandingBalanceTotal.Should().Be(100m);
+            snap.Delinquencies.Should().ContainSingle(d => d.TenantName.Contains("Clerk") && d.Balance == 100m);
+            snap.Delinquencies.Should().NotContain(d => d.TenantName.Contains("Gone"));
         }
     }
 }

@@ -9,6 +9,15 @@ services:
     # Host 8082 — NAS :8080 is already used by tikr-web
     ports:
       - 8082:8080
+    # Compose v2 keys — Synology/non-Swarm often ignores deploy.resources.
+    mem_limit: 1536m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo >/dev/tcp/127.0.0.1/8080'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       TZ: America/Denver

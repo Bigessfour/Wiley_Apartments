@@ -4,7 +4,13 @@ public interface IRentRollService
 {
     Task<IReadOnlyList<RentRollRow>> GetRentRollAsync(CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<DelinquencyRow>> GetDelinquencyAsync(CancellationToken cancellationToken = default);
+    /// <param name="occupancy">
+    /// Current (default) = open occupants only. Former = ended occupancy with a remaining balance.
+    /// All = every tenant/unit pair (mixed — not for dashboard).
+    /// </param>
+    Task<IReadOnlyList<DelinquencyRow>> GetDelinquencyAsync(
+        OccupancyFilter occupancy = OccupancyFilter.Current,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record RentRollRow(

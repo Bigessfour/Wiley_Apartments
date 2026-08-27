@@ -32,6 +32,7 @@ try
 
     app.MapGet("/api/documents/{id:guid}/download", async (
             Guid id,
+            bool inline,
             Wiley.Apartments.Contracts.IDocumentService documents,
             CancellationToken ct) =>
         {
@@ -44,8 +45,8 @@ try
 
             return Results.File(
                 path,
-                info.ContentType ?? "application/octet-stream",
-                info.OriginalFileName);
+                info.ContentType ?? "application/pdf",
+                fileDownloadName: inline ? null : info.OriginalFileName);
         })
         .RequireAuthorization();
 

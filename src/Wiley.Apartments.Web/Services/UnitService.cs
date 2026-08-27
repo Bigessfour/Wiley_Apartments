@@ -30,6 +30,13 @@ public sealed class UnitService(
             .ThenBy(u => u.Number)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Unit>> GetResidentialAsync(CancellationToken cancellationToken = default) =>
+        await _db.Units
+            .AsNoTracking()
+            .Where(u => !u.IsFacility)
+            .OrderBy(u => u.Number)
+            .ToListAsync(cancellationToken);
+
     public async Task<Unit?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await _db.Units.FindAsync([id], cancellationToken);
 
@@ -122,7 +129,7 @@ public sealed class UnitService(
         existing.Beds = unit.Beds;
         existing.Baths = unit.Baths;
         existing.Status = unit.Status;
-        existing.Notes = unit.Notes;
+        existing.Notes = unit.Notes?.Trim();
         existing.CurrentTenantId = unit.CurrentTenantId;
         existing.MonthlyRent = unit.MonthlyRent;
         existing.SecurityDeposit = unit.SecurityDeposit;

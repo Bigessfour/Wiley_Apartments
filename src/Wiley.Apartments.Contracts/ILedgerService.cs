@@ -9,6 +9,7 @@ public interface ILedgerService
     Task<IReadOnlyList<LedgerLine>> GetLedgerAsync(
         Guid? tenantId = null,
         Guid? unitId = null,
+        OccupancyFilter occupancy = OccupancyFilter.All,
         CancellationToken cancellationToken = default);
 
     Task<decimal> GetBalanceAsync(

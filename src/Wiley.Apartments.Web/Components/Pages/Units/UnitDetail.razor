@@ -34,9 +34,23 @@ else if (Unit is null)
 }
 else
 {
-    <PageHeader Title="@($"Unit {Unit.Number}")" Subtitle="Complete unit inventory and status">
+    <PageHeader Title="@(Unit.IsFacility ? "Community Center" : $"Unit {Unit.Number}")"
+                Subtitle="@(Unit.IsFacility
+                    ? "Facility record — not an apartment rental. Layout lives here; bookings live under Community Center."
+                    : "Complete unit inventory and status")">
+        @if (Unit.IsFacility)
+        {
+            <SfButton CssClass="e-primary e-small" Content="CC hub"
+                      OnClick="@(() => Navigation.NavigateTo("/community-center"))" />
+        }
         <SfButton CssClass="e-outline" Content="Back to units" OnClick="GoToUnitList" />
     </PageHeader>
+    @if (Unit.IsFacility)
+    {
+        <div class="alert alert-info">
+            CC is excluded from the Units roster, rent roll, and occupancy. Open CC hub for renters, reservations, and agreements.
+        </div>
+    }
 
     @if (!string.IsNullOrEmpty(GridError))
     {
@@ -180,7 +194,13 @@ else
                     }
 
                     <div class="row g-3 mb-3 align-items-end">
-                        @if (CurrentOccupancy is null)
+                        @if (Unit.IsFacility)
+                        {
+                            <div class="col-12">
+                                <p class="mb-0">Community Center bookings use <a href="/community-center/reservations">CC reservations</a>, not apartment occupancy.</p>
+                            </div>
+                        }
+                        else if (CurrentOccupancy is null)
                         {
                             <div class="col-md-6">
                                 <label class="form-label">Start occupancy</label>

@@ -10,10 +10,12 @@ public class FacilityReservation
     public FacilityRenter? FacilityRenter { get; set; }
     public DateTime StartUtc { get; set; }
     public DateTime EndUtc { get; set; }
+    public FacilitySpace Space { get; set; } = FacilitySpace.WholeBuilding;
     public FacilityReservationStatus Status { get; set; } = FacilityReservationStatus.Draft;
     public decimal RentalFee { get; set; }
     public decimal DepositAmount { get; set; }
     public string? Notes { get; set; }
+    public ICollection<FacilityReservationEquipment> Equipment { get; set; } = [];
     public string? GeneratedPdfRelativePath { get; set; }
     public Guid? SignedDocumentId { get; set; }
     public Guid? ScheduledItemId { get; set; }

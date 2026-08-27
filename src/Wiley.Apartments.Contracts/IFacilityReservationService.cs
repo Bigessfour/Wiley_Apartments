@@ -33,5 +33,6 @@ public interface IFacilityReservationService
         DateTime startUtc,
         DateTime endUtc,
         Guid? excludeId = null,
+        FacilitySpace space = FacilitySpace.WholeBuilding,
         CancellationToken cancellationToken = default);
 }

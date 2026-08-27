@@ -4,6 +4,7 @@
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @inject IUnitService UnitService
@@ -13,12 +14,19 @@
 <PageTitle>Units</PageTitle>
 
 <PageHeader Title="Units"
-            Subtitle="@Subtitle" />
+            Subtitle="@Subtitle">
+    <SfButton CssClass="e-outline e-small" Content="Community Center"
+              OnClick="@(() => Navigation.NavigateTo("/community-center"))" />
+</PageHeader>
+
+<p class="small text-muted mb-2">
+    Residential apartments only. Community Center (CC) is a facility — open it from Community Center, not this roster.
+</p>
 
 @if (!string.IsNullOrWhiteSpace(StatusFilter))
 {
     <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 py-2" role="status">
-        <span>Showing units with status <strong>@StatusFilter</strong> (@Units.Count of @AllUnits.Count).</span>
+        <span>Showing units with status <strong>@StatusFilterLabel</strong> (@Units.Count of @AllUnits.Count).</span>
         <SfButton CssClass="e-small e-outline" Content="Clear filter" OnClick="ClearStatusFilter" />
     </div>
 }
@@ -48,68 +56,132 @@
     <GridEditSettings AllowAdding="@CanAddUnit"
                       AllowEditing="true"
                       AllowDeleting="true"
-                      Mode="EditMode.Normal"
+                      Mode="EditMode.Dialog"
                       ShowDeleteConfirmDialog="true" />
     <GridColumns>
         <GridColumn Field="@nameof(Unit.Id)"
                     IsPrimaryKey="true"
                     Visible="false"
                     AllowEditing="false" />
+        <GridColumn Field="@nameof(Unit.RowVersion)"
+                    Visible="false"
+                    AllowEditing="false" />
+        <GridColumn Field="@nameof(Unit.CurrentTenantId)"
+                    Visible="false"
+                    AllowEditing="false" />
+        <GridColumn Field="@nameof(Unit.IsFacility)"
+                    Visible="false"
+                    AllowEditing="false" />
         <GridColumn Field="@nameof(Unit.Number)"
                     HeaderText="Unit #"
                     Width="100"
                     ValidationRules="@(new ValidationRules { Required = true })" />
-        <GridColumn Field="@nameof(Unit.IsFacility)"
-                    HeaderText="Type"
-                    Width="110"
-                    AllowEditing="false">
-            <Template>
-                @{
-                    var row = context as Unit;
-                }
-                @if (row!.IsFacility)
-                {
-                    <span class="badge text-bg-info">Facility</span>
-                }
-                else
-                {
-                    <span class="badge text-bg-secondary">Residential</span>
-                }
-            </Template>
-        </GridColumn>
         <GridColumn Field="@nameof(Unit.SqFt)"
                     HeaderText="Sq Ft"
                     TextAlign="TextAlign.Right"
-                    EditType="EditType.NumericEdit"
                     Format="N0"
                     Width="110"
-                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <SfNumericTextBox TValue="decimal"
+                                      @bind-Value="unit.SqFt"
+                                      Format="N0"
+                                      Decimals="0"
+                                      Min="0"
+                                      Step="1"
+                                      ShowSpinButton="true"
+                                      Width="100%" />
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.Beds)"
                     HeaderText="Beds"
                     TextAlign="TextAlign.Right"
-                    EditType="EditType.NumericEdit"
                     Width="90"
-                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <SfNumericTextBox TValue="int"
+                                      @bind-Value="unit.Beds"
+                                      Format="N0"
+                                      Min="0"
+                                      Step="1"
+                                      ShowSpinButton="true"
+                                      Width="100%" />
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.Baths)"
                     HeaderText="Baths"
                     TextAlign="TextAlign.Right"
-                    EditType="EditType.NumericEdit"
                     Width="90"
-                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <SfNumericTextBox TValue="int"
+                                      @bind-Value="unit.Baths"
+                                      Format="N0"
+                                      Min="0"
+                                      Step="1"
+                                      ShowSpinButton="true"
+                                      Width="100%" />
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.MonthlyRent)"
                     HeaderText="Rent"
                     TextAlign="TextAlign.Right"
-                    EditType="EditType.NumericEdit"
                     Format="C2"
                     Width="110"
-                    ValidationRules="@(new ValidationRules { Min = 0 })" />
+                    ValidationRules="@(new ValidationRules { Min = 0 })">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <SfNumericTextBox TValue="decimal"
+                                      @bind-Value="unit.MonthlyRent"
+                                      Format="C2"
+                                      Decimals="2"
+                                      Min="0"
+                                      Step="25"
+                                      ShowSpinButton="true"
+                                      Width="100%" />
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.SecurityDeposit)"
                     HeaderText="Deposit"
                     TextAlign="TextAlign.Right"
-                    EditType="EditType.NumericEdit"
                     Format="C2"
                     Width="110"
-                    ValidationRules="@(new ValidationRules { Min = 0 })" />
+                    ValidationRules="@(new ValidationRules { Min = 0 })">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <SfNumericTextBox TValue="decimal"
+                                      @bind-Value="unit.SecurityDeposit"
+                                      Format="C2"
+                                      Decimals="2"
+                                      Min="0"
+                                      Step="25"
+                                      ShowSpinButton="true"
+                                      Width="100%" />
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.LeaseTerm)"
                     HeaderText="Term"
                     Width="120" />
@@ -125,29 +197,53 @@
                     EditType="EditType.DropDownEdit">
             <EditTemplate>
                 @{
-                    var unit = context as Unit;
+                    var unit = (Unit)context;
                 }
                 <SfDropDownList TValue="UnitStatus"
                                 TItem="UnitStatusOption"
                                 DataSource="@StatusOptions"
-                                @bind-Value="unit!.Status">
+                                @bind-Value="unit.Status">
                     <DropDownListFieldSettings Value="Value" Text="Text" />
                 </SfDropDownList>
             </EditTemplate>
             <Template>
                 @{
-                    var row = context as Unit;
+                    var row = (Unit)context;
                 }
-                <UnitStatusChip Status="row!.Status" />
+                <UnitStatusChip Status="row.Status" />
             </Template>
         </GridColumn>
         <GridColumn Field="@nameof(Unit.Notes)"
                     HeaderText="Layout notes"
-                    Width="180" />
+                    Width="220">
+            <Template>
+                @{
+                    var row = (Unit)context;
+                    var notes = row.Notes ?? "";
+                    var preview = notes.Length > 40 ? notes[..40] + "…" : notes;
+                }
+                <span title="@notes">@preview</span>
+            </Template>
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <SfTextBox @bind-Value="unit.Notes"
+                               Multiline="true"
+                               Placeholder="Floor plan, storage, layout notes"
+                               Width="100%" />
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn HeaderText=""
                     Width="90"
                     AllowEditing="false"
+                    AllowAdding="false"
                     TextAlign="TextAlign.Center">
+            <EditTemplate>
+                <span></span>
+            </EditTemplate>
             <Template>
                 @{
                     var unit = context as Unit;
@@ -168,9 +264,13 @@
 
     [SupplyParameterFromQuery(Name = "status")]
     public string? StatusFilter { get; set; }
+
+    private string StatusFilterLabel =>
+        string.Equals(StatusFilter, "Empty", StringComparison.OrdinalIgnoreCase)
+            ? "Vacant or Make-Ready"
+            : StatusFilter ?? "";
     // Cap and portfolio counts must use the full set, not the status-filtered grid.
-    private int ResidentialCount => AllUnits.Count(u => !u.IsFacility);
-    private int FacilityCount => AllUnits.Count(u => u.IsFacility);
+    private int ResidentialCount => AllUnits.Count;
     private bool CanAddUnit => UnitService.MaxUnits <= 0 || ResidentialCount < UnitService.MaxUnits;
     private string Subtitle
     {
@@ -179,12 +279,10 @@
             var residential = UnitService.MaxUnits > 0
                 ? $"{ResidentialCount} of {UnitService.MaxUnits} residential"
                 : $"{ResidentialCount} residential";
-            var baseText = FacilityCount > 0
-                ? $"Town of Wiley — {residential} + {FacilityCount} facility. Edit layout inline, or Open for inventory."
-                : $"Town of Wiley — {residential} units. Edit layout inline, or Open for inventory.";
+            var baseText = $"Town of Wiley — {residential} units. Edit layout, then Update. Open for inventory.";
             if (!string.IsNullOrWhiteSpace(StatusFilter))
             {
-                return $"{baseText} Filter: {StatusFilter}.";
+                return $"{baseText} Filter: {StatusFilterLabel}.";
             }
 
             return baseText;
@@ -211,7 +309,7 @@
 
     private async Task ReloadAsync()
     {
-        AllUnits = (await UnitService.GetAllAsync()).ToList();
+        AllUnits = (await UnitService.GetResidentialAsync()).ToList();
         ApplyStatusFilter();
     }
 
@@ -224,6 +322,14 @@
         }
 
         var wanted = StatusFilter.Trim().Replace("-", "", StringComparison.Ordinal);
+        if (wanted.Equals("Empty", StringComparison.OrdinalIgnoreCase)
+            || wanted.Equals("VacantOrMakeReady", StringComparison.OrdinalIgnoreCase))
+        {
+            Units = AllUnits
+                .Where(u => u.Status is UnitStatus.Vacant or UnitStatus.MakeReady)
+                .ToList();
+            return;
+        }
         Units = AllUnits.Where(u =>
         {
             var key = u.Status.ToString().Replace("-", "", StringComparison.Ordinal);
@@ -244,6 +350,15 @@
     private async Task OnActionBeginAsync(ActionEventArgs<Unit> args)
     {
         ErrorMessage = null;
+
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && args.Data is not null)
+        {
+            args.Data.IsFacility = false;
+            if (args.Data.RowVersion == Guid.Empty)
+            {
+                args.Data.RowVersion = Guid.NewGuid();
+            }
+        }
 
         if (args.RequestType == Syncfusion.Blazor.Grids.Action.Add && !CanAddUnit)
         {
@@ -282,6 +397,11 @@
                     await UnitService.CreateAsync(args.Data);
                     break;
                 case Syncfusion.Blazor.Grids.Action.Save when args.Action == "Edit" && args.Data is not null:
+                    var existing = await UnitService.GetByIdAsync(args.Data.Id)
+                        ?? throw new InvalidOperationException("Unit not found.");
+                    args.Data.RowVersion = existing.RowVersion;
+                    args.Data.CurrentTenantId = existing.CurrentTenantId;
+                    args.Data.IsFacility = existing.IsFacility;
                     await UnitService.UpdateAsync(args.Data);
                     break;
                 case Syncfusion.Blazor.Grids.Action.Delete when args.Data is not null:

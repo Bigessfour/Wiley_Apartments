@@ -6,11 +6,14 @@
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Popups
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Components.Shared
 @inject IFacilityReservationService ReservationService
 @inject IFacilityRenterService RenterService
+@inject IFacilityRentalRateService RateService
+@inject IFacilityInventoryService InventoryService
 @inject IUnitService UnitService
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
@@ -19,7 +22,7 @@
 <PageTitle>CC Reservations</PageTitle>
 
 <PageHeader Title="Community Center reservations"
-            Subtitle="Hall bookings appear on the shared schedule when Confirmed.">
+            Subtitle="Confirmed and pending bookings appear on the schedule. Fireplace, Kitchen, and Hall can overlap; Entire Facility blocks all rooms.">
     <SfButton CssClass="e-outline e-small" Content="CC schedule"
               OnClick="GoSchedule" />
 </PageHeader>
@@ -39,25 +42,110 @@
                 <DropDownListFieldSettings Text="Label" Value="Id" />
             </SfDropDownList>
         </div>
-        <div class="col-md-3">
-            <label class="form-label">Start (local)</label>
-            <SfDateTimePicker TValue="DateTime?" @bind-Value="FormStartLocal" />
+        <div class="col-md-4">
+            <SfTooltip Content="@SpaceTooltip" OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
+                <label class="form-label cs-help-label">Space</label>
+            </SfTooltip>
+            <SfDropDownList TValue="FacilitySpace" TItem="SpaceOption" DataSource="@SpaceOptions"
+                            @bind-Value="FormSpace" Placeholder="Select room">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
         </div>
-        <div class="col-md-3">
-            <label class="form-label">End (local)</label>
-            <SfDateTimePicker TValue="DateTime?" @bind-Value="FormEndLocal" />
+        <div class="col-md-4">
+            <SfTooltip Content="@RateTooltip" OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
+                <label class="form-label cs-help-label">Rate (from Settings)</label>
+            </SfTooltip>
+            <SfDropDownList TValue="Guid?" TItem="RateOption" DataSource="@RateOptionsForSpace"
+                            @bind-Value="FormRateId" Placeholder="Select a default, then edit if needed"
+                            ShowClearButton="true">
+                <DropDownListFieldSettings Text="Label" Value="Id" />
+            </SfDropDownList>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Start date</label>
+            <SfDatePicker TValue="DateTime?"
+                          @bind-Value="FormStartDate"
+                          Format="MM/dd/yyyy"
+                          Placeholder="Event date"
+                          ShowClearButton="true"
+                          Width="100%" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Start time</label>
+            <SfTimePicker TValue="DateTime?"
+                          @bind-Value="FormStartTime"
+                          Format="h:mm tt"
+                          Step="15"
+                          Placeholder="e.g. 10:00 AM"
+                          ShowClearButton="true"
+                          Width="100%" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">End date</label>
+            <SfDatePicker TValue="DateTime?"
+                          @bind-Value="FormEndDate"
+                          Format="MM/dd/yyyy"
+                          Placeholder="End date"
+                          ShowClearButton="true"
+                          Width="100%" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">End time</label>
+            <SfTimePicker TValue="DateTime?"
+                          @bind-Value="FormEndTime"
+                          Format="h:mm tt"
+                          Step="15"
+                          Placeholder="e.g. 2:00 PM"
+                          ShowClearButton="true"
+                          Width="100%" />
         </div>
         <div class="col-md-2">
-            <label class="form-label">Fee</label>
+            <SfTooltip Content="Filled from the rate dropdown. Change the dollar amount for this booking without editing Settings."
+                       OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
+                <label class="form-label cs-help-label">Fee</label>
+            </SfTooltip>
             <SfNumericTextBox TValue="decimal?" @bind-Value="FormFee" Format="C2" Min="0" />
         </div>
         <div class="col-md-2">
             <label class="form-label">Deposit</label>
             <SfNumericTextBox TValue="decimal?" @bind-Value="FormDeposit" Format="C2" Min="0" />
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label">Notes</label>
             <SfTextBox @bind-Value="FormNotes" />
+        </div>
+        <div class="col-12">
+            <SfTooltip Content="@EquipmentTooltip" OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
+                <label class="form-label cs-help-label">Equipment needed</label>
+            </SfTooltip>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <SfDropDownList TValue="Guid?" TItem="InventoryOption" DataSource="@InventoryOptions"
+                                    @bind-Value="FormEquipmentItemId" Placeholder="Choose from CC inventory"
+                                    AllowFiltering="true" ShowClearButton="true">
+                        <DropDownListFieldSettings Text="Label" Value="Id" />
+                    </SfDropDownList>
+                </div>
+                <div class="col-md-2">
+                    <SfNumericTextBox TValue="int" @bind-Value="FormEquipmentQty" Min="1" Format="n0" />
+                </div>
+                <div class="col-md-2">
+                    <SfButton CssClass="e-outline e-small" Content="Add equipment" OnClick="AddEquipment" />
+                </div>
+            </div>
+            @if (EquipmentLines.Count > 0)
+            {
+                <ul class="mt-2 mb-0 small">
+                    @foreach (var line in EquipmentLines)
+                    {
+                        <li>
+                            @line.Quantity × @line.Name
+                            <SfButton CssClass="e-small e-link" Content="Remove"
+                                      OnClick="@(() => RemoveEquipment(line.InventoryItemId))" />
+                        </li>
+                    }
+                </ul>
+            }
         </div>
         <div class="col-12">
             <SfButton CssClass="e-primary e-small" Content="Save as Draft" Disabled="@Busy" OnClick="@(() => SaveAsync(FacilityReservationStatus.Draft))" />
@@ -69,8 +157,10 @@
 <SfGrid TValue="Row" DataSource="@Rows" AllowPaging="true" AllowSorting="true" Height="360">
     <GridColumns>
         <GridColumn Field="@nameof(Row.RenterName)" HeaderText="Renter" Width="160" />
+        <GridColumn Field="@nameof(Row.Space)" HeaderText="Space" Width="140" />
         <GridColumn Field="@nameof(Row.StartDisplay)" HeaderText="Start" Width="140" />
         <GridColumn Field="@nameof(Row.EndDisplay)" HeaderText="End" Width="140" />
+        <GridColumn Field="@nameof(Row.Equipment)" HeaderText="Equipment" Width="180" />
         <GridColumn Field="@nameof(Row.Status)" HeaderText="Status" Width="100" />
         <GridColumn Field="@nameof(Row.Fee)" HeaderText="Fee" Format="C2" Width="90" />
         <GridColumn Field="@nameof(Row.Deposit)" HeaderText="Deposit" Format="C2" Width="90" />
@@ -87,19 +177,102 @@
 </SfGrid>
 
 @code {
+    private const string SpaceTooltip =
+        "Fireplace Room, Kitchen, and Hall can be booked at the same time. Entire Facility is a package and blocks every room.";
+    private const string RateTooltip =
+        "Default fee and deposit come from Settings → Community Center rates. Pick a rate, then change the Fee/Deposit boxes for this booking only.";
+    private const string EquipmentTooltip =
+        "Items come from Community Center → Inventory. Example: Banquet tables, quantity 5.";
+
     [SupplyParameterFromQuery(Name = "renterId")] public Guid? QueryRenterId { get; set; }
 
     private List<Row> Rows { get; set; } = [];
     private List<RenterOption> RenterOptions { get; set; } = [];
+    private List<FacilityRentalRate> AllRates { get; set; } = [];
+    private List<InventoryOption> InventoryOptions { get; set; } = [];
+    private List<EquipmentLine> EquipmentLines { get; set; } = [];
     private Guid? FacilityUnitId { get; set; }
     private Guid? FormRenterId { get; set; }
-    private DateTime? FormStartLocal { get; set; }
-    private DateTime? FormEndLocal { get; set; }
+    private FacilitySpace _formSpace = FacilitySpace.MainHall;
+    private FacilitySpace FormSpace
+    {
+        get => _formSpace;
+        set
+        {
+            _formSpace = value;
+            ApplyRateForSpace();
+        }
+    }
+    private Guid? _formRateId;
+    private Guid? FormRateId
+    {
+        get => _formRateId;
+        set
+        {
+            _formRateId = value;
+            var rate = AllRates.FirstOrDefault(r => r.Id == value);
+            if (rate is not null)
+            {
+                FormFee = rate.Fee;
+                FormDeposit = rate.Deposit;
+            }
+        }
+    }
+    private DateTime? _formStartDate;
+    private DateTime? _formStartTime;
+    private DateTime? FormStartDate
+    {
+        get => _formStartDate;
+        set
+        {
+            _formStartDate = value;
+            if (_formStartDate is DateTime startDate
+                && (FormEndDate is null || FormEndDate.Value.Date < startDate.Date))
+            {
+                FormEndDate = startDate.Date;
+            }
+        }
+    }
+    private DateTime? FormStartTime
+    {
+        get => _formStartTime;
+        set
+        {
+            _formStartTime = value;
+            if (_formStartTime is DateTime startTime && FormEndTime is null)
+            {
+                var suggestedEnd = DateTime.Today.Add(startTime.TimeOfDay).AddHours(4);
+                FormEndTime = DateTime.Today.Add(suggestedEnd.TimeOfDay);
+                if (suggestedEnd.Date > DateTime.Today && FormStartDate is DateTime startDate)
+                {
+                    FormEndDate = startDate.Date.AddDays(1);
+                }
+            }
+        }
+    }
+    private DateTime? FormEndDate { get; set; }
+    private DateTime? FormEndTime { get; set; }
     private decimal? FormFee { get; set; } = 150m;
     private decimal? FormDeposit { get; set; } = 100m;
     private string? FormNotes { get; set; }
+    private Guid? FormEquipmentItemId { get; set; }
+    private int FormEquipmentQty { get; set; } = 1;
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
+
+    private static readonly List<SpaceOption> SpaceOptions =
+    [
+        new(FacilitySpace.FireplaceRoom, FacilitySpaceInfo.DisplayName(FacilitySpace.FireplaceRoom)),
+        new(FacilitySpace.Kitchen, FacilitySpaceInfo.DisplayName(FacilitySpace.Kitchen)),
+        new(FacilitySpace.MainHall, FacilitySpaceInfo.DisplayName(FacilitySpace.MainHall)),
+        new(FacilitySpace.WholeBuilding, FacilitySpaceInfo.DisplayName(FacilitySpace.WholeBuilding))
+    ];
+
+    private List<RateOption> RateOptionsForSpace =>
+        AllRates
+            .Where(r => r.Space == FormSpace)
+            .Select(r => new RateOption(r.Id, $"{r.Name} — {r.Fee:C} / {r.Deposit:C} dep."))
+            .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -109,10 +282,59 @@
         RenterOptions = renters
             .Select(r => new RenterOption(r.Id, $"{r.LastName}, {r.FirstName}"))
             .ToList();
+        AllRates = (await RateService.ListAsync()).ToList();
+        if (FacilityUnitId is Guid uid)
+        {
+            InventoryOptions = (await InventoryService.ListAsync(uid, includeZeroQuantity: false))
+                .Select(i => new InventoryOption(i.Id, $"{i.Name} ({i.Quantity} on hand)"))
+                .ToList();
+        }
 
         FormRenterId = QueryRenterId;
+        ApplyRateForSpace();
         await LoadAsync();
     }
+
+    private void ApplyRateForSpace()
+    {
+        var match = AllRates.FirstOrDefault(r => r.Space == FormSpace);
+        if (match is not null)
+        {
+            FormRateId = match.Id;
+        }
+    }
+
+    private void AddEquipment()
+    {
+        if (FormEquipmentItemId is not Guid itemId || FormEquipmentQty < 1)
+        {
+            ErrorMessage = "Choose an inventory item and a quantity of 1 or more.";
+            return;
+        }
+
+        var name = InventoryOptions.FirstOrDefault(i => i.Id == itemId)?.Label ?? "Item";
+        var existing = EquipmentLines.FirstOrDefault(l => l.InventoryItemId == itemId);
+        if (existing is not null)
+        {
+            existing.Quantity += FormEquipmentQty;
+        }
+        else
+        {
+            EquipmentLines.Add(new EquipmentLine
+            {
+                InventoryItemId = itemId,
+                Name = name.Split('(')[0].Trim(),
+                Quantity = FormEquipmentQty
+            });
+        }
+
+        FormEquipmentItemId = null;
+        FormEquipmentQty = 1;
+        ErrorMessage = null;
+    }
+
+    private void RemoveEquipment(Guid inventoryItemId) =>
+        EquipmentLines.RemoveAll(l => l.InventoryItemId == inventoryItemId);
 
     private async Task LoadAsync()
     {
@@ -125,8 +347,13 @@
                 RenterName = r.FacilityRenter is null
                     ? ""
                     : $"{r.FacilityRenter.LastName}, {r.FacilityRenter.FirstName}",
+                Space = FacilitySpaceInfo.DisplayName(r.Space),
                 StartDisplay = Clock.ToDisplayTime(r.StartUtc).ToString("g"),
                 EndDisplay = Clock.ToDisplayTime(r.EndUtc).ToString("g"),
+                Equipment = r.Equipment.Count == 0
+                    ? ""
+                    : string.Join(", ", r.Equipment.Select(e =>
+                        $"{e.Quantity} × {e.InventoryItem?.Name ?? "item"}")),
                 Status = r.Status.ToString(),
                 Fee = r.RentalFee,
                 Deposit = r.DepositAmount
@@ -144,12 +371,20 @@
 
     private async Task SaveAsync(FacilityReservationStatus status)
     {
-        if (FacilityUnitId is null || FormRenterId is null || FormStartLocal is null || FormEndLocal is null
+        if (FacilityUnitId is null || FormRenterId is null
+            || CombineLocal(FormStartDate, FormStartTime) is not DateTime startLocal
+            || CombineLocal(FormEndDate ?? FormStartDate, FormEndTime) is not DateTime endLocal
             || FormFee is null || FormDeposit is null)
         {
             Logger.LogWarning(
                 "FacilityReservationList save blocked: missing required fields status={Status}.", status);
-            ErrorMessage = "Renter, start, end, fee, and deposit are required.";
+            ErrorMessage = "Renter, start date, start time, end date, end time, fee, and deposit are required.";
+            return;
+        }
+
+        if (endLocal <= startLocal)
+        {
+            ErrorMessage = "End date and time must be after the start.";
             return;
         }
 
@@ -157,25 +392,32 @@
         ErrorMessage = null;
         try
         {
-            var startUtc = Clock.ToUtc(FormStartLocal.Value);
-            var endUtc = Clock.ToUtc(FormEndLocal.Value);
+            var startUtc = Clock.ToUtc(startLocal);
+            var endUtc = Clock.ToUtc(endLocal);
             Logger.LogInformation(
-                "FacilityReservationList creating reservation renter={RenterId} unit={UnitId} status={Status} start={Start} end={End}.",
-                FormRenterId, FacilityUnitId, status, startUtc, endUtc);
+                "FacilityReservationList creating reservation renter={RenterId} unit={UnitId} status={Status} space={Space} start={Start} end={End}.",
+                FormRenterId, FacilityUnitId, status, FormSpace, startUtc, endUtc);
             var created = await ReservationService.CreateAsync(new FacilityReservation
             {
                 UnitId = FacilityUnitId.Value,
                 FacilityRenterId = FormRenterId.Value,
                 StartUtc = startUtc,
                 EndUtc = endUtc,
+                Space = FormSpace,
                 Status = status,
                 RentalFee = FormFee.Value,
                 DepositAmount = FormDeposit.Value,
-                Notes = FormNotes
+                Notes = FormNotes,
+                Equipment = EquipmentLines.Select(l => new FacilityReservationEquipment
+                {
+                    InventoryItemId = l.InventoryItemId,
+                    Quantity = l.Quantity
+                }).ToList()
             });
             Logger.LogInformation(
                 "FacilityReservationList created reservation {ReservationId} status={Status}.",
                 created.Id, created.Status);
+            EquipmentLines.Clear();
             await LoadAsync();
         }
         catch (Exception ex)
@@ -188,6 +430,16 @@
         {
             Busy = false;
         }
+    }
+
+    private static DateTime? CombineLocal(DateTime? date, DateTime? time)
+    {
+        if (date is null || time is null)
+        {
+            return null;
+        }
+
+        return DateTime.SpecifyKind(date.Value.Date.Add(time.Value.TimeOfDay), DateTimeKind.Unspecified);
     }
 
     private void GoSchedule()
@@ -207,12 +459,24 @@
     {
         public Guid Id { get; set; }
         public string RenterName { get; set; } = "";
+        public string Space { get; set; } = "";
         public string StartDisplay { get; set; } = "";
         public string EndDisplay { get; set; } = "";
+        public string Equipment { get; set; } = "";
         public string Status { get; set; } = "";
         public decimal Fee { get; set; }
         public decimal Deposit { get; set; }
     }
 
     private sealed record RenterOption(Guid Id, string Label);
+    private sealed record SpaceOption(FacilitySpace Value, string Text);
+    private sealed record RateOption(Guid Id, string Label);
+    private sealed record InventoryOption(Guid Id, string Label);
+
+    private sealed class EquipmentLine
+    {
+        public Guid InventoryItemId { get; set; }
+        public string Name { get; set; } = "";
+        public int Quantity { get; set; }
+    }
 }

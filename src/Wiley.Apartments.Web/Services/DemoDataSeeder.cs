@@ -443,20 +443,21 @@ public sealed class DemoDataSeeder(
         cc.Notes = $"{DemoTag} Community Center facility — event rentals. Demo renters attached.";
         ConcurrencyHelper.BumpRowVersion(cc);
 
-        var renterSpecs = new (string First, string Last, string Phone, string Email, int DaysAgo, int DurationDays, decimal Fee, decimal Dep)[]
+        var renterSpecs = new (string First, string Last, string Phone, string Email, int DaysAgo, int DurationDays, decimal Fee, decimal Dep, FacilitySpace Space)[]
         {
-            ("Morgan", "Ellis", "(719) 555-0201", "morgan.ellis@wiley-demo.local", 60, 1, 150m, 100m),
-            ("Taylor", "Brooks", "(719) 555-0202", "taylor.brooks@wiley-demo.local", 35, 2, 275m, 150m),
-            ("Riley", "Santos", "(719) 555-0203", "riley.santos@wiley-demo.local", 12, 1, 150m, 100m),
-            ("Quinn", "Patel", "(719) 555-0204", "quinn.patel@wiley-demo.local", 5, 3, 400m, 200m),
-            ("Avery", "Kim", "(719) 555-0205", "avery.kim@wiley-demo.local", -10, 1, 150m, 100m) // upcoming
+            ("Morgan", "Ellis", "(719) 555-0201", "morgan.ellis@wiley-demo.local", 60, 1, 150m, 100m, FacilitySpace.MainHall),
+            ("Taylor", "Brooks", "(719) 555-0202", "taylor.brooks@wiley-demo.local", 35, 2, 275m, 150m, FacilitySpace.WholeBuilding),
+            ("Riley", "Santos", "(719) 555-0203", "riley.santos@wiley-demo.local", 12, 1, 75m, 75m, FacilitySpace.Kitchen),
+            ("Quinn", "Patel", "(719) 555-0204", "quinn.patel@wiley-demo.local", 5, 3, 250m, 150m, FacilitySpace.WholeBuilding),
+            ("Avery", "Kim", "(719) 555-0205", "avery.kim@wiley-demo.local", -10, 1, 50m, 50m, FacilitySpace.FireplaceRoom) // upcoming
         };
 
         var ccRenterCount = 0;
         var schedCount = 2; // already added residential
         var maintCount = 2;
+        var seededReservations = new List<FacilityReservation>();
 
-        foreach (var (First, Last, Phone, Email, DaysAgo, DurationDays, Fee, Dep) in renterSpecs)
+        foreach (var (First, Last, Phone, Email, DaysAgo, DurationDays, Fee, Dep, Space) in renterSpecs)
         {
             var renter = new FacilityRenter
             {
@@ -489,6 +490,7 @@ public sealed class DemoDataSeeder(
                 FacilityRenterId = renter.Id,
                 StartUtc = start,
                 EndUtc = end,
+                Space = Space,
                 Status = status,
                 RentalFee = Fee,
                 DepositAmount = Dep,
@@ -497,6 +499,7 @@ public sealed class DemoDataSeeder(
                 RowVersion = Guid.NewGuid()
             };
             _db.FacilityReservations.Add(reservation);
+            seededReservations.Add(reservation);
 
             _db.LedgerEntries.Add(new LedgerEntry
             {
@@ -546,7 +549,7 @@ public sealed class DemoDataSeeder(
                 _db.ScheduledItems.Add(new ScheduledItem
                 {
                     Id = calId,
-                    Title = $"CC rental — {First} {Last}",
+                    Title = $"{FacilitySpaceInfo.DisplayName(Space)} — {First} {Last}",
                     Category = ScheduledItemCategory.FacilityRental,
                     UnitId = cc.Id,
                     FacilityReservationId = reservation.Id,
@@ -645,6 +648,28 @@ public sealed class DemoDataSeeder(
                 Name = "Ceiling fans", Quantity = 6, Condition = "Good", Location = "Hall",
                 Notes = DemoTag, RowVersion = Guid.NewGuid()
             });
+
+        var banquetTables = _db.FacilityInventoryItems.Local.First(i => i.Name == "Banquet tables");
+        var foldingChairs = _db.FacilityInventoryItems.Local.First(i => i.Name == "Folding chairs");
+        foreach (var reservation in seededReservations.Where(r =>
+                     r.Space is FacilitySpace.MainHall or FacilitySpace.WholeBuilding))
+        {
+            _db.FacilityReservationEquipment.AddRange(
+                new FacilityReservationEquipment
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityReservationId = reservation.Id,
+                    InventoryItemId = banquetTables.Id,
+                    Quantity = 5
+                },
+                new FacilityReservationEquipment
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityReservationId = reservation.Id,
+                    InventoryItemId = foldingChairs.Id,
+                    Quantity = 20
+                });
+        }
 
         // CC maintenance + ops
         _db.MaintenanceRequests.Add(new MaintenanceRequest
@@ -901,6 +926,8 @@ public sealed class DemoDataSeeder(
                 .ToListAsync(cancellationToken);
             _db.FacilityInspections.RemoveRange(
                 _db.FacilityInspections.Where(i => reservationIds.Contains(i.FacilityReservationId)));
+            _db.FacilityReservationEquipment.RemoveRange(
+                _db.FacilityReservationEquipment.Where(e => reservationIds.Contains(e.FacilityReservationId)));
             _db.LedgerEntries.RemoveRange(_db.LedgerEntries.Where(e =>
                 e.FacilityRenterId != null && demoFacilityRenterIds.Contains(e.FacilityRenterId.Value)));
             _db.ScheduledItems.RemoveRange(_db.ScheduledItems.Where(s =>

@@ -84,6 +84,116 @@ public class FacilityReservationServiceTests
             .WithMessage("*overlaps*");
     }
 
+    [Fact]
+    public async Task Confirm_AllowsKitchenAndHallAtTheSameTime()
+    {
+        await using var db = CreateDb();
+        var (unit, renter, service, start, end) = await SeedCcAsync(db);
+
+        await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.Kitchen,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 75,
+            DepositAmount = 75
+        });
+
+        var hall = await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.MainHall,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 150,
+            DepositAmount = 100
+        });
+
+        hall.Space.Should().Be(FacilitySpace.MainHall);
+        (await db.ScheduledItems.CountAsync(s =>
+            s.FacilityReservationId != null && !s.IsDeleted)).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Confirm_RejectsKitchenWhenWholeBuildingIsBooked()
+    {
+        await using var db = CreateDb();
+        var (unit, renter, service, start, end) = await SeedCcAsync(db);
+
+        await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.WholeBuilding,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 250,
+            DepositAmount = 150
+        });
+
+        var act = async () => await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.Kitchen,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 75,
+            DepositAmount = 75
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*overlaps*");
+    }
+
+    [Fact]
+    public void CalendarLabel_UsesHallAndEntireFacility()
+    {
+        FacilitySpaceInfo.CalendarLabel(FacilitySpace.MainHall).Should().Be("Hall");
+        FacilitySpaceInfo.CalendarLabel(FacilitySpace.WholeBuilding).Should().Be("Entire Facility");
+        FacilitySpaceInfo.DisplayName(FacilitySpace.WholeBuilding).Should().Be("Entire Facility");
+        FacilitySpaceInfo.Conflicts(FacilitySpace.Kitchen, FacilitySpace.MainHall).Should().BeFalse();
+        FacilitySpaceInfo.Conflicts(FacilitySpace.Kitchen, FacilitySpace.Kitchen).Should().BeTrue();
+        FacilitySpaceInfo.Conflicts(FacilitySpace.WholeBuilding, FacilitySpace.FireplaceRoom).Should().BeTrue();
+    }
+
+    private static async Task<(Unit unit, FacilityRenter renter, FacilityReservationService service, DateTime start, DateTime end)>
+        SeedCcAsync(ApartmentsDbContext db)
+    {
+        var unit = new Unit
+        {
+            Id = Guid.NewGuid(),
+            Number = "CC",
+            IsFacility = true,
+            Status = UnitStatus.Vacant,
+            RowVersion = Guid.NewGuid()
+        };
+        var renter = new FacilityRenter
+        {
+            Id = Guid.NewGuid(),
+            FirstName = "A",
+            LastName = "B",
+            Phone = "1",
+            Email = "a@b.c",
+            MailingAddress = "1 Main",
+            RowVersion = Guid.NewGuid()
+        };
+        db.Units.Add(unit);
+        db.FacilityRenters.Add(renter);
+        await db.SaveChangesAsync();
+        var service = new FacilityReservationService(db, new FixedClock(), NullLogger<FacilityReservationService>.Instance);
+        var start = DateTime.UtcNow.Date.AddDays(1);
+        var end = start.AddHours(4);
+        return (unit, renter, service, start, end);
+    }
+
     [Theory]
     [InlineData(FacilityReservationStatus.Completed, FacilityReservationStatus.Confirmed)]
     [InlineData(FacilityReservationStatus.Cancelled, FacilityReservationStatus.Confirmed)]
@@ -170,12 +280,19 @@ public class FacilityRentalAgreementGeneratorTests
             "a@b.c",
             "2026-08-01 10:00",
             "2026-08-01 14:00",
+            "Main Space (Hall)",
+            "5 x Banquet tables",
             "$150.00",
             "$100.00",
             "No alcohol",
             "2026-08-11 12:00"));
         bytes.Should().NotBeEmpty();
         bytes.Length.Should().BeGreaterThan(100);
+        System.Text.Encoding.ASCII.GetString(bytes, 0, 4).Should().Be("%PDF");
+        var text = System.Text.Encoding.Latin1.GetString(bytes);
+        text.Should().Contain("Community Center Rental Agreement");
+        text.Should().Contain("Morgan Ellis");
+        text.Should().Contain("No alcohol");
     }
 }
 

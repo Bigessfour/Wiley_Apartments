@@ -143,7 +143,7 @@
                         <strong>Something went wrong on this page.</strong>
                         <p class="mb-2 mt-2 small">@ex.GetType().Name: @ex.Message</p>
                         <p class="mb-2 small text-muted">
-                            Details were written to <code>src/Wiley.Apartments.Web/logs/clerksuite-*.log</code>.
+                            The error was logged. Dismiss and retry, or note this page if it keeps happening.
                         </p>
                         <SfButton CssClass="e-outline e-small" Content="Dismiss and retry" OnClick="RecoverAsync" />
                     </div>
@@ -207,9 +207,16 @@
             return;
         }
 
-        IsDarkMode = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
-        _themeLoaded = true;
-        StateHasChanged();
+        try
+        {
+            IsDarkMode = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+            _themeLoaded = true;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Theme helper optional if JS has not loaded yet.
+        }
     }
 
     private async Task OnThemeChangedAsync(Syncfusion.Blazor.Buttons.ChangeEventArgs<bool> args)

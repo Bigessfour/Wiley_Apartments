@@ -20,6 +20,7 @@ appsettings.Development.json
 appsettings.Local.json
 **/Data/*.db
 **/Data/*.db-*
+**/Data/dpkeys/
 logs/
 
 # OS

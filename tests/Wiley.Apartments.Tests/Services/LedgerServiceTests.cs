@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Domain;
 using Wiley.Apartments.Web.Configuration;
 using Wiley.Apartments.Web.Data;
@@ -43,6 +44,21 @@ public class LedgerServiceTests
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
         return (unit, tenant);
+    }
+
+    private static async Task SeedOpenOccupancyAsync(ApartmentsDbContext db, Unit unit, Tenant tenant)
+    {
+        unit.CurrentTenantId = tenant.Id;
+        unit.Status = UnitStatus.Occupied;
+        db.Occupancies.Add(new Occupancy
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            TenantId = tenant.Id,
+            StartUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            EndUtc = null
+        });
+        await db.SaveChangesAsync();
     }
 
     [Fact]
@@ -105,6 +121,7 @@ public class LedgerServiceTests
         await using (db)
         {
             var (unit, tenant) = await SeedAsync(db);
+            await SeedOpenOccupancyAsync(db, unit, tenant);
             await lateFees.UpdateAsync(enabled: true, amount: 25m, graceDays: 5);
             await service.PostChargeAsync(
                 tenant.Id, unit.Id, 650m, clock.UtcNow.AddDays(-10), notes: "Rent");
@@ -284,6 +301,66 @@ public class LedgerServiceTests
 
             (await service.ApplyLateFeesAsync(clock.UtcNow)).Should().Be(0);
             (await service.GetBalanceAsync(tenant.Id, unit.Id)).Should().Be(900m);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyLateFeesAsync_SkipsFormerOccupants()
+    {
+        var (db, service, lateFees, clock) = Create();
+        await using (db)
+        {
+            var (unit, former) = await SeedAsync(db);
+            db.Occupancies.Add(new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                TenantId = former.Id,
+                StartUtc = clock.UtcNow.AddYears(-2),
+                EndUtc = clock.UtcNow.AddMonths(-6)
+            });
+            await db.SaveChangesAsync();
+            await lateFees.UpdateAsync(enabled: true, amount: 25m, graceDays: 5);
+            await service.PostChargeAsync(
+                former.Id, unit.Id, 650m, clock.UtcNow.AddDays(-10), notes: "Old rent");
+
+            (await service.ApplyLateFeesAsync(clock.UtcNow)).Should().Be(0);
+            (await service.GetBalanceAsync(former.Id, unit.Id)).Should().Be(650m);
+        }
+    }
+
+    [Fact]
+    public async Task GetLedgerAsync_CurrentFilter_HidesFormerTenantLines()
+    {
+        var (db, service, _, clock) = Create();
+        await using (db)
+        {
+            var (unit, current) = await SeedAsync(db);
+            await SeedOpenOccupancyAsync(db, unit, current);
+            var former = new Tenant { Id = Guid.NewGuid(), FirstName = "Pat", LastName = "Gone" };
+            db.Tenants.Add(former);
+            db.Occupancies.Add(new Occupancy
+            {
+                Id = Guid.NewGuid(),
+                UnitId = unit.Id,
+                TenantId = former.Id,
+                StartUtc = clock.UtcNow.AddYears(-2),
+                EndUtc = clock.UtcNow.AddMonths(-6)
+            });
+            await db.SaveChangesAsync();
+
+            await service.PostChargeAsync(current.Id, unit.Id, 100m, clock.UtcNow, notes: "Current");
+            await service.PostChargeAsync(former.Id, unit.Id, 5000m, clock.UtcNow.AddYears(-1), notes: "Former");
+
+            var currentLines = await service.GetLedgerAsync(occupancy: OccupancyFilter.Current);
+            currentLines.Should().ContainSingle(l => l.Entry.TenantId == current.Id);
+            currentLines.Should().NotContain(l => l.Entry.TenantId == former.Id);
+
+            var formerLines = await service.GetLedgerAsync(occupancy: OccupancyFilter.Former);
+            formerLines.Should().ContainSingle(l => l.Entry.TenantId == former.Id);
+
+            var named = await service.GetLedgerAsync(former.Id, unit.Id, OccupancyFilter.Current);
+            named.Should().ContainSingle(l => l.Entry.Amount == 5000m);
         }
     }
 }

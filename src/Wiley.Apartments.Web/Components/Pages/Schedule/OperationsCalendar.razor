@@ -2,9 +2,11 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Calendars
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Schedule
+@using Syncfusion.Blazor.Popups
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @inject IScheduleService ScheduleService
@@ -42,6 +44,7 @@
             @bind-SelectedDate="SelectedDate"
             AllowDragAndDrop="true"
             AllowResizing="true"
+            AllowOverlap="true"
             ShowQuickInfo="true">
     <ScheduleEvents TValue="ScheduleAppointment"
                     OnActionBegin="OnActionBegin"
@@ -63,6 +66,10 @@
                 <tr>
                     <td class="e-textlabel">Category</td>
                     <td colspan="4">
+                        <SfTooltip Content="Community Center rooms, default rates, and double-booking are on Community Center → Reservations. Edit rate catalog in Settings → Community Center rates."
+                                   OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
+                            <span class="cs-help-label">Category</span>
+                        </SfTooltip>
                         <SfDropDownList TValue="string" TItem="CategoryOption"
                                         DataSource="@CategoryOptions"
                                         @bind-Value="appt.Category">
@@ -84,15 +91,45 @@
                     </td>
                 </tr>
                 <tr>
-                    <td class="e-textlabel">From</td>
+                    <td class="e-textlabel">From date</td>
                     <td colspan="4">
-                        <SfDateTimePicker TValue="DateTime" @bind-Value="appt.StartTime" />
+                        <SfDatePicker TValue="DateTime"
+                                      @bind-Value="appt.StartDate"
+                                      Format="MM/dd/yyyy"
+                                      Placeholder="Start date"
+                                      Width="100%" />
                     </td>
                 </tr>
                 <tr>
-                    <td class="e-textlabel">To</td>
+                    <td class="e-textlabel">From time</td>
                     <td colspan="4">
-                        <SfDateTimePicker TValue="DateTime?" @bind-Value="appt.EndTimeNullable" />
+                        <SfTimePicker TValue="DateTime"
+                                      @bind-Value="appt.StartTimeOfDay"
+                                      Format="h:mm tt"
+                                      Step="15"
+                                      Placeholder="Start time"
+                                      Width="100%" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">To date</td>
+                    <td colspan="4">
+                        <SfDatePicker TValue="DateTime"
+                                      @bind-Value="appt.EndDate"
+                                      Format="MM/dd/yyyy"
+                                      Placeholder="End date"
+                                      Width="100%" />
+                    </td>
+                </tr>
+                <tr>
+                    <td class="e-textlabel">To time</td>
+                    <td colspan="4">
+                        <SfTimePicker TValue="DateTime"
+                                      @bind-Value="appt.EndTimeOfDay"
+                                      Format="h:mm tt"
+                                      Step="15"
+                                      Placeholder="End time"
+                                      Width="100%" />
                     </td>
                 </tr>
                 <tr>
@@ -105,7 +142,27 @@
             </table>
         </EditorTemplate>
     </ScheduleTemplates>
-    <ScheduleEventSettings DataSource="@DataSource" />
+    <ScheduleEventSettings DataSource="@DataSource">
+        <Template>
+            @{
+                var appt = context as ScheduleAppointment;
+            }
+            @if (appt is not null && !string.IsNullOrWhiteSpace(appt.RoomLabel))
+            {
+                <div class="cs-sched-appt">
+                    <div class="cs-sched-room">@appt.RoomLabel</div>
+                    @if (!string.IsNullOrWhiteSpace(appt.RenterLabel))
+                    {
+                        <div class="cs-sched-who">@appt.RenterLabel</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="cs-sched-appt">@(appt?.Subject)</div>
+            }
+        </Template>
+    </ScheduleEventSettings>
     <ScheduleViews>
         <ScheduleView Option="View.Day" />
         <ScheduleView Option="View.Week" />
@@ -130,7 +187,7 @@
     private string HeaderSubtitle =>
         FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel)
             ? $"Showing items for {FilterUnitLabel}. Cleaning, vacancy, inspection, and other unit work. Drag to reschedule."
-            : "Cleaning, vacancy, inspection, and other unit work. Drag to reschedule. Upcoming reminders appear on the dashboard.";
+            : "Cleaning, vacancy, inspection, and CC room rentals. Same-time Kitchen + Hall is allowed. Drag unit work to reschedule; change CC rentals on Reservations.";
 
     private static readonly List<CategoryOption> CategoryOptions =
     [
@@ -247,6 +304,15 @@
 
     private void OnActionBegin(Syncfusion.Blazor.Schedule.ActionEventArgs<ScheduleAppointment> args)
     {
+        if (args.ActionType is Syncfusion.Blazor.Schedule.ActionType.EventRemove
+            && args.DeletedRecords?.Any(a =>
+                ParseCategory(a.Category) == ScheduledItemCategory.FacilityRental) == true)
+        {
+            args.Cancel = true;
+            ErrorMessage = "Cancel Community Center rentals on Community Center → Reservations.";
+            return;
+        }
+
         if (args.ActionType is Syncfusion.Blazor.Schedule.ActionType.EventCreate
             or Syncfusion.Blazor.Schedule.ActionType.EventChange)
         {
@@ -255,6 +321,13 @@
                 ?? [];
             foreach (var appt in records)
             {
+                if (ParseCategory(appt.Category) == ScheduledItemCategory.FacilityRental)
+                {
+                    args.Cancel = true;
+                    ErrorMessage = "Change Community Center rentals on Community Center → Reservations so rooms, fees, and overlap stay in sync.";
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(appt.Subject))
                 {
                     args.Cancel = true;
@@ -330,6 +403,12 @@
             {
                 foreach (var appt in args.DeletedRecords.Where(a => a.ItemId != Guid.Empty))
                 {
+                    if (ParseCategory(appt.Category) == ScheduledItemCategory.FacilityRental)
+                    {
+                        ErrorMessage = "Cancel Community Center rentals on Community Center → Reservations.";
+                        continue;
+                    }
+
                     await ScheduleService.SoftDeleteAsync(appt.ItemId);
                 }
 
@@ -364,17 +443,21 @@
                 ScheduledItemCategory.Cleaning => "cs-sched-cleaning",
                 ScheduledItemCategory.Vacancy => "cs-sched-vacancy",
                 ScheduledItemCategory.Inspection => "cs-sched-inspection",
-                ScheduledItemCategory.FacilityRental => "cs-sched-facility-rental",
+                ScheduledItemCategory.FacilityRental => string.IsNullOrEmpty(args.Data.SpaceCss)
+                    ? "cs-sched-facility-rental"
+                    : args.Data.SpaceCss,
                 _ => "cs-sched-other"
             };
 
-            if (args.CssClasses is null)
-            {
-                args.CssClasses = [css];
-            }
-            else if (!args.CssClasses.Contains(css))
+            args.CssClasses ??= [];
+            if (!args.CssClasses.Contains(css))
             {
                 args.CssClasses.Add(css);
+            }
+            if (!string.IsNullOrEmpty(args.Data.SpaceCss)
+                && !args.CssClasses.Contains("cs-sched-facility-rental"))
+            {
+                args.CssClasses.Add("cs-sched-facility-rental");
             }
         }
         catch
@@ -385,22 +468,44 @@
 
     private ScheduleAppointment ToAppointment(ScheduledItem item, int localId)
     {
-        var start = Clock.ToDisplayTime(item.StartUtc);
-        var end = item.EndUtc is DateTime e
+        var reservation = item.FacilityReservation;
+        var startUtc = reservation?.StartUtc ?? item.StartUtc;
+        var endUtc = reservation?.EndUtc ?? item.EndUtc;
+        var start = Clock.ToDisplayTime(startUtc);
+        var end = endUtc is DateTime e
             ? Clock.ToDisplayTime(e)
             : start.AddHours(1);
         var unitLabel = item.Unit is null ? null : $"Unit {item.Unit.Number}";
+        var isCc = item.Category == ScheduledItemCategory.FacilityRental;
+        var roomLabel = reservation is null ? null : FacilitySpaceInfo.CalendarLabel(reservation.Space);
+        var renter = reservation?.FacilityRenter;
+        var renterLabel = renter is null
+            ? null
+            : $"{renter.FirstName} {renter.LastName}".Trim();
+        if (isCc && string.IsNullOrWhiteSpace(renterLabel))
+        {
+            renterLabel = item.Title;
+        }
+
+        var subject = isCc && !string.IsNullOrWhiteSpace(roomLabel)
+            ? string.IsNullOrWhiteSpace(renterLabel) ? roomLabel : $"{roomLabel} — {renterLabel}"
+            : item.Title;
+
         return new ScheduleAppointment
         {
             Id = localId,
             ItemId = item.Id,
-            Subject = item.Title,
+            Subject = subject,
             StartTime = start,
             EndTime = end,
             Description = item.Notes,
             Category = item.Category.ToString(),
             UnitId = item.UnitId,
-            Location = unitLabel,
+            Location = isCc ? roomLabel ?? "Community Center" : unitLabel,
+            RoomLabel = roomLabel,
+            RenterLabel = renterLabel,
+            SpaceCss = reservation is null ? null : FacilitySpaceInfo.CalendarCss(reservation.Space),
+            IsReadonly = isCc,
             IsAllDay = false
         };
     }
@@ -423,6 +528,26 @@
         public string Subject { get; set; } = string.Empty;
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
+        public DateTime StartDate
+        {
+            get => StartTime.Date;
+            set => StartTime = value.Date.Add(StartTime.TimeOfDay);
+        }
+        public DateTime StartTimeOfDay
+        {
+            get => DateTime.Today.Add(StartTime.TimeOfDay);
+            set => StartTime = StartTime.Date.Add(value.TimeOfDay);
+        }
+        public DateTime EndDate
+        {
+            get => EndTime.Date;
+            set => EndTime = value.Date.Add(EndTime.TimeOfDay);
+        }
+        public DateTime EndTimeOfDay
+        {
+            get => DateTime.Today.Add(EndTime.TimeOfDay);
+            set => EndTime = EndTime.Date.Add(value.TimeOfDay);
+        }
         public DateTime? EndTimeNullable
         {
             get => EndTime;
@@ -438,6 +563,10 @@
         public string Category { get; set; } = nameof(ScheduledItemCategory.Other);
         public Guid? UnitId { get; set; }
         public string? Location { get; set; }
+        public string? RoomLabel { get; set; }
+        public string? RenterLabel { get; set; }
+        public string? SpaceCss { get; set; }
+        public bool IsReadonly { get; set; }
         public bool IsAllDay { get; set; }
     }
 

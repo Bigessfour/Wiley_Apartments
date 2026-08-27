@@ -6,6 +6,9 @@ public interface IUnitService
 {
     Task<IReadOnlyList<Unit>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Apartment units only — Community Center is not a rental unit.</summary>
+    Task<IReadOnlyList<Unit>> GetResidentialAsync(CancellationToken cancellationToken = default);
+
     Task<Unit?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Community Center (or first facility) unit, or null if not seeded yet.</summary>

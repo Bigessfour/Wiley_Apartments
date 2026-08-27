@@ -1,6 +1,7 @@
 @page "/reports/delinquency"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Grids
 @using Wiley.Apartments.Contracts
 @inject IRentRollService RentRollService
@@ -11,8 +12,11 @@
 
 <PageTitle>Delinquency</PageTitle>
 
-<PageHeader Title="Delinquency" Subtitle="Tenant/unit pairs with positive ledger balance." CssClass="d-print-none">
+<PageHeader Title="Delinquency" Subtitle="@HeaderSubtitle" CssClass="d-print-none">
     <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick="@(() => Navigation.NavigateTo("/reports"))" />
+    <SfButton CssClass="e-outline e-small"
+              Content="@(Scope == OccupancyFilter.Current ? "Former accounts" : "Current occupants")"
+              OnClick="ToggleScopeAsync" />
     <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
     <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
 </PageHeader>
@@ -23,7 +27,7 @@
 }
 
 <p class="small text-muted">
-    @Rows.Count delinquent account(s) · Total @TotalBalance.ToString("C")
+    @Rows.Count account(s) · Total @TotalBalance.ToString("C")
 </p>
 
 <SfGrid TValue="DelinquencyView" DataSource="@Rows" AllowSorting="true">
@@ -39,15 +43,28 @@
     private List<DelinquencyView> Rows { get; set; } = [];
     private decimal TotalBalance { get; set; }
     private string? ErrorMessage { get; set; }
+    private OccupancyFilter Scope { get; set; } = OccupancyFilter.Current;
+
+    private string HeaderSubtitle => Scope == OccupancyFilter.Current
+        ? "Current occupants with a positive balance. Former tenant ledgers are retained — use Former accounts."
+        : "Former occupants with a remaining balance. These do not affect current unit operations.";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ToggleScopeAsync()
+    {
+        Scope = Scope == OccupancyFilter.Current
+            ? OccupancyFilter.Former
+            : OccupancyFilter.Current;
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
         ErrorMessage = null;
         try
         {
-            var data = await RentRollService.GetDelinquencyAsync();
+            var data = await RentRollService.GetDelinquencyAsync(Scope);
             Rows = data.Select(d => new DelinquencyView
             {
                 UnitNumber = d.UnitNumber,

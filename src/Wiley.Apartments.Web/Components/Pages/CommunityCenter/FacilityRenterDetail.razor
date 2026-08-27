@@ -44,7 +44,8 @@ else
         <p class="mb-1"><strong>Email</strong> @Renter.Email</p>
         <p class="mb-1"><strong>Address</strong> @Renter.MailingAddress</p>
         <p class="mb-1"><strong>Alternate</strong> @(Renter.AlternateContact ?? "—")</p>
-        <p class="mb-1"><strong>ID</strong> @(Renter.IdType ?? "—") @(Renter.IdReference)</p>
+        <p class="mb-1"><strong>Photo ID</strong> @(string.IsNullOrWhiteSpace(Renter.IdType) ? "—" : Renter.IdType)
+            @(string.IsNullOrWhiteSpace(Renter.IdReference) ? "" : $" · last 4 / # {Renter.IdReference}")</p>
         <p class="mb-0"><strong>Notes</strong> @(string.IsNullOrWhiteSpace(Renter.Notes) ? "—" : Renter.Notes)</p>
     </div>
 

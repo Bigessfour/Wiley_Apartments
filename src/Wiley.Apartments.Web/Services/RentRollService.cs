@@ -13,6 +13,7 @@ public sealed class RentRollService(ApartmentsDbContext db, ILogger<RentRollServ
     public async Task<IReadOnlyList<RentRollRow>> GetRentRollAsync(CancellationToken cancellationToken = default)
     {
         var units = await _db.Units.AsNoTracking()
+            .Where(u => !u.IsFacility)
             .OrderBy(u => u.Number)
             .ToListAsync(cancellationToken);
 
@@ -109,7 +110,9 @@ public sealed class RentRollService(ApartmentsDbContext db, ILogger<RentRollServ
         return rows;
     }
 
-    public async Task<IReadOnlyList<DelinquencyRow>> GetDelinquencyAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DelinquencyRow>> GetDelinquencyAsync(
+        OccupancyFilter occupancy = OccupancyFilter.Current,
+        CancellationToken cancellationToken = default)
     {
         var entries = await _db.LedgerEntries.AsNoTracking()
             .Include(e => e.Tenant)
@@ -119,10 +122,29 @@ public sealed class RentRollService(ApartmentsDbContext db, ILogger<RentRollServ
             .ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
 
+        var currentPairs = occupancy == OccupancyFilter.All
+            ? null
+            : await CurrentOccupancyQuery.LoadPairsAsync(_db, cancellationToken);
+
         var groups = entries.GroupBy(e => new { TenantId = e.TenantId!.Value, e.UnitId });
         var rows = new List<DelinquencyRow>();
         foreach (var g in groups)
         {
+            var pair = (g.Key.TenantId, g.Key.UnitId);
+            if (currentPairs is not null)
+            {
+                var isCurrent = currentPairs.Contains(pair);
+                if (occupancy == OccupancyFilter.Current && !isCurrent)
+                {
+                    continue;
+                }
+
+                if (occupancy == OccupancyFilter.Former && isCurrent)
+                {
+                    continue;
+                }
+            }
+
             decimal balance = 0;
             DateTime? oldestPastDueCharge = null;
             foreach (var e in g)
@@ -154,8 +176,9 @@ public sealed class RentRollService(ApartmentsDbContext db, ILogger<RentRollServ
 
         var result = rows.OrderByDescending(r => r.Balance).ThenBy(r => r.UnitNumber).ToList();
         _logger.LogInformation(
-            "Delinquency report generated: {DelinquentCount} account(s) with positive balance.",
-            result.Count);
+            "Delinquency report generated: {DelinquentCount} account(s) with positive balance (scope={Scope}).",
+            result.Count,
+            occupancy);
         return result;
     }
 

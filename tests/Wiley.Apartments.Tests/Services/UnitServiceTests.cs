@@ -197,4 +197,40 @@ public class UnitServiceTests
         updated.IsHandicapAccessible.Should().BeTrue();
         updated.LeaseTerm.Should().Be("Year");
     }
+
+    [Fact]
+    public async Task GetResidentialAsync_ExcludesCommunityCenter()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+        await service.CreateAsync(new Unit { Number = "1", SqFt = 500, Beds = 1, Baths = 1 });
+        await service.CreateAsync(new Unit { Number = "CC", IsFacility = true, SqFt = 2000 });
+
+        var residential = await service.GetResidentialAsync();
+        residential.Should().ContainSingle(u => u.Number == "1");
+        residential.Should().NotContain(u => u.Number == "CC" || u.IsFacility);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PersistsNotes()
+    {
+        await using var db = CreateContext();
+        var service = CreateService(db);
+        var unit = await service.CreateAsync(new Unit
+        {
+            Number = "8",
+            SqFt = 640,
+            Beds = 2,
+            Baths = 1,
+            Notes = "Placeholder"
+        });
+
+        unit.Notes = "  Storage off kitchen; tub/shower combo  ";
+        unit.SqFt = 650;
+        var updated = await service.UpdateAsync(unit);
+
+        updated.Notes.Should().Be("Storage off kitchen; tub/shower combo");
+        updated.SqFt.Should().Be(650);
+        (await service.GetByIdAsync(unit.Id))!.Notes.Should().Be("Storage off kitchen; tub/shower combo");
+    }
 }

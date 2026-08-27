@@ -67,13 +67,16 @@ public sealed class FacilityReservationService(
         if (reservation.Status == FacilityReservationStatus.Confirmed)
         {
             await EnsureNoConfirmedOverlapAsync(
-                reservation.UnitId, reservation.StartUtc, reservation.EndUtc, null, cancellationToken);
+                reservation.UnitId, reservation.StartUtc, reservation.EndUtc, null,
+                reservation.Space, cancellationToken);
         }
+
+        NormalizeEquipment(reservation);
 
         _db.FacilityReservations.Add(reservation);
         await _db.SaveChangesAsync(cancellationToken);
 
-        if (reservation.Status == FacilityReservationStatus.Confirmed)
+        if (reservation.Status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
             await UpsertCalendarAsync(reservation, cancellationToken);
         }
@@ -87,6 +90,7 @@ public sealed class FacilityReservationService(
         CancellationToken cancellationToken = default)
     {
         var existing = await _db.FacilityReservations
+                           .Include(r => r.Equipment)
                            .FirstOrDefaultAsync(r => r.Id == reservation.Id && !r.IsDeleted, cancellationToken)
                        ?? throw new InvalidOperationException($"Facility reservation {reservation.Id} was not found.");
 
@@ -94,23 +98,26 @@ public sealed class FacilityReservationService(
         if (reservation.Status == FacilityReservationStatus.Confirmed)
         {
             await EnsureNoConfirmedOverlapAsync(
-                reservation.UnitId, reservation.StartUtc, reservation.EndUtc, reservation.Id, cancellationToken);
+                reservation.UnitId, reservation.StartUtc, reservation.EndUtc, reservation.Id,
+                reservation.Space, cancellationToken);
         }
 
         existing.FacilityRenterId = reservation.FacilityRenterId;
         existing.UnitId = reservation.UnitId;
         existing.StartUtc = EnsureUtc(reservation.StartUtc);
         existing.EndUtc = EnsureUtc(reservation.EndUtc);
+        existing.Space = reservation.Space;
         existing.Status = reservation.Status;
         existing.RentalFee = decimal.Round(reservation.RentalFee, 2, MidpointRounding.AwayFromZero);
         existing.DepositAmount = decimal.Round(reservation.DepositAmount, 2, MidpointRounding.AwayFromZero);
         existing.Notes = Trim(reservation.Notes, 2000);
+        ReplaceEquipment(existing, reservation.Equipment);
 
         _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = reservation.RowVersion;
         ConcurrencyHelper.BumpRowVersion(existing);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "FacilityReservation", cancellationToken);
 
-        if (existing.Status == FacilityReservationStatus.Confirmed)
+        if (existing.Status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
             await UpsertCalendarAsync(existing, cancellationToken);
         }
@@ -140,7 +147,8 @@ public sealed class FacilityReservationService(
         if (status == FacilityReservationStatus.Confirmed)
         {
             await EnsureNoConfirmedOverlapAsync(
-                existing.UnitId, existing.StartUtc, existing.EndUtc, existing.Id, cancellationToken);
+                existing.UnitId, existing.StartUtc, existing.EndUtc, existing.Id,
+                existing.Space, cancellationToken);
         }
 
         if (status == FacilityReservationStatus.Completed)
@@ -166,7 +174,7 @@ public sealed class FacilityReservationService(
         ConcurrencyHelper.BumpRowVersion(existing);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "FacilityReservation", cancellationToken);
 
-        if (status == FacilityReservationStatus.Confirmed)
+        if (status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
             await UpsertCalendarAsync(existing, cancellationToken);
         }
@@ -234,26 +242,27 @@ public sealed class FacilityReservationService(
         DateTime startUtc,
         DateTime endUtc,
         Guid? excludeId = null,
+        FacilitySpace space = FacilitySpace.WholeBuilding,
         CancellationToken cancellationToken = default)
     {
         startUtc = EnsureUtc(startUtc);
         endUtc = EnsureUtc(endUtc);
-        var overlap = await _db.FacilityReservations.AsNoTracking()
-            .AnyAsync(
-                r => !r.IsDeleted
-                     && r.UnitId == unitId
-                     && r.Status == FacilityReservationStatus.Confirmed
-                     && (excludeId == null || r.Id != excludeId)
-                     && r.StartUtc < endUtc
-                     && startUtc < r.EndUtc,
-                cancellationToken);
-        if (overlap)
+        var candidates = await _db.FacilityReservations.AsNoTracking()
+            .Where(r => !r.IsDeleted
+                        && r.UnitId == unitId
+                        && r.Status == FacilityReservationStatus.Confirmed
+                        && (excludeId == null || r.Id != excludeId)
+                        && r.StartUtc < endUtc
+                        && startUtc < r.EndUtc)
+            .Select(r => r.Space)
+            .ToListAsync(cancellationToken);
+        if (candidates.Any(existing => FacilitySpaceInfo.Conflicts(space, existing)))
         {
             _logger.LogWarning(
-                "Confirmed facility reservation overlap rejected unit={UnitId} start={Start} end={End} exclude={ExcludeId}.",
-                unitId, startUtc, endUtc, excludeId);
+                "Confirmed facility reservation overlap rejected unit={UnitId} space={Space} start={Start} end={End} exclude={ExcludeId}.",
+                unitId, space, startUtc, endUtc, excludeId);
             throw new InvalidOperationException(
-                "Confirmed Community Center reservation overlaps an existing confirmed booking.");
+                $"Confirmed {FacilitySpaceInfo.DisplayName(space)} reservation overlaps an existing confirmed booking for that room or Entire Facility.");
         }
     }
 
@@ -261,9 +270,14 @@ public sealed class FacilityReservationService(
     {
         var renter = await _db.FacilityRenters.AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == reservation.FacilityRenterId, cancellationToken);
-        var title = renter is null
-            ? "CC rental"
-            : $"CC rental — {renter.FirstName} {renter.LastName}";
+        var spaceLabel = FacilitySpaceInfo.CalendarLabel(reservation.Space);
+        var who = renter is null ? "CC rental" : $"{renter.FirstName} {renter.LastName}";
+        var pending = reservation.Status == FacilityReservationStatus.Request ? " (pending)" : "";
+        var title = $"{spaceLabel} — {who}{pending}";
+        var equipmentNote = await FormatEquipmentNoteAsync(reservation.Id, cancellationToken);
+        var notes = string.Join(
+            "\n",
+            new[] { reservation.Notes, equipmentNote }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         ScheduledItem item;
         if (reservation.ScheduledItemId is Guid sid)
@@ -290,7 +304,7 @@ public sealed class FacilityReservationService(
         item.DueUtc = reservation.StartUtc;
         item.IsCompleted = false;
         item.IsDeleted = false;
-        item.Notes = reservation.Notes;
+        item.Notes = Trim(notes, 2000);
 
         reservation.ScheduledItemId = item.Id;
         var tracked = await _db.FacilityReservations.FirstAsync(r => r.Id == reservation.Id, cancellationToken);
@@ -351,7 +365,61 @@ public sealed class FacilityReservationService(
             .AsNoTracking()
             .Include(r => r.FacilityRenter)
             .Include(r => r.Unit)
+            .Include(r => r.Equipment)
+            .ThenInclude(e => e.InventoryItem)
             .Where(r => !r.IsDeleted);
+
+    private async Task<string?> FormatEquipmentNoteAsync(Guid reservationId, CancellationToken cancellationToken)
+    {
+        var lines = await _db.FacilityReservationEquipment
+            .AsNoTracking()
+            .Include(e => e.InventoryItem)
+            .Where(e => e.FacilityReservationId == reservationId)
+            .ToListAsync(cancellationToken);
+        if (lines.Count == 0)
+        {
+            return null;
+        }
+
+        return "Equipment: " + string.Join(
+            ", ",
+            lines.Select(e => $"{e.Quantity} × {e.InventoryItem?.Name ?? "item"}"));
+    }
+
+    private static void NormalizeEquipment(FacilityReservation reservation)
+    {
+        var cleaned = reservation.Equipment
+            .Where(e => e.InventoryItemId != Guid.Empty && e.Quantity > 0)
+            .GroupBy(e => e.InventoryItemId)
+            .Select(g => new FacilityReservationEquipment
+            {
+                Id = Guid.NewGuid(),
+                InventoryItemId = g.Key,
+                Quantity = g.Sum(x => x.Quantity)
+            })
+            .ToList();
+        reservation.Equipment = cleaned;
+    }
+
+    private static void ReplaceEquipment(
+        FacilityReservation existing,
+        ICollection<FacilityReservationEquipment> incoming)
+    {
+        existing.Equipment.Clear();
+        foreach (var line in incoming
+                     .Where(e => e.InventoryItemId != Guid.Empty && e.Quantity > 0)
+                     .GroupBy(e => e.InventoryItemId)
+                     .Select(g => new { ItemId = g.Key, Quantity = g.Sum(x => x.Quantity) }))
+        {
+            existing.Equipment.Add(new FacilityReservationEquipment
+            {
+                Id = Guid.NewGuid(),
+                FacilityReservationId = existing.Id,
+                InventoryItemId = line.ItemId,
+                Quantity = line.Quantity
+            });
+        }
+    }
 
     private static string? Trim(string? value, int max)
     {

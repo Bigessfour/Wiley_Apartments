@@ -4,10 +4,13 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Grids
 @using Wiley.Apartments.Contracts
+@using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Configuration
 @inject IJSRuntime JsRuntime
 @inject ILateFeeSettingsService LateFeeSettings
+@inject IFacilityRentalRateService CcRates
 @inject ILedgerService LedgerService
 @inject IDocumentPathResolver DocumentPaths
 @inject IDemoDataSeeder DemoSeeder
@@ -111,6 +114,29 @@
     </div>
 </section>
 
+<section class="settings-panel e-card p-4 mb-4" aria-labelledby="ccrates-heading">
+    <h2 id="ccrates-heading" class="h5 mb-3">Community Center rates</h2>
+    <p class="text-muted mb-3">
+        Default fee and deposit for Fireplace Room, Kitchen, Hall, and Entire Facility.
+        Clerks pick these on a reservation, then can change the dollar amount for that booking.
+        Hover the Space/Rate labels on Community Center → Reservations for details.
+    </p>
+    <SfGrid TValue="FacilityRentalRate" DataSource="@CcRateRows" AllowPaging="false" Height="280"
+            Toolbar="@(new List<string> { "Edit", "Update", "Cancel" })">
+        <GridEditSettings AllowEditing="true" Mode="EditMode.Normal" />
+        <GridEvents TValue="FacilityRentalRate" OnActionBegin="OnCcRateActionBeginAsync" />
+        <GridColumns>
+            <GridColumn Field="@nameof(FacilityRentalRate.Id)" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field="@nameof(FacilityRentalRate.Name)" HeaderText="Rate name" Width="180" />
+            <GridColumn Field="@nameof(FacilityRentalRate.Space)" HeaderText="Space" Width="150" AllowEditing="false" />
+            <GridColumn Field="@nameof(FacilityRentalRate.Fee)" HeaderText="Fee" Format="C2" Width="110" />
+            <GridColumn Field="@nameof(FacilityRentalRate.Deposit)" HeaderText="Deposit" Format="C2" Width="110" />
+            <GridColumn Field="@nameof(FacilityRentalRate.SortOrder)" HeaderText="Order" Width="80" />
+            <GridColumn Field="@nameof(FacilityRentalRate.IsActive)" HeaderText="Active" Width="90" DisplayAsCheckBox="true" EditType="EditType.BooleanEdit" />
+        </GridColumns>
+    </SfGrid>
+</section>
+
 <section class="settings-panel e-card p-4 mb-4" aria-labelledby="portal-heading">
     <h2 id="portal-heading" class="h5 mb-3">Payment portal (G3 / PayStar)</h2>
     <p class="text-muted mb-2">
@@ -202,6 +228,7 @@
     private bool LateFeesEnabled { get; set; }
     private decimal LateFeeAmount { get; set; }
     private int LateFeeGraceDays { get; set; }
+    private List<FacilityRentalRate> CcRateRows { get; set; } = [];
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
     private string? SuccessMessage { get; set; }
@@ -227,6 +254,7 @@
         LateFeesEnabled = settings.Enabled;
         LateFeeAmount = settings.Amount;
         LateFeeGraceDays = settings.GraceDays;
+        CcRateRows = (await CcRates.ListAsync(includeInactive: true)).ToList();
         EffectiveDocumentRoot = await DocumentPaths.GetDocumentRootAsync();
         DocumentRootPath = EffectiveDocumentRoot;
         if (await DemoSeeder.IsDemoLoadedAsync())
@@ -310,6 +338,27 @@
         finally
         {
             Busy = false;
+        }
+    }
+
+    private async Task OnCcRateActionBeginAsync(Syncfusion.Blazor.Grids.ActionEventArgs<FacilityRentalRate> args)
+    {
+        if (args.RequestType != Syncfusion.Blazor.Grids.Action.Save || args.Data is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await CcRates.UpsertAsync(args.Data);
+            CcRateRows = (await CcRates.ListAsync(includeInactive: true)).ToList();
+            await Toast.ShowSuccessAsync("Community Center rate saved.");
+        }
+        catch (Exception ex)
+        {
+            args.Cancel = true;
+            Logger.LogError(ex, "Settings CC rate save failed.");
+            ErrorMessage = ex.Message;
         }
     }
 

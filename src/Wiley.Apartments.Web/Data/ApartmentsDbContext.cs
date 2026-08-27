@@ -25,6 +25,8 @@ public class ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options) 
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<FacilityRenter> FacilityRenters => Set<FacilityRenter>();
     public DbSet<FacilityReservation> FacilityReservations => Set<FacilityReservation>();
+    public DbSet<FacilityReservationEquipment> FacilityReservationEquipment => Set<FacilityReservationEquipment>();
+    public DbSet<FacilityRentalRate> FacilityRentalRates => Set<FacilityRentalRate>();
     public DbSet<FacilityInspection> FacilityInspections => Set<FacilityInspection>();
     public DbSet<FacilityInventoryItem> FacilityInventoryItems => Set<FacilityInventoryItem>();
 
@@ -351,6 +353,7 @@ public class ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options) 
             entity.ToTable("FacilityReservations");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Space).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.RentalFee).HasPrecision(18, 2);
             entity.Property(e => e.DepositAmount).HasPrecision(18, 2);
             entity.Property(e => e.Notes).HasMaxLength(2000);
@@ -359,6 +362,7 @@ public class ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options) 
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.Status });
             entity.HasIndex(e => new { e.FacilityRenterId, e.IsDeleted });
             entity.HasIndex(e => new { e.StartUtc, e.EndUtc });
+            entity.HasIndex(e => new { e.Space, e.Status });
             entity.HasOne(e => e.Unit)
                 .WithMany()
                 .HasForeignKey(e => e.UnitId)
@@ -367,6 +371,32 @@ public class ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options) 
                 .WithMany()
                 .HasForeignKey(e => e.FacilityRenterId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(e => e.Equipment)
+                .WithOne()
+                .HasForeignKey(e => e.FacilityReservationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<FacilityReservationEquipment>(entity =>
+        {
+            entity.ToTable("FacilityReservationEquipment");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.FacilityReservationId, e.InventoryItemId }).IsUnique();
+            entity.HasOne(e => e.InventoryItem)
+                .WithMany()
+                .HasForeignKey(e => e.InventoryItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<FacilityRentalRate>(entity =>
+        {
+            entity.ToTable("FacilityRentalRates");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Space).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.Name).HasMaxLength(128).IsRequired();
+            entity.Property(e => e.Fee).HasPrecision(18, 2);
+            entity.Property(e => e.Deposit).HasPrecision(18, 2);
+            entity.HasIndex(e => new { e.Space, e.IsActive, e.SortOrder });
         });
 
         builder.Entity<FacilityInspection>(entity =>

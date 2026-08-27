@@ -2,7 +2,9 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
 @using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Components.Shared
@@ -50,15 +52,54 @@
         <GridColumn Field="@nameof(FacilityRenter.FirstName)" HeaderText="First" Width="120"
                     ValidationRules="@(new ValidationRules { Required = true })" />
         <GridColumn Field="@nameof(FacilityRenter.Organization)" HeaderText="Organization" Width="140" />
-        <GridColumn Field="@nameof(FacilityRenter.Phone)" HeaderText="Phone" Width="120"
-                    ValidationRules="@(new ValidationRules { Required = true })" />
+        <GridColumn Field="@nameof(FacilityRenter.Phone)" HeaderText="Phone" Width="140"
+                    ValidationRules="@(new ValidationRules { Required = true })">
+            <EditTemplate>
+                @{
+                    var renter = (FacilityRenter)context;
+                }
+                <SfMaskedTextBox @bind-Value="renter.Phone"
+                                 Mask="(000) 000-0000"
+                                 PromptChar="@('_')"
+                                 Placeholder="(719) 555-0100"
+                                 Width="100%" />
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(FacilityRenter.Email)" HeaderText="Email" Width="180"
                     ValidationRules="@(new ValidationRules { Required = true })" />
         <GridColumn Field="@nameof(FacilityRenter.MailingAddress)" HeaderText="Address" Width="200"
                     ValidationRules="@(new ValidationRules { Required = true })" />
-        <GridColumn Field="@nameof(FacilityRenter.AlternateContact)" HeaderText="Alternate" Width="140" />
-        <GridColumn Field="@nameof(FacilityRenter.IdType)" HeaderText="ID type" Width="100" />
-        <GridColumn Field="@nameof(FacilityRenter.IdReference)" HeaderText="ID ref" Width="100" />
+        <GridColumn Field="@nameof(FacilityRenter.AlternateContact)" HeaderText="Day-of / emergency contact" Width="180" />
+        <GridColumn Field="@nameof(FacilityRenter.IdType)" HeaderText="Photo ID type" Width="150">
+            <EditTemplate>
+                @{
+                    var renter = (FacilityRenter)context;
+                }
+                <SfDropDownList TValue="string?"
+                                TItem="IdTypeOption"
+                                DataSource="@IdTypeOptions"
+                                @bind-Value="renter.IdType"
+                                Placeholder="Select the ID they present"
+                                AllowFiltering="true"
+                                AllowCustom="true"
+                                PopupHeight="240px"
+                                Width="100%">
+                    <DropDownListFieldSettings Value="Value" Text="Text" />
+                </SfDropDownList>
+            </EditTemplate>
+        </GridColumn>
+        <GridColumn Field="@nameof(FacilityRenter.IdReference)"
+                    HeaderText="ID last 4 or document #"
+                    Width="180">
+            <EditTemplate>
+                @{
+                    var renter = (FacilityRenter)context;
+                }
+                <SfTextBox @bind-Value="renter.IdReference"
+                           Placeholder="Last 4 of DL/ID, or passport number — not a full SSN"
+                           Width="100%" />
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(FacilityRenter.Notes)" HeaderText="Notes" Width="160" />
         <GridColumn Field="@nameof(FacilityRenter.RowVersion)" Visible="false" />
     </GridColumns>
@@ -68,6 +109,17 @@
     private SfGrid<FacilityRenter>? GridRef { get; set; }
     private List<FacilityRenter> Rows { get; set; } = [];
     private string? ErrorMessage { get; set; }
+
+    private static readonly List<IdTypeOption> IdTypeOptions =
+    [
+        new(null, "(none)"),
+        new("Driver's license", "Driver's license"),
+        new("State ID", "State ID"),
+        new("Passport", "Passport"),
+        new("Military ID", "Military ID"),
+        new("Tribal ID", "Tribal ID"),
+        new("Other", "Other")
+    ];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -142,4 +194,6 @@
             Navigation.NavigateTo($"/community-center/renters/{args.RowData.Id}");
         }
     }
+
+    private sealed record IdTypeOption(string? Value, string Text);
 }

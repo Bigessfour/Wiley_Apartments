@@ -21,6 +21,10 @@
 
 <PageHeader Title="Tenant ledger"
             Subtitle="@HeaderSubtitle">
+    <SfButton CssClass="e-outline e-small"
+              Content="@(CurrentOnly ? "Include former" : "Current only")"
+              Disabled="@Busy"
+              OnClick="ToggleCurrentOnlyAsync" />
     <SfButton CssClass="e-primary e-small" Content="Record payment" Disabled="@Busy"
               OnClick="@(() => OpenFormAsync("payment"))" />
     <SfButton CssClass="e-outline e-small" Content="Post charge" Disabled="@Busy"
@@ -39,7 +43,7 @@
         <label class="form-label">Filter tenant</label>
         <SfDropDownList TValue="Guid?" TItem="IdOption"
                         DataSource="@TenantFilterOptions"
-                        Placeholder="All tenants"
+                        Placeholder="@(CurrentOnly ? "Current occupants" : "All tenants")"
                         AllowFiltering="true"
                         ShowClearButton="true"
                         @bind-Value="FilterTenantId"
@@ -216,11 +220,24 @@
     private bool FormOpenReceipt { get; set; } = true;
     private bool _queryApplied;
     private string? FilterUnitLabel { get; set; }
+    private bool CurrentOnly { get; set; } = true;
 
-    private string HeaderSubtitle =>
-        FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel)
-            ? $"Ledger filtered to {FilterUnitLabel}. Record charges and payments; balance updates immediately."
-            : "Record charges and payments (cash, check, online reference). Payments reduce the running balance immediately.";
+    private string HeaderSubtitle
+    {
+        get
+        {
+            if (FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel))
+            {
+                return CurrentOnly
+                    ? $"Current occupant ledger for {FilterUnitLabel}. Use Include former for past residents of this unit."
+                    : $"Full history for {FilterUnitLabel}, including former tenants.";
+            }
+
+            return CurrentOnly
+                ? "Current occupants only. Former tenant charges stay on file — use Include former or open a tenant."
+                : "All tenant ledgers, including former occupants. Payments reduce the running balance immediately.";
+        }
+    }
 
     private static readonly List<MethodOption> MethodOptions =
     [
@@ -232,16 +249,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var tenants = await TenantService.SearchAsync();
-        TenantFormOptions = tenants
-            .OrderBy(t => t.LastName)
-            .Select(t => new IdOption { Id = t.Id, Text = $"{t.LastName}, {t.FirstName}" })
-            .ToList();
-        TenantFilterOptions =
-        [
-            new IdOption { Id = null, Text = "(All tenants)" },
-            .. TenantFormOptions
-        ];
+        await LoadTenantOptionsAsync();
 
         var units = await UnitService.GetAllAsync();
         UnitFormOptions = units
@@ -273,6 +281,7 @@
         {
             FilterTenantId = tid;
             FormTenantId = tid;
+            await EnsureTenantInOptionsAsync(tid);
         }
 
         if (QueryUnitId is Guid uid)
@@ -339,13 +348,56 @@
         }
     }
 
+    private async Task ToggleCurrentOnlyAsync()
+    {
+        CurrentOnly = !CurrentOnly;
+        await LoadTenantOptionsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadTenantOptionsAsync()
+    {
+        var tenants = await TenantService.SearchAsync(currentOnly: CurrentOnly);
+        TenantFormOptions = tenants
+            .OrderBy(t => t.LastName)
+            .Select(t => new IdOption { Id = t.Id, Text = $"{t.LastName}, {t.FirstName}" })
+            .ToList();
+        TenantFilterOptions =
+        [
+            new IdOption { Id = null, Text = CurrentOnly ? "(Current occupants)" : "(All tenants)" },
+            .. TenantFormOptions
+        ];
+    }
+
+    private async Task EnsureTenantInOptionsAsync(Guid tenantId)
+    {
+        if (TenantFormOptions.Any(o => o.Id == tenantId))
+        {
+            return;
+        }
+
+        var tenant = await TenantService.GetByIdAsync(tenantId);
+        if (tenant is null || tenant.IsDeleted)
+        {
+            return;
+        }
+
+        CurrentOnly = false;
+        await LoadTenantOptionsAsync();
+    }
+
     private async Task LoadAsync()
     {
         Busy = true;
         ErrorMessage = null;
         try
         {
-            var lines = await LedgerService.GetLedgerAsync(FilterTenantId, FilterUnitId);
+            var occupancy = FilterTenantId is Guid
+                ? OccupancyFilter.All
+                : CurrentOnly
+                    ? OccupancyFilter.Current
+                    : OccupancyFilter.All;
+            var lines = await LedgerService.GetLedgerAsync(FilterTenantId, FilterUnitId, occupancy);
             Rows = lines.Select(l => new LedgerRow
             {
                 EntryId = l.Entry.Id,

@@ -56,6 +56,12 @@ public sealed class OccupancyService(
         var tenant = await _db.Tenants.FindAsync([tenantId], cancellationToken)
             ?? throw new InvalidOperationException($"Tenant {tenantId} was not found.");
 
+        if (unit.IsFacility || unit.Number == UnitService.CommunityCenterNumber)
+        {
+            throw new InvalidOperationException(
+                "Community Center is a facility, not a rental unit. Use CC reservations instead of occupancy.");
+        }
+
         if (tenant.IsDeleted)
         {
             throw new InvalidOperationException("Cannot start occupancy for a soft-deleted tenant.");
@@ -142,13 +148,14 @@ public sealed class OccupancyService(
         unit.CurrentTenantId = null;
         if (unit.Status == UnitStatus.Occupied)
         {
-            unit.Status = UnitStatus.Vacant;
+            // Between tenants: turnover, not available to rent. Clerk sets Vacant when make-ready is done.
+            unit.Status = UnitStatus.MakeReady;
         }
 
         ConcurrencyHelper.BumpRowVersion(unit);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Unit", cancellationToken);
         _logger.LogInformation(
-            "Ended occupancy {OccupancyId} unit {UnitNumber}.",
+            "Ended occupancy {OccupancyId} unit {UnitNumber}; unit is now make-ready.",
             occupancy.Id,
             unit.Number);
 

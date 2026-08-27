@@ -27,6 +27,7 @@ public sealed class LedgerService(
     public async Task<IReadOnlyList<LedgerLine>> GetLedgerAsync(
         Guid? tenantId = null,
         Guid? unitId = null,
+        OccupancyFilter occupancy = OccupancyFilter.All,
         CancellationToken cancellationToken = default)
     {
         var query = _db.LedgerEntries
@@ -39,6 +40,31 @@ public sealed class LedgerService(
         if (tenantId is Guid tid)
         {
             query = query.Where(e => e.TenantId == tid);
+        }
+        else if (occupancy == OccupancyFilter.Current)
+        {
+            query = query.Where(e =>
+                e.FacilityRenterId != null
+                || _db.Units.Any(u =>
+                    u.Id == e.UnitId
+                    && u.Status == UnitStatus.Occupied
+                    && !u.IsFacility
+                    && (u.CurrentTenantId == e.TenantId
+                        || _db.Occupancies.Any(o =>
+                            o.EndUtc == null && o.TenantId == e.TenantId && o.UnitId == e.UnitId))));
+        }
+        else if (occupancy == OccupancyFilter.Former)
+        {
+            query = query.Where(e =>
+                e.FacilityRenterId == null
+                && e.TenantId != null
+                && !_db.Units.Any(u =>
+                    u.Id == e.UnitId
+                    && u.Status == UnitStatus.Occupied
+                    && !u.IsFacility
+                    && (u.CurrentTenantId == e.TenantId
+                        || _db.Occupancies.Any(o =>
+                            o.EndUtc == null && o.TenantId == e.TenantId && o.UnitId == e.UnitId))));
         }
 
         if (unitId is Guid uid)
@@ -67,7 +93,7 @@ public sealed class LedgerService(
         Guid? unitId = null,
         CancellationToken cancellationToken = default)
     {
-        var lines = await GetLedgerAsync(tenantId, unitId, cancellationToken);
+        var lines = await GetLedgerAsync(tenantId, unitId, cancellationToken: cancellationToken);
         return lines.Count == 0 ? 0m : lines[^1].RunningBalance;
     }
 
@@ -496,11 +522,18 @@ public sealed class LedgerService(
             .ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
 
+        var currentPairs = await CurrentOccupancyQuery.LoadPairsAsync(_db, cancellationToken);
+
         var assessed = 0;
         foreach (var group in entries
                      .Where(e => e.TenantId is not null)
                      .GroupBy(e => new { TenantId = e.TenantId!.Value, e.UnitId }))
         {
+            if (!currentPairs.Contains((group.Key.TenantId, group.Key.UnitId)))
+            {
+                continue;
+            }
+
             decimal balance = 0;
             var hasPastDueCharge = false;
             var hasLateFeeThisMonth = false;

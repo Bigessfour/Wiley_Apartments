@@ -26,15 +26,11 @@ public sealed record DashboardSnapshot(
     decimal OutstandingBalanceTotal,
     IReadOnlyList<DashboardStatusSlice> UnitStatusSlices,
     IReadOnlyList<DashboardMonthAmount> CollectionByMonth,
-    double CollectionRatePercent,
-    IReadOnlyList<DashboardHeatCell> PaymentHeatmap);
+    double CollectionRatePercent);
 
 public sealed record DashboardStatusSlice(string Status, int Count);
 
 public sealed record DashboardMonthAmount(string Label, decimal Amount);
-
-/// <summary>Unit × month cell for payment-collection heatmap (amount paid, deposits excluded).</summary>
-public sealed record DashboardHeatCell(string Unit, string Month, double Value);
 
 public sealed record RentPivotRow(
     string Unit,

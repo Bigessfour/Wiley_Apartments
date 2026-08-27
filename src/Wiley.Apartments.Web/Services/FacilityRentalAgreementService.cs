@@ -24,6 +24,8 @@ public sealed class FacilityRentalAgreementService(
     {
         var reservation = await _db.FacilityReservations
                               .Include(r => r.FacilityRenter)
+                              .Include(r => r.Equipment)
+                              .ThenInclude(e => e.InventoryItem)
                               .FirstOrDefaultAsync(r => r.Id == reservationId && !r.IsDeleted, cancellationToken)
                           ?? throw new InvalidOperationException($"Facility reservation {reservationId} was not found.");
 
@@ -61,6 +63,11 @@ public sealed class FacilityRentalAgreementService(
         var endLocal = _clock.ToDisplayTime(reservation.EndUtc);
         var generatedLocal = _clock.ToDisplayTime(_clock.UtcNow);
 
+        var equipment = reservation.Equipment.Count == 0
+            ? "None"
+            : string.Join(", ", reservation.Equipment.Select(e =>
+                $"{e.Quantity} x {e.InventoryItem?.Name ?? "item"}"));
+
         var pdf = _generator.Generate(new FacilityRentalAgreementData(
             $"{renter.FirstName} {renter.LastName}".Trim(),
             renter.Organization ?? "—",
@@ -69,6 +76,8 @@ public sealed class FacilityRentalAgreementService(
             renter.Email,
             startLocal.ToString("yyyy-MM-dd HH:mm"),
             endLocal.ToString("yyyy-MM-dd HH:mm"),
+            FacilitySpaceInfo.DisplayName(reservation.Space),
+            equipment,
             reservation.RentalFee.ToString("C"),
             reservation.DepositAmount.ToString("C"),
             reservation.Notes,

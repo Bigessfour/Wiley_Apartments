@@ -130,9 +130,32 @@ public sealed class FacilityRenterService(
 
         renter.FirstName = renter.FirstName.Trim();
         renter.LastName = renter.LastName.Trim();
-        renter.Phone = renter.Phone.Trim();
+        renter.Phone = FormatUsPhone(renter.Phone);
         renter.Email = renter.Email.Trim();
         renter.MailingAddress = renter.MailingAddress.Trim();
+    }
+
+    /// <summary>Formats a 10-digit US number as (719) 555-0100; otherwise returns trimmed input.</summary>
+    internal static string FormatUsPhone(string phone)
+    {
+        var trimmed = phone.Trim();
+        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (digits.Length == 11 && digits[0] == '1')
+        {
+            digits = digits[1..];
+        }
+
+        if (digits.Length == 10)
+        {
+            return $"({digits[..3]}) {digits[3..6]}-{digits[6..]}";
+        }
+
+        return trimmed;
     }
 
     private static string? TrimOrNull(string? value, int max)

@@ -487,6 +487,48 @@ h1:focus {
   border-color: #6f42c1 !important;
 }
 
+.e-schedule .e-appointment.cs-sched-cc-fireplace,
+.cs-sched-cc-fireplace.e-appointment {
+  background: #b45309 !important;
+  border-color: #b45309 !important;
+}
+
+.e-schedule .e-appointment.cs-sched-cc-kitchen,
+.cs-sched-cc-kitchen.e-appointment {
+  background: #0f766e !important;
+  border-color: #0f766e !important;
+}
+
+.e-schedule .e-appointment.cs-sched-cc-hall,
+.cs-sched-cc-hall.e-appointment {
+  background: #6f42c1 !important;
+  border-color: #6f42c1 !important;
+}
+
+.e-schedule .e-appointment.cs-sched-cc-entire,
+.cs-sched-cc-entire.e-appointment {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+}
+
+.cs-sched-appt {
+  padding: 2px 3px;
+  line-height: 1.15;
+  overflow: hidden;
+  height: 100%;
+  white-space: normal;
+}
+
+.cs-sched-room {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.cs-sched-who {
+  font-size: 10px;
+  opacity: 0.95;
+}
+
 .e-schedule .e-appointment.cs-sched-other,
 .cs-sched-other.e-appointment {
   background: #6c757d !important;
@@ -562,6 +604,22 @@ h1:focus {
 
 .kpi-grid--viz .kpi-card .kpi-value {
   font-size: 1.55rem;
+}
+
+.kpi-grid.kpi-grid--viz {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .kpi-grid.kpi-grid--viz {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-grid.kpi-grid--viz {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .kpi-sub {
@@ -1142,6 +1200,57 @@ html:not([data-theme="dark"]) .e-pager .e-numericitem {
 .kpi-card--link:hover { box-shadow: 0 0.35rem 1rem rgba(15, 108, 189, 0.12); transform: translateY(-1px); }
 .panel-body-fill { height: 100%; width: 100%; padding: 4px; box-sizing: border-box; }
 .panel-body-scroll { overflow: auto; height: 100%; max-height: 100%; }
+
+.home-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 0.25rem;
+  align-items: stretch;
+}
+
+.home-dash-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-radius);
+  background: var(--cs-panel);
+  box-shadow: var(--cs-shadow);
+  overflow: hidden;
+}
+
+.home-dash-header {
+  border-bottom: 1px solid var(--cs-border);
+  background: color-mix(in srgb, var(--cs-accent-soft) 55%, var(--cs-panel));
+  padding: 0.65rem 0.85rem;
+}
+
+.home-dash-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 8px 8px;
+}
+
+.home-dash-body--scroll {
+  overflow: auto;
+  max-height: 14rem;
+  padding: 0.65rem 0.85rem 0.85rem;
+}
+
+.home-dash-panel--list {
+  min-height: 11rem;
+}
+
+.home-dash-panel--chart {
+  min-height: 20rem;
+}
+
+@media (max-width: 768px) {
+  .home-dash-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .days-pill {
   display: inline-block; margin-left: 0.25rem; padding: 0.05rem 0.4rem;
   border-radius: 999px; font-size: 0.75rem; font-variant-numeric: tabular-nums;
@@ -1151,4 +1260,9 @@ html:not([data-theme="dark"]) .e-pager .e-numericitem {
 .urgency-critical .days-pill { background: #ffe3e3; color: #c92a2a; font-weight: 700; }
 @media (max-width: 576px) {
   .kpi-grid--viz { grid-template-columns: 1fr; }
+}
+
+.cs-help-label {
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
 }

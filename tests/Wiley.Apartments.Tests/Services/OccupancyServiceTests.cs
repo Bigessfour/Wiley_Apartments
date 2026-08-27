@@ -74,7 +74,7 @@ public class OccupancyServiceTests
             (await service.GetCurrentForUnitAsync(unit.Id)).Should().BeNull();
 
             var reloaded = await db.Units.AsNoTracking().SingleAsync(u => u.Id == unit.Id);
-            reloaded.Status.Should().Be(UnitStatus.Vacant);
+            reloaded.Status.Should().Be(UnitStatus.MakeReady);
             reloaded.CurrentTenantId.Should().BeNull();
         }
     }
@@ -95,6 +95,31 @@ public class OccupancyServiceTests
 
             await act.Should().ThrowAsync<InvalidOperationException>()
                 .WithMessage("*active occupancy*");
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_Throws_WhenFacilityUnit()
+    {
+        var (db, service, _) = Create();
+        await using (db)
+        {
+            var unit = new Unit
+            {
+                Id = Guid.NewGuid(),
+                Number = "CC",
+                IsFacility = true,
+                SqFt = 2000,
+                Status = UnitStatus.Vacant
+            };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Pat", LastName = "Nguyen" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var act = () => service.StartAsync(unit.Id, tenant.Id);
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*facility*");
         }
     }
 }

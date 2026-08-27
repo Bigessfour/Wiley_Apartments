@@ -53,7 +53,17 @@ else
             </a>
         }
     </p>
-    <p><strong>Fee</strong> @Reservation.RentalFee.ToString("C") · <strong>Deposit</strong> @Reservation.DepositAmount.ToString("C")</p>
+    <p>
+        <strong>Space</strong> @FacilitySpaceInfo.DisplayName(Reservation.Space)
+        · <strong>Fee</strong> @Reservation.RentalFee.ToString("C")
+        · <strong>Deposit</strong> @Reservation.DepositAmount.ToString("C")
+    </p>
+    <p>
+        <strong>Equipment</strong>
+        @(Reservation.Equipment.Count == 0
+            ? "None"
+            : string.Join(", ", Reservation.Equipment.Select(e => $"{e.Quantity} × {e.InventoryItem?.Name ?? "item"}")))
+    </p>
     <p class="text-muted">@(Reservation.Notes ?? "No notes.")</p>
 
     <div class="d-flex flex-wrap gap-2 mb-3">
@@ -70,6 +80,15 @@ else
                   Title="@(CanMarkComplete ? "Complete reservation" : (!CanComplete ? "Record a PostRental inspection first" : "Confirm booking first, or already closed"))"
                   OnClick="@(() => SetStatusAsync(FacilityReservationStatus.Completed))" />
         <SfButton CssClass="e-outline e-small" Content="Generate agreement" Disabled="@Busy" OnClick="GenerateAgreementAsync" />
+        @if (_agreementDocumentId is Guid agreementDocId)
+        {
+            <a class="e-btn e-primary e-small" href="@($"/api/documents/{agreementDocId}/download?inline=true")" target="_blank" rel="noopener">
+                Open agreement PDF
+            </a>
+            <a class="e-btn e-outline e-small" href="@($"/api/documents/{agreementDocId}/download")" target="_blank" rel="noopener">
+                Download agreement PDF
+            </a>
+        }
         <SfButton CssClass="e-outline e-small" Content="Preview agreement"
                   Disabled="@(Busy || (_agreementPdfBytes is null && string.IsNullOrEmpty(Reservation.GeneratedPdfRelativePath) && Reservation.SignedDocumentId is null))"
                   OnClick="PreviewAgreementAsync" />
@@ -132,7 +151,7 @@ else
         {
             <ClerkPdfViewer PdfBytes="@_agreementPdfBytes"
                             DownloadFileName="@AgreementDownloadName"
-                            Height="520px" />
+                            Height="680px" />
         }
     </div>
 
@@ -207,6 +226,7 @@ else
     private string InspectBy { get; set; } = "Clerk";
     private string? InspectNotes { get; set; }
     private byte[]? _agreementPdfBytes;
+    private Guid? _agreementDocumentId;
     private (string Name, byte[] Bytes)? _pendingSigned;
     private readonly Dictionary<Guid, (string Name, string ContentType, byte[] Bytes)> _pendingInspectionUploads = new();
     private List<FacilityInspectionType> InspectionTypeValues { get; } =
@@ -251,9 +271,20 @@ else
                 }
             }
 
+            var docs = await DocumentService.ListForEntityAsync(DocumentEntityType.FacilityReservation, Id);
+            var latestAgreement = docs
+                .Where(d => d.Category == DocumentCategory.FacilityAgreement)
+                .OrderByDescending(d => d.UploadedAtUtc)
+                .FirstOrDefault();
+            _agreementDocumentId = latestAgreement?.Id;
+            if (_agreementPdfBytes is null && latestAgreement is not null)
+            {
+                _agreementPdfBytes = await DocumentService.ReadBytesAsync(latestAgreement.Id);
+            }
+
             Logger.LogInformation(
-                "FacilityReservationDetail loaded reservation {ReservationId} status={Status} renter={RenterId} inspections={InspectionCount} charges={HasCharges} payments={HasPayments}.",
-                Id, Reservation.Status, Reservation.FacilityRenterId, Inspections.Count, HasCharges, HasPayments);
+                "FacilityReservationDetail loaded reservation {ReservationId} status={Status} renter={RenterId} inspections={InspectionCount} charges={HasCharges} payments={HasPayments} agreementDoc={DocumentId}.",
+                Id, Reservation.Status, Reservation.FacilityRenterId, Inspections.Count, HasCharges, HasPayments, _agreementDocumentId);
         }
         catch (Exception ex)
         {
@@ -302,11 +333,12 @@ else
             Logger.LogInformation("FacilityReservationDetail generating agreement for {ReservationId}.", Id);
             var result = await AgreementService.GenerateAsync(Id);
             _agreementPdfBytes = result.PdfBytes;
-            AgreementMessage = $"Agreement generated ({result.FileName}). Path: {result.RelativePath}";
+            _agreementDocumentId = result.DocumentId;
+            AgreementMessage = $"Agreement generated ({result.FileName}). If the viewer is blank, use Open agreement PDF.";
             Logger.LogInformation(
-                "FacilityReservationDetail agreement generated reservation={ReservationId} document={DocumentId} path={Path}.",
-                Id, result.DocumentId, result.RelativePath);
-            await LoadAsync();
+                "FacilityReservationDetail agreement generated reservation={ReservationId} document={DocumentId} path={Path} bytes={ByteCount}.",
+                Id, result.DocumentId, result.RelativePath, result.PdfBytes.Length);
+            Reservation = await ReservationService.GetByIdAsync(Id);
         }
         catch (Exception ex)
         {

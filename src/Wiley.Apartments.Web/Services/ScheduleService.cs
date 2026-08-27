@@ -20,6 +20,8 @@ public sealed class ScheduleService(
             .Include(s => s.Unit)
             .Include(s => s.Tenant)
             .Include(s => s.Lease)
+            .Include(s => s.FacilityReservation!)
+                .ThenInclude(r => r.FacilityRenter)
             .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted, cancellationToken);
 
     public async Task<IReadOnlyList<ScheduledItem>> QueryAsync(
@@ -34,6 +36,8 @@ public sealed class ScheduleService(
             .AsNoTracking()
             .Include(s => s.Unit)
             .Include(s => s.Tenant)
+            .Include(s => s.FacilityReservation!)
+                .ThenInclude(r => r.FacilityRenter)
             .Where(s => !s.IsDeleted);
 
         if (unitId is Guid uid)

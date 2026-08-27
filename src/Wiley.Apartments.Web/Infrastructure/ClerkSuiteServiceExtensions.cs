@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Server.Circuits;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -53,6 +54,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
         builder.Services.AddScoped<IFacilityRenterService, FacilityRenterService>();
         builder.Services.AddScoped<IFacilityReservationService, FacilityReservationService>();
+        builder.Services.AddScoped<IFacilityRentalRateService, FacilityRentalRateService>();
         builder.Services.AddScoped<IFacilityInspectionService, FacilityInspectionService>();
         builder.Services.AddScoped<IFacilityInventoryService, FacilityInventoryService>();
         builder.Services.AddSingleton<FacilityRentalAgreementGenerator>();
@@ -67,6 +69,14 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<DocumentVaultAntiforgeryFilter>();
         builder.Services.AddHealthChecks()
             .AddCheck<DocumentRootHealthCheck>("document-root");
+
+        var dataProtectionKeys = Directory.Exists("/data")
+            ? "/data/dpkeys"
+            : Path.Combine(builder.Environment.ContentRootPath, "Data", "dpkeys");
+        Directory.CreateDirectory(dataProtectionKeys);
+        builder.Services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeys))
+            .SetApplicationName("ClerkSuite");
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";
