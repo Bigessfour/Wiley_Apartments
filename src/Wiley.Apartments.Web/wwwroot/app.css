@@ -188,15 +188,23 @@ h1:focus {
   color: var(--cs-sidebar-text) !important;
   border-right: none !important;
   box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 .clerksuite-sidebar-panel {
-  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden;
   background: var(--cs-sidebar);
   color: var(--cs-sidebar-text);
 }
 
 .clerksuite-brand {
+  flex-shrink: 0;
   padding: 1.35rem 1.25rem 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -229,10 +237,29 @@ h1:focus {
 }
 
 .clerksuite-nav {
-  padding: 0.85rem 0.75rem 1.5rem;
+  padding: 0.85rem 0.75rem 1.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.clerksuite-nav::-webkit-scrollbar {
+  width: 10px;
+}
+
+.clerksuite-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+}
+
+.clerksuite-nav::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .clerksuite-nav .nav-link {
@@ -524,9 +551,16 @@ h1:focus {
   font-size: 11px;
 }
 
-.cs-sched-who {
-  font-size: 10px;
-  opacity: 0.95;
+.e-schedule .e-appointment.cs-sched-work-order,
+.cs-sched-work-order.e-appointment {
+  background: #c2410c !important;
+  border-color: #c2410c !important;
+}
+
+.cs-sched-tip {
+  padding: 0.35rem 0.15rem;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .e-schedule .e-appointment.cs-sched-other,

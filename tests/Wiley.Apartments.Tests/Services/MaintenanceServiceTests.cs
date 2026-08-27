@@ -72,8 +72,8 @@ public class MaintenanceServiceTests
         var (db, service) = Create();
         await using (db)
         {
-            var (unit, _) = await SeedAsync(db);
-            var wo = await service.CreateAsync(unit.Id, "Fix sink", MaintenancePriority.Normal);
+            var (unit, asset) = await SeedAsync(db);
+            var wo = await service.CreateAsync(unit.Id, "Fix sink", MaintenancePriority.Normal, asset.Id);
             var done = await service.CompleteAsync(wo.Id, cost: 85.50m, completedByDisplay: "Test Clerk");
 
             done.Status.Should().Be(MaintenanceStatus.Completed);
@@ -86,6 +86,7 @@ public class MaintenanceServiceTests
             ops.Amount.Should().Be(85.50m);
             ops.MaintenanceRequestId.Should().Be(wo.Id);
             ops.UnitId.Should().Be(unit.Id);
+            ops.Notes.Should().Contain("Fridge");
         }
     }
 

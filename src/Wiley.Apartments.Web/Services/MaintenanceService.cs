@@ -170,7 +170,7 @@ public sealed class MaintenanceService(
                 request.Cost.Value,
                 request.CompletedUtc.Value,
                 unitId: request.UnitId,
-                notes: $"Maintenance WO {request.Id:N}: {request.Description}",
+                notes: await FormatOpsCostNotesAsync(request, cancellationToken),
                 maintenanceRequestId: request.Id,
                 cancellationToken: cancellationToken);
             request.OperatingCostId = ops.Id;
@@ -208,6 +208,22 @@ public sealed class MaintenanceService(
         {
             throw new InvalidOperationException($"Unit {unitId} was not found.");
         }
+    }
+
+    private async Task<string> FormatOpsCostNotesAsync(MaintenanceRequest request, CancellationToken cancellationToken)
+    {
+        var assetBit = "";
+        if (request.AssetId is Guid aid)
+        {
+            var asset = await _db.Assets.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == aid, cancellationToken);
+            if (asset is not null)
+            {
+                assetBit = $" · {asset.Type} ({asset.Serial})";
+            }
+        }
+
+        return $"Maintenance WO {request.Id:N}{assetBit}: {request.Description}";
     }
 
     private async Task EnsureAssetAsync(Guid? assetId, Guid unitId, CancellationToken cancellationToken)

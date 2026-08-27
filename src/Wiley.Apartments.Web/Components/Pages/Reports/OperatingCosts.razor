@@ -1,6 +1,7 @@
 @page "/reports/operating-costs"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @rendermode InteractiveServer
+@using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
@@ -15,7 +16,7 @@
 
 <PageTitle>Operating costs</PageTitle>
 
-<PageHeader Title="Operating costs" Subtitle="Landlord P&L expenses by unit/category (not tenant ledger)." CssClass="d-print-none">
+<PageHeader Title="Operating costs" Subtitle="Landlord P&L expenses by unit/category, including unit-tagged renovations (not tenant ledger)." CssClass="d-print-none">
     <SfButton CssClass="e-outline e-small" Content="← Reports" OnClick="@(() => Navigation.NavigateTo("/reports"))" />
     <SfButton CssClass="e-primary e-small" Content="Print / PDF" OnClick="PrintAsync" />
 </PageHeader>
@@ -35,6 +36,13 @@
         <SfDropDownList TValue="string" TItem="CatOption" DataSource="@CatOptions" @bind-Value="FilterCategory"
                         ShowClearButton="true" Placeholder="All">
             <DropDownListFieldSettings Text="Text" Value="Value" />
+        </SfDropDownList>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Unit</label>
+        <SfDropDownList TValue="Guid?" TItem="UnitOption" DataSource="@UnitFilterOptions" @bind-Value="FilterUnitId"
+                        ShowClearButton="true" Placeholder="All" AllowFiltering="true">
+            <DropDownListFieldSettings Text="Text" Value="Id" />
         </SfDropDownList>
     </div>
     <div class="col-md-3 d-flex align-items-end">
@@ -82,6 +90,59 @@
 
 <p class="small text-muted">Total (filter): @Total.ToString("C")</p>
 
+@if (CategorySlices.Count > 0 || UnitBars.Count > 0)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <h2 class="h6">By category</h2>
+            @if (CategorySlices.Count == 0)
+            {
+                <p class="text-muted small">No category totals for this filter.</p>
+            }
+            else
+            {
+                <SfAccumulationChart Width="100%" Height="280px" Theme="@ChartTheme" EnableSmartLabels="true"
+                                     EnableAnimation="false" EnableBorderOnMouseMove="false">
+                    <AccumulationChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Bottom">
+                        <AccumulationChartLegendBorder Color="transparent" Width="0" />
+                    </AccumulationChartLegendSettings>
+                    <AccumulationChartTooltipSettings Enable="true" Format="${point.x}: <b>${point.y}</b>" />
+                    <AccumulationChartSeriesCollection>
+                        <AccumulationChartSeries DataSource="@CategorySlices"
+                                                 XName="Label"
+                                                 YName="Amount"
+                                                 InnerRadius="55%"
+                                                 Radius="80%"
+                                                 Type="AccumulationType.Pie">
+                            <AccumulationDataLabelSettings Visible="true" Name="Label" />
+                        </AccumulationChartSeries>
+                    </AccumulationChartSeriesCollection>
+                </SfAccumulationChart>
+            }
+        </div>
+        <div class="col-lg-6">
+            <h2 class="h6">By unit</h2>
+            @if (UnitBars.Count == 0)
+            {
+                <p class="text-muted small">No unit totals for this filter.</p>
+            }
+            else
+            {
+                <SfChart Width="100%" Height="280px" Theme="@ChartTheme">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@UnitBars" XName="Label" YName="Amount" Type="ChartSeriesType.Column" Name="Cost" />
+                    </ChartSeriesCollection>
+                    <ChartLegendSettings Visible="false">
+                        <ChartLegendBorder Color="transparent" Width="0" />
+                    </ChartLegendSettings>
+                    <ChartTooltipSettings Enable="true" />
+                </SfChart>
+            }
+        </div>
+    </div>
+}
+
 <SfGrid TValue="CostRow" DataSource="@Rows" AllowSorting="true" AllowPaging="true">
     <GridPageSettings PageSize="25" />
     <GridColumns>
@@ -95,13 +156,24 @@
 </SfGrid>
 
 @code {
+    [SupplyParameterFromQuery(Name = "unitId")]
+    public Guid? QueryUnitId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? QueryCategory { get; set; }
+
     private List<CostRow> Rows { get; set; } = [];
     private List<UnitOption> UnitOptions { get; set; } = [];
+    private List<UnitOption> UnitFilterOptions { get; set; } = [];
+    private List<ChartSlice> CategorySlices { get; set; } = [];
+    private List<ChartSlice> UnitBars { get; set; } = [];
     private string? FilterCategory { get; set; }
+    private Guid? FilterUnitId { get; set; }
     private decimal Total { get; set; }
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
     private string? SuccessMessage { get; set; }
+    private Theme ChartTheme { get; set; } = Theme.Fluent2;
     private OperatingCostCategory FormCategory { get; set; } = OperatingCostCategory.Utility;
     private Guid? FormUnitId { get; set; }
     private decimal? FormAmount { get; set; }
@@ -114,6 +186,7 @@
         new() { Value = nameof(OperatingCostCategory.Utility), Text = "Utility" },
         new() { Value = nameof(OperatingCostCategory.Repair), Text = "Repair" },
         new() { Value = nameof(OperatingCostCategory.Replace), Text = "Replace" },
+        new() { Value = nameof(OperatingCostCategory.Renovation), Text = "Renovation" },
         new() { Value = nameof(OperatingCostCategory.CommonUpkeep), Text = "Common upkeep" }
     ];
 
@@ -122,6 +195,7 @@
         new() { Value = OperatingCostCategory.Utility, Text = "Utility" },
         new() { Value = OperatingCostCategory.Repair, Text = "Repair" },
         new() { Value = OperatingCostCategory.Replace, Text = "Replace" },
+        new() { Value = OperatingCostCategory.Renovation, Text = "Renovation" },
         new() { Value = OperatingCostCategory.CommonUpkeep, Text = "Common upkeep" }
     ];
 
@@ -131,6 +205,20 @@
         UnitOptions = units.OrderBy(u => u.Number)
             .Select(u => new UnitOption { Id = u.Id, Text = $"Unit {u.Number}" })
             .ToList();
+        UnitFilterOptions = UnitOptions;
+        if (QueryUnitId is Guid qid && UnitOptions.Any(u => u.Id == qid))
+        {
+            FilterUnitId = qid;
+            FormUnitId = qid;
+        }
+
+        if (!string.IsNullOrWhiteSpace(QueryCategory)
+            && Enum.TryParse<OperatingCostCategory>(QueryCategory, out var qCat))
+        {
+            FilterCategory = qCat.ToString();
+            FormCategory = qCat;
+        }
+
         await LoadAsync();
     }
 
@@ -140,7 +228,7 @@
         try
         {
             OperatingCostCategory? cat = Enum.TryParse<OperatingCostCategory>(FilterCategory, out var c) ? c : null;
-            var costs = await OpsCosts.QueryAsync(category: cat);
+            var costs = await OpsCosts.QueryAsync(unitId: FilterUnitId, category: cat);
             Rows = costs.Select(x => new CostRow
             {
                 DateDisplay = Clock.ToDisplayTime(x.IncurredUtc).ToString("d"),
@@ -151,6 +239,16 @@
                 Notes = x.Notes ?? ""
             }).ToList();
             Total = Rows.Sum(r => r.Amount);
+            CategorySlices = Rows
+                .GroupBy(r => r.Category)
+                .Select(g => new ChartSlice { Label = g.Key, Amount = g.Sum(x => x.Amount) })
+                .OrderByDescending(s => s.Amount)
+                .ToList();
+            UnitBars = Rows
+                .GroupBy(r => string.IsNullOrWhiteSpace(r.UnitNumber) ? "(Building)" : r.UnitNumber)
+                .Select(g => new ChartSlice { Label = g.Key, Amount = g.Sum(x => x.Amount) })
+                .OrderByDescending(s => s.Amount)
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -196,6 +294,35 @@
     }
 
     private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            var isDark = await Js.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
+            var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
+            if (next != ChartTheme)
+            {
+                ChartTheme = next;
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // Theme helper optional in test host.
+        }
+    }
+
+    private sealed class ChartSlice
+    {
+        public string Label { get; set; } = "";
+        public decimal Amount { get; set; }
+    }
 
     private sealed class CostRow
     {

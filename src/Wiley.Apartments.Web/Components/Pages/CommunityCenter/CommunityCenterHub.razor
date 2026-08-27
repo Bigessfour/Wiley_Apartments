@@ -83,10 +83,10 @@ else
         <SfButton CssClass="e-outline" Content="Maintenance"
                   OnClick="@(() => Navigation.NavigateTo($"/maintenance?unitId={Facility.Id}"))" />
         <SfButton CssClass="e-outline" Content="Documents"
-                  OnClick="@(() => Navigation.NavigateTo("/documents"))" />
+                  OnClick="@(() => Navigation.NavigateTo("/documents?cc=1"))" />
     </div>
     <p class="small text-muted mt-2 mb-0">
-        Documents opens the shared vault — pick entity type CC renter / reservation / inspection / inventory when uploading.
+        Documents opens the vault filtered to Community Center records (`?cc=1`). Pick CC renter / reservation / inspection / inventory when uploading.
     </p>
 }
 

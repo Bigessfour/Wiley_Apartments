@@ -28,7 +28,7 @@ public interface ILeaseService
         string? customClauses = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Fill template (prefer fillable PDF) under DocumentRoot/leases. Remains Draft until signed/activated.</summary>
+    /// <summary>Fill Brookside template under DocumentRoot/leases. Remains Draft until signed. Copies rent onto the unit and starts occupancy when the unit is vacant.</summary>
     Task<Lease> GenerateDocumentsAsync(Guid leaseId, CancellationToken cancellationToken = default);
 
     /// <summary>Store signed PDF in the vault, link to lease, set status Active.</summary>

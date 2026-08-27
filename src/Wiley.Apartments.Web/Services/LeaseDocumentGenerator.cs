@@ -148,32 +148,83 @@ public sealed class LeaseDocumentGenerator
         using var pdfDocument = pdfRenderer.ConvertToPDF(document);
         using var pdfStream = new MemoryStream();
         pdfDocument.Save(pdfStream);
-        var pdfBytes = AppendCustomClausesIfNeeded(pdfStream.ToArray(), data.CustomClauses);
+        var pdfBytes = OverlayMergeValues(pdfStream.ToArray(), data);
+        pdfBytes = AppendCustomClausesIfNeeded(pdfBytes, data.CustomClauses);
         return (docxBytes, pdfBytes);
     }
 
-    /// <summary>Preferred generate: fillable PDF when template is PDF; else DOCX→fillable→fill.</summary>
+    /// <summary>
+    /// Clerk-facing PDF: DOCX uses underscore/marker text replace (same idea as CC agreements).
+    /// Fillable PDF templates are filled then leftover @@markers@@ are painted over.
+    /// </summary>
     public (byte[]? Docx, byte[] Pdf) Generate(Stream template, string templateFileName, LeaseMergeData data)
     {
         if (templateFileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             var pdf = FillPdf(template, data);
+            pdf = OverlayMergeValues(pdf, data);
             return (null, pdf);
         }
 
-        // DOCX source: build fillable PDF in-memory then fill (PDF-first product path).
-        using var buffer = new MemoryStream();
-        template.CopyTo(buffer);
-        var docxBytes = buffer.ToArray();
+        using var forDocx = new MemoryStream();
+        template.CopyTo(forDocx);
+        forDocx.Position = 0;
+        return GenerateFromDocx(forDocx, data);
+    }
 
-        using var forFillable = new MemoryStream(docxBytes);
-        var fillable = CreateFillablePdfFromDocx(forFillable);
-        using var fillableStream = new MemoryStream(fillable);
-        var filledPdf = FillPdf(fillableStream, data);
+    /// <summary>True when the PDF still shows unmerged @@Field@@ tokens.</summary>
+    public static bool ContainsMergeMarkers(byte[] pdf)
+    {
+        using var loaded = new PdfLoadedDocument(pdf);
+        for (var i = 0; i < loaded.Pages.Count; i++)
+        {
+            if (loaded.Pages[i].ExtractText().Contains("@@", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
 
-        using var forDocx = new MemoryStream(docxBytes);
-        var (filledDocx, _) = GenerateFromDocx(forDocx, data);
-        return (filledDocx, filledPdf);
+        return false;
+    }
+
+    /// <summary>
+    /// Cover leftover @@Marker@@ text and draw merge values. AcroForm FindText often misses
+    /// markers after DOCX→PDF, which is what left unreadable leases on Regenerate.
+    /// </summary>
+    public byte[] OverlayMergeValues(byte[] pdf, LeaseMergeData data)
+    {
+        var values = ToFieldValues(data);
+        using var input = new MemoryStream(pdf);
+        using var loaded = new PdfLoadedDocument(input);
+        var font = new PdfStandardFont(PdfFontFamily.Helvetica, 9);
+
+        foreach (var (marker, fieldName, _, _) in FieldMap)
+        {
+            if (!values.TryGetValue(fieldName, out var value) || string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (!loaded.FindText(marker, out Dictionary<int, List<RectangleF>>? matches) || matches is null)
+            {
+                continue;
+            }
+
+            foreach (var (pageIndex, rects) in matches)
+            {
+                var page = loaded.Pages[pageIndex];
+                foreach (var rect in rects.Where(r => r.Width > 1 && r.Height > 1))
+                {
+                    page.Graphics.DrawRectangle(PdfBrushes.White, rect);
+                    var bounds = new RectangleF(rect.X, rect.Y, Math.Max(rect.Width, 80f), rect.Height + 2f);
+                    page.Graphics.DrawString(value, font, PdfBrushes.Black, bounds);
+                }
+            }
+        }
+
+        using var output = new MemoryStream();
+        loaded.Save(output);
+        return output.ToArray();
     }
 
     /// <summary>Append an Additional Clauses page when the clerk provided custom text (FR-009).</summary>
@@ -250,6 +301,11 @@ public sealed class LeaseDocumentGenerator
             $"each month beginning {values["RentStart"]}.");
         Replace(document, "Resident has deposited $___________ with the owner",
             $"Resident has deposited ${values["SecurityDeposit"]} with the owner");
+
+        foreach (var (marker, fieldName, _, _) in FieldMap)
+        {
+            Replace(document, marker, values[fieldName]);
+        }
     }
 
     private static void Replace(WordDocument document, string find, string replace) =>

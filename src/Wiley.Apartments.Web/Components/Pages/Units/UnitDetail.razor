@@ -294,6 +294,14 @@ else
                                                 Format="d"
                                                 Width="120" />
                                     <GridColumn Field="@nameof(Asset.Condition)" HeaderText="Condition" Width="110" />
+                                    <GridColumn HeaderText="" Width="130">
+                                        <Template>
+                                            @{
+                                                var asset = (Asset)context;
+                                            }
+                                            <a href="@($"/maintenance?unitId={UnitId}&assetId={asset.Id}")">Work order</a>
+                                        </Template>
+                                    </GridColumn>
                                 </GridColumns>
                             </SfGrid>
                         </div>
@@ -450,7 +458,11 @@ else
                             Work-order history for this unit.
                             <a href="@($"/maintenance?unitId={UnitId}")">Open maintenance for this unit</a>
                         </p>
-                        <div style="min-width: 220px;">
+                        <div class="d-flex gap-2 flex-wrap align-items-end">
+                            <SfButton CssClass="e-primary e-small"
+                                      Content="New work order"
+                                      OnClick="@(() => Navigation.NavigateTo($"/maintenance?unitId={UnitId}"))" />
+                            <div style="min-width: 220px;">
                             <label class="form-label small mb-1">Filter by asset</label>
                             <SfDropDownList TValue="Guid?" TItem="AssetFilterOption"
                                             DataSource="@AssetFilterOptions"
@@ -460,6 +472,7 @@ else
                                             ValueChange="OnMaintenanceAssetFilterChanged">
                                 <DropDownListFieldSettings Text="Text" Value="Id" />
                             </SfDropDownList>
+                            </div>
                         </div>
                     </div>
                     <SfGrid TValue="MaintenanceRow" DataSource="@DisplayedMaintenanceRows" AllowPaging="true" AllowSorting="true" Height="360">
@@ -481,10 +494,11 @@ else
                     <TabHeader Text="Ops costs"></TabHeader>
                 </ChildContent>
                 <ContentTemplate>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                         <p class="text-muted small mb-0">
-                            Landlord expenses for this unit (Utility / Repair / Replace / CommonUpkeep).
-                            Full portfolio entry: <a href="/reports/operating-costs">Operating costs report</a>.
+                            Landlord expenses for this unit (Utility / Repair / Replace / Renovation / CommonUpkeep).
+                            Full portfolio entry: <a href="@($"/reports/operating-costs?unitId={UnitId}")">Operating costs report</a>.
+                            Remodel: <a href="@($"/reports/operating-costs?unitId={UnitId}&category=Renovation")">Record renovation</a>.
                         </p>
                         <span class="fw-semibold">Total @OpsCostTotal.ToString("C")</span>
                     </div>

@@ -76,6 +76,40 @@ public class LeaseDocumentGeneratorTests
             .Select(i => loaded.Pages[i].ExtractText()));
         text.Should().Contain("Pat Nguyen");
         text.Should().Contain("650.00");
+        text.Should().NotContain("@@ResidentName@@");
+        text.Should().NotContain("@@MonthlyRent@@");
+    }
+
+    [Fact]
+    public void Generate_FromSyntheticDocx_ReplacesBlanksWithoutLeavingMarkers()
+    {
+        using var document = new Syncfusion.DocIO.DLS.WordDocument();
+        var section = document.AddSection();
+        foreach (var line in new[]
+                 {
+                     "to _________________________________referred to as resident",
+                     "rent for this initial period is_____",
+                     "apartment at ____________________",
+                     "Resident has deposited $___________ with the owner"
+                 })
+        {
+            section.AddParagraph().AppendText(line);
+        }
+
+        using var template = new MemoryStream();
+        document.Save(template, Syncfusion.DocIO.FormatType.Docx);
+        template.Position = 0;
+
+        var generator = new LeaseDocumentGenerator();
+        var (_, pdf) = generator.Generate(template, "synthetic.docx", SampleData());
+
+        pdf.Length.Should().BeGreaterThan(200);
+        LeaseDocumentGenerator.ContainsMergeMarkers(pdf).Should().BeFalse();
+        using var loaded = new PdfLoadedDocument(pdf);
+        var text = string.Join('\n', Enumerable.Range(0, loaded.Pages.Count)
+            .Select(i => loaded.Pages[i].ExtractText()));
+        text.Should().Contain("Pat Nguyen");
+        text.Should().Contain("650.00");
     }
 
     [Fact]

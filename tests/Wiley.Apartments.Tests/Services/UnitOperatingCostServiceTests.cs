@@ -41,6 +41,13 @@ public class UnitOperatingCostServiceTests
                 notes: "Hall lights");
             common.UnitId.Should().BeNull();
             common.Category.Should().Be(OperatingCostCategory.CommonUpkeep);
+
+            var reno = () => service.CreateAsync(
+                OperatingCostCategory.Renovation,
+                500m,
+                DateTime.UtcNow,
+                unitId: null);
+            await reno.Should().ThrowAsync<ArgumentException>();
         }
     }
 

@@ -42,8 +42,9 @@ public class DashboardServiceTests
         var opts = Options.Create(new ClerkSuiteOptions { DocumentRoot = Path.GetTempPath() });
         var paths = new Wiley.Apartments.Tests.Support.FixedDocumentPathResolver(opts.Value.DocumentRoot);
         var documents = new DocumentService(db, paths, clock, NullLogger<DocumentService>.Instance);
+        var occupancy = new OccupancyService(db, clock, NullLogger<OccupancyService>.Instance);
         var leases = new LeaseService(
-            db, opts, paths, env, clock, new LeaseDocumentGenerator(), documents, NullLogger<LeaseService>.Instance);
+            db, opts, paths, env, clock, new LeaseDocumentGenerator(), documents, occupancy, NullLogger<LeaseService>.Instance);
         var rentRoll = new RentRollService(db, NullLogger<RentRollService>.Instance);
         var ops = new UnitOperatingCostService(db, NullLogger<UnitOperatingCostService>.Instance);
         var maintenance = new MaintenanceService(db, ops, clock, NullLogger<MaintenanceService>.Instance);

@@ -158,6 +158,8 @@ public sealed class DemoDataSeeder(
         });
         unit1.Status = UnitStatus.Occupied;
         unit1.CurrentTenantId = jordan.Id;
+        unit1.MonthlyRent = 850m;
+        unit1.SecurityDeposit = 850m;
         unit1.SqFt = 980;
         unit1.Beds = 2;
         unit1.Baths = 1;

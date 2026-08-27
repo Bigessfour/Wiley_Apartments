@@ -44,8 +44,9 @@ public sealed class LedgerService(
         else if (occupancy == OccupancyFilter.Current)
         {
             query = query.Where(e =>
-                e.FacilityRenterId != null
-                || _db.Units.Any(u =>
+                e.FacilityRenterId == null
+                && e.TenantId != null
+                && _db.Units.Any(u =>
                     u.Id == e.UnitId
                     && u.Status == UnitStatus.Occupied
                     && !u.IsFacility

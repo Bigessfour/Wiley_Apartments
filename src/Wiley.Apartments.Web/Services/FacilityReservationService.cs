@@ -64,7 +64,7 @@ public sealed class FacilityReservationService(
         reservation.Id = Guid.NewGuid();
         reservation.IsDeleted = false;
         reservation.RowVersion = Guid.NewGuid();
-        if (reservation.Status == FacilityReservationStatus.Confirmed)
+        if (reservation.Status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
             await EnsureNoConfirmedOverlapAsync(
                 reservation.UnitId, reservation.StartUtc, reservation.EndUtc, null,
@@ -72,6 +72,11 @@ public sealed class FacilityReservationService(
         }
 
         NormalizeEquipment(reservation);
+
+        if (reservation.Status == FacilityReservationStatus.Confirmed)
+        {
+            await HoldInventoryAsync(reservation, cancellationToken);
+        }
 
         _db.FacilityReservations.Add(reservation);
         await _db.SaveChangesAsync(cancellationToken);
@@ -95,7 +100,7 @@ public sealed class FacilityReservationService(
                        ?? throw new InvalidOperationException($"Facility reservation {reservation.Id} was not found.");
 
         await ValidateReservationAsync(reservation, reservation.Id, cancellationToken);
-        if (reservation.Status == FacilityReservationStatus.Confirmed)
+        if (reservation.Status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
             await EnsureNoConfirmedOverlapAsync(
                 reservation.UnitId, reservation.StartUtc, reservation.EndUtc, reservation.Id,
@@ -111,11 +116,22 @@ public sealed class FacilityReservationService(
         existing.RentalFee = decimal.Round(reservation.RentalFee, 2, MidpointRounding.AwayFromZero);
         existing.DepositAmount = decimal.Round(reservation.DepositAmount, 2, MidpointRounding.AwayFromZero);
         existing.Notes = Trim(reservation.Notes, 2000);
+        if (existing.InventoryHeld)
+        {
+            await ReleaseInventoryAsync(existing, cancellationToken);
+        }
+
         ReplaceEquipment(existing, reservation.Equipment);
 
         _db.Entry(existing).Property(e => e.RowVersion).OriginalValue = reservation.RowVersion;
         ConcurrencyHelper.BumpRowVersion(existing);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "FacilityReservation", cancellationToken);
+
+        if (existing.Status == FacilityReservationStatus.Confirmed)
+        {
+            await HoldInventoryAsync(existing, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
 
         if (existing.Status is FacilityReservationStatus.Confirmed or FacilityReservationStatus.Request)
         {
@@ -139,12 +155,14 @@ public sealed class FacilityReservationService(
         CancellationToken cancellationToken = default)
     {
         var existing = await _db.FacilityReservations
+                           .Include(r => r.Equipment)
                            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted, cancellationToken)
                        ?? throw new InvalidOperationException($"Facility reservation {id} was not found.");
 
         EnsureTransitionAllowed(existing.Status, status);
 
-        if (status == FacilityReservationStatus.Confirmed)
+        if (status == FacilityReservationStatus.Confirmed
+            || status == FacilityReservationStatus.Request)
         {
             await EnsureNoConfirmedOverlapAsync(
                 existing.UnitId, existing.StartUtc, existing.EndUtc, existing.Id,
@@ -169,6 +187,15 @@ public sealed class FacilityReservationService(
             existing.Notes = Trim(
                 string.IsNullOrWhiteSpace(existing.Notes) ? note : $"{existing.Notes}\n{note}",
                 2000);
+        }
+
+        if (status == FacilityReservationStatus.Confirmed)
+        {
+            await HoldInventoryAsync(existing, cancellationToken);
+        }
+        else if (existing.InventoryHeld)
+        {
+            await ReleaseInventoryAsync(existing, cancellationToken);
         }
 
         ConcurrencyHelper.BumpRowVersion(existing);
@@ -250,7 +277,8 @@ public sealed class FacilityReservationService(
         var candidates = await _db.FacilityReservations.AsNoTracking()
             .Where(r => !r.IsDeleted
                         && r.UnitId == unitId
-                        && r.Status == FacilityReservationStatus.Confirmed
+                        && (r.Status == FacilityReservationStatus.Confirmed
+                            || r.Status == FacilityReservationStatus.Request)
                         && (excludeId == null || r.Id != excludeId)
                         && r.StartUtc < endUtc
                         && startUtc < r.EndUtc)
@@ -262,7 +290,7 @@ public sealed class FacilityReservationService(
                 "Confirmed facility reservation overlap rejected unit={UnitId} space={Space} start={Start} end={End} exclude={ExcludeId}.",
                 unitId, space, startUtc, endUtc, excludeId);
             throw new InvalidOperationException(
-                $"Confirmed {FacilitySpaceInfo.DisplayName(space)} reservation overlaps an existing confirmed booking for that room or Entire Facility.");
+                $"{FacilitySpaceInfo.DisplayName(space)} overlaps a pending or confirmed booking for that room or Entire Facility.");
         }
     }
 
@@ -419,6 +447,62 @@ public sealed class FacilityReservationService(
                 Quantity = line.Quantity
             });
         }
+    }
+
+    private async Task HoldInventoryAsync(FacilityReservation reservation, CancellationToken cancellationToken)
+    {
+        if (reservation.InventoryHeld)
+        {
+            return;
+        }
+
+        var lines = reservation.Equipment.Count > 0
+            ? reservation.Equipment.ToList()
+            : await _db.FacilityReservationEquipment
+                .Where(e => e.FacilityReservationId == reservation.Id)
+                .ToListAsync(cancellationToken);
+        foreach (var line in lines)
+        {
+            var item = await _db.FacilityInventoryItems
+                           .FirstOrDefaultAsync(i => i.Id == line.InventoryItemId && !i.IsDeleted, cancellationToken)
+                       ?? throw new InvalidOperationException("Reservation equipment is missing from inventory.");
+            if (item.Quantity < line.Quantity)
+            {
+                throw new InvalidOperationException(
+                    $"Not enough {item.Name} in inventory (have {item.Quantity}, need {line.Quantity}).");
+            }
+
+            item.Quantity -= line.Quantity;
+        }
+
+        reservation.InventoryHeld = true;
+    }
+
+    private async Task ReleaseInventoryAsync(FacilityReservation reservation, CancellationToken cancellationToken)
+    {
+        if (!reservation.InventoryHeld)
+        {
+            return;
+        }
+
+        var lines = reservation.Equipment.Count > 0
+            ? reservation.Equipment.ToList()
+            : await _db.FacilityReservationEquipment
+                .Where(e => e.FacilityReservationId == reservation.Id)
+                .ToListAsync(cancellationToken);
+        foreach (var line in lines)
+        {
+            var item = await _db.FacilityInventoryItems
+                .FirstOrDefaultAsync(i => i.Id == line.InventoryItemId, cancellationToken);
+            if (item is null)
+            {
+                continue;
+            }
+
+            item.Quantity += line.Quantity;
+        }
+
+        reservation.InventoryHeld = false;
     }
 
     private static string? Trim(string? value, int max)

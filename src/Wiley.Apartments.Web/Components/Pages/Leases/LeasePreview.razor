@@ -468,7 +468,10 @@ else
             await PreferDisplayPdfAsync();
             if (_pdfBytes is { Length: > 0 })
             {
-                await Toast.ShowSuccessAsync("Lease PDF generated.");
+                var occupied = Lease.Unit?.Status == UnitStatus.Occupied;
+                await Toast.ShowSuccessAsync(occupied
+                    ? "Lease PDF generated. Unit rent was copied from this lease; occupancy is started if the unit was vacant."
+                    : "Lease PDF generated.");
             }
             else if (string.IsNullOrEmpty(ErrorMessage))
             {

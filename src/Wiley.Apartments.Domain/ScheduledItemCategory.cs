@@ -6,5 +6,6 @@ public enum ScheduledItemCategory
     Vacancy = 1,
     Inspection = 2,
     Other = 3,
-    FacilityRental = 4
+    FacilityRental = 4,
+    WorkOrder = 5
 }

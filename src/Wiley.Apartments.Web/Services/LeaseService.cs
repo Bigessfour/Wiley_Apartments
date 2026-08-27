@@ -15,6 +15,7 @@ public sealed class LeaseService(
     IDateTimeService clock,
     LeaseDocumentGenerator generator,
     IDocumentService documents,
+    IOccupancyService occupancy,
     ILogger<LeaseService> logger) : ILeaseService
 {
     private static readonly (string BaseName, string DisplayName, string Term)[] KnownTemplates =
@@ -30,6 +31,7 @@ public sealed class LeaseService(
     private readonly IDateTimeService _clock = clock;
     private readonly LeaseDocumentGenerator _generator = generator;
     private readonly IDocumentService _documents = documents;
+    private readonly IOccupancyService _occupancy = occupancy;
     private readonly ILogger<LeaseService> _logger = logger;
 
     public Task<IReadOnlyList<LeaseTemplateInfo>> ListTemplatesAsync(
@@ -165,6 +167,7 @@ public sealed class LeaseService(
         };
 
         _db.Leases.Add(lease);
+        ApplyUnitFinancials(lease);
         await _db.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Created draft lease {LeaseId} using {Template}.", lease.Id, selected.FileName);
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
@@ -248,7 +251,9 @@ public sealed class LeaseService(
 
         // Stay Draft until signed upload / activate workflow (T3.3 / T3.4).
         lease.Status = LeaseStatus.Draft;
+        ApplyUnitFinancials(lease);
         await _db.SaveChangesAsync(cancellationToken);
+        await TryStartOccupancyFromLeaseAsync(lease, cancellationToken);
 
         _logger.LogInformation("Generated lease PDF for {LeaseId}: {Pdf}", lease.Id, pdfRel);
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
@@ -292,7 +297,9 @@ public sealed class LeaseService(
 
         lease.SignedDocumentId = doc.Id;
         lease.Status = LeaseStatus.Active;
+        ApplyUnitFinancials(lease);
         await _db.SaveChangesAsync(cancellationToken);
+        await TryStartOccupancyFromLeaseAsync(lease, cancellationToken);
 
         _logger.LogInformation(
             "Attached signed lease document {DocumentId} to lease {LeaseId}; status Active.",
@@ -369,6 +376,7 @@ public sealed class LeaseService(
 
         lease.Status = LeaseStatus.Amended;
         lease.LifecycleNote = TrimNote(note) ?? lease.LifecycleNote;
+        ApplyUnitFinancials(lease);
         ConcurrencyHelper.BumpRowVersion(lease);
         await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
         _logger.LogInformation("Amended lease {LeaseId}.", lease.Id);
@@ -485,6 +493,47 @@ public sealed class LeaseService(
 
         var trimmed = note.Trim();
         return trimmed.Length > 2000 ? trimmed[..2000] : trimmed;
+    }
+
+    private void ApplyUnitFinancials(Lease lease)
+    {
+        var unit = lease.Unit ?? _db.Units.Find(lease.UnitId);
+        if (unit is null || unit.IsFacility)
+        {
+            return;
+        }
+
+        unit.MonthlyRent = lease.Rent;
+        unit.SecurityDeposit = lease.Deposit;
+        ConcurrencyHelper.BumpRowVersion(unit);
+    }
+
+    private async Task TryStartOccupancyFromLeaseAsync(Lease lease, CancellationToken cancellationToken)
+    {
+        var unit = lease.Unit ?? await _db.Units.FindAsync([lease.UnitId], cancellationToken);
+        if (unit is null || unit.IsFacility || unit.Number == UnitService.CommunityCenterNumber)
+        {
+            return;
+        }
+
+        var current = await _occupancy.GetCurrentForUnitAsync(lease.UnitId, cancellationToken);
+        if (current is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _occupancy.StartAsync(lease.UnitId, lease.TenantId, lease.StartUtc, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Lease {LeaseId} PDF saved but occupancy was not started for unit {UnitId}.",
+                lease.Id,
+                lease.UnitId);
+        }
     }
 
     /// <summary>

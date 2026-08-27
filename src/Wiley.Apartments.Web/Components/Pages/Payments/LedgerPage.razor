@@ -228,6 +228,11 @@
         {
             if (FilterUnitId is Guid && !string.IsNullOrEmpty(FilterUnitLabel))
             {
+                if (UnitFormOptions.Any(u => u.Id == FilterUnitId && u.IsFacility))
+                {
+                    return $"Community Center ledger for {FilterUnitLabel} (facility renters).";
+                }
+
                 return CurrentOnly
                     ? $"Current occupant ledger for {FilterUnitLabel}. Use Include former for past residents of this unit."
                     : $"Full history for {FilterUnitLabel}, including former tenants.";
@@ -258,7 +263,8 @@
             .Select(u => new IdOption
             {
                 Id = u.Id,
-                Text = u.IsFacility ? $"Facility {u.Number}" : $"Unit {u.Number}"
+                Text = u.IsFacility ? $"Facility {u.Number}" : $"Unit {u.Number}",
+                IsFacility = u.IsFacility
             })
             .ToList();
         UnitFilterOptions =
@@ -394,9 +400,11 @@
         {
             var occupancy = FilterTenantId is Guid
                 ? OccupancyFilter.All
-                : CurrentOnly
-                    ? OccupancyFilter.Current
-                    : OccupancyFilter.All;
+                : FilterUnitId is Guid fuid && UnitFormOptions.Any(u => u.Id == fuid && u.IsFacility)
+                    ? OccupancyFilter.All
+                    : CurrentOnly
+                        ? OccupancyFilter.Current
+                        : OccupancyFilter.All;
             var lines = await LedgerService.GetLedgerAsync(FilterTenantId, FilterUnitId, occupancy);
             Rows = lines.Select(l => new LedgerRow
             {
@@ -533,10 +541,23 @@
         try
         {
             var count = await LedgerService.PostMonthlyRentChargesAsync();
-            await Toast.ShowSuccessAsync(count == 0
-                ? "No new rent charges needed for this month."
-                : $"Posted {count} rent charge(s) for active leases.");
+            string? emptyBanner = null;
+            if (count == 0)
+            {
+                emptyBanner =
+                    "No new rent charges for this month. They may already be posted, or there is no Active lease / occupied unit with monthly rent.";
+                await Toast.ShowInfoAsync(emptyBanner, "Nothing posted");
+            }
+            else
+            {
+                await Toast.ShowSuccessAsync($"Posted {count} rent charge(s) for this month.");
+            }
+
             await LoadAsync();
+            if (emptyBanner is not null)
+            {
+                ErrorMessage = emptyBanner;
+            }
         }
         catch (Exception ex)
         {
@@ -568,6 +589,7 @@
     {
         public Guid? Id { get; set; }
         public string Text { get; set; } = "";
+        public bool IsFacility { get; set; }
     }
 
     private sealed class MethodOption

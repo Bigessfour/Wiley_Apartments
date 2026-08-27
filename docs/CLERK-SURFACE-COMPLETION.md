@@ -19,6 +19,12 @@
 
 **This workflow targets D2.** D1 is already signed. D3 is optional product ambition, not required for town ops.
 
+### Status — Deb UAT 2026-08-26 (updated evening)
+
+**S1s addressed locally** after the clerk walk: residential lease merge (DOCX text replace on generate/regenerate) and occupancy+rent from generating a draft lease. Punchlist: [handover/2026-08-26-DEB-UAT-PUNCHLIST.md](./handover/2026-08-26-DEB-UAT-PUNCHLIST.md). Surface log: [handover/surface-logs/2026-08-26-deb-uat.md](./handover/surface-logs/2026-08-26-deb-uat.md).
+
+Re-tick inventory after Deb prints the Unit 1 lease and confirms Generate rent. Remaining items are S2/S3.
+
 ---
 
 ## 2. How we compare to professional market products
@@ -255,10 +261,8 @@ When all inventory boxes are PASS D2 or PASS WITH NOTES (no S0/S1), mark:
 
 ---
 
-## Status (2026-08-11 evening)
+## Status (2026-08-26 Deb UAT)
 
-**Spec 002 CC surfaces F3–F9: PASS WITH NOTES (D2 for this track).** Prior A–E / G–I / F1–F2 PASS WITH NOTES.
-**Unchecked for this board:** none in F3–F9.
-NAS residual: [NAS-CLERK-SMOKE.md](./handover/NAS-CLERK-SMOKE.md).
+**S1 lease merge + occupancy/rent collection fixed locally** (evening). Remaining S2/S3 in [handover/2026-08-26-DEB-UAT-PUNCHLIST.md](./handover/2026-08-26-DEB-UAT-PUNCHLIST.md).
 
-**Open follow-ups (non-blocking):** reservation status button guards (Confirm after Completed); FacilityRenterDetail error layout parity; optional Cancel confirm.
+2026-08-11 evening (historical): Spec 002 F3–F9 PASS WITH NOTES on that pass. NAS residual: [NAS-CLERK-SMOKE.md](./handover/NAS-CLERK-SMOKE.md).

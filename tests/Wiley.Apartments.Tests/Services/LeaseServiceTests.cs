@@ -59,6 +59,7 @@ public class LeaseServiceTests
             paths,
             clock,
             NullLogger<DocumentService>.Instance);
+        var occupancy = new OccupancyService(db, clock, NullLogger<OccupancyService>.Instance);
         var service = new LeaseService(
             db,
             opts,
@@ -67,6 +68,7 @@ public class LeaseServiceTests
             clock,
             new LeaseDocumentGenerator(),
             documents,
+            occupancy,
             NullLogger<LeaseService>.Instance);
         return (db, service, documentRoot);
     }
@@ -143,6 +145,28 @@ public class LeaseServiceTests
             lease.GeneratedPdfRelativePath.Should().NotBeNullOrWhiteSpace();
             File.Exists(Path.Combine(workRoot, lease.GeneratedPdfRelativePath!)).Should().BeTrue();
             File.Exists(Path.Combine(workRoot, "templates", "brookside-year-lease.pdf")).Should().BeTrue();
+
+            var unitAfter = await db.Units.FindAsync(unit.Id);
+            unitAfter!.MonthlyRent.Should().Be(650m);
+            unitAfter.SecurityDeposit.Should().Be(650m);
+            unitAfter.Status.Should().Be(UnitStatus.Occupied);
+            unitAfter.CurrentTenantId.Should().Be(tenant.Id);
+
+            var pdfBytes = await File.ReadAllBytesAsync(Path.Combine(workRoot, lease.GeneratedPdfRelativePath!));
+            using var loaded = new Syncfusion.Pdf.Parsing.PdfLoadedDocument(pdfBytes);
+            var text = string.Join('\n', Enumerable.Range(0, loaded.Pages.Count)
+                .Select(i => loaded.Pages[i].ExtractText()));
+            text.Should().Contain("Pat Nguyen");
+            text.Should().NotContain("@@ResidentName@@");
+            text.Should().NotContain("@@MonthlyRent@@");
+
+            var regenerated = await service.GenerateDocumentsAsync(draft.Id);
+            var pdfAgain = await File.ReadAllBytesAsync(Path.Combine(workRoot, regenerated.GeneratedPdfRelativePath!));
+            using var loadedAgain = new Syncfusion.Pdf.Parsing.PdfLoadedDocument(pdfAgain);
+            var textAgain = string.Join('\n', Enumerable.Range(0, loadedAgain.Pages.Count)
+                .Select(i => loadedAgain.Pages[i].ExtractText()));
+            textAgain.Should().Contain("Pat Nguyen");
+            textAgain.Should().NotContain("@@ResidentName@@");
         }
 
         try

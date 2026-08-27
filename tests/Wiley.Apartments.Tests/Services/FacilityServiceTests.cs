@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Domain;
 using Wiley.Apartments.Web.Data;
 using Wiley.Apartments.Web.Services;
@@ -117,6 +118,128 @@ public class FacilityReservationServiceTests
         hall.Space.Should().Be(FacilitySpace.MainHall);
         (await db.ScheduledItems.CountAsync(s =>
             s.FacilityReservationId != null && !s.IsDeleted)).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Request_HoldsTheRoomAgainstLaterConfirmedOverlap()
+    {
+        await using var db = CreateDb();
+        var (unit, renter, service, start, end) = await SeedCcAsync(db);
+
+        await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.Kitchen,
+            Status = FacilityReservationStatus.Request,
+            RentalFee = 75,
+            DepositAmount = 75
+        });
+
+        var act = async () => await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.Kitchen,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 75,
+            DepositAmount = 75
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*overlaps*");
+    }
+
+    [Fact]
+    public async Task Confirm_HoldsInventoryAndCancelRestoresQuantity()
+    {
+        await using var db = CreateDb();
+        var (unit, renter, service, start, end) = await SeedCcAsync(db);
+        var item = new FacilityInventoryItem
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            Name = "Banquet tables",
+            Category = FacilityInventoryCategory.Table,
+            Quantity = 10,
+            RowVersion = Guid.NewGuid()
+        };
+        db.FacilityInventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        var created = await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.MainHall,
+            Status = FacilityReservationStatus.Request,
+            RentalFee = 150,
+            DepositAmount = 100,
+            Equipment =
+            [
+                new FacilityReservationEquipment { InventoryItemId = item.Id, Quantity = 3 }
+            ]
+        });
+
+        (await db.FacilityInventoryItems.AsNoTracking().SingleAsync(i => i.Id == item.Id))
+            .Quantity.Should().Be(10);
+
+        await service.SetStatusAsync(created.Id, FacilityReservationStatus.Confirmed);
+        (await db.FacilityInventoryItems.AsNoTracking().SingleAsync(i => i.Id == item.Id))
+            .Quantity.Should().Be(7);
+        (await db.FacilityReservations.AsNoTracking().SingleAsync(r => r.Id == created.Id))
+            .InventoryHeld.Should().BeTrue();
+
+        await service.SetStatusAsync(created.Id, FacilityReservationStatus.Cancelled);
+        (await db.FacilityInventoryItems.AsNoTracking().SingleAsync(i => i.Id == item.Id))
+            .Quantity.Should().Be(10);
+        (await db.FacilityReservations.AsNoTracking().SingleAsync(r => r.Id == created.Id))
+            .InventoryHeld.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Confirm_RejectsWhenInventoryQuantityIsInsufficient()
+    {
+        await using var db = CreateDb();
+        var (unit, renter, service, start, end) = await SeedCcAsync(db);
+        var item = new FacilityInventoryItem
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            Name = "Chairs",
+            Category = FacilityInventoryCategory.Chair,
+            Quantity = 2,
+            RowVersion = Guid.NewGuid()
+        };
+        db.FacilityInventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        var act = async () => await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 100,
+            DepositAmount = 50,
+            Equipment =
+            [
+                new FacilityReservationEquipment { InventoryItemId = item.Id, Quantity = 5 }
+            ]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Not enough*");
+        (await db.FacilityReservations.CountAsync()).Should().Be(0);
+        (await db.FacilityInventoryItems.AsNoTracking().SingleAsync(i => i.Id == item.Id))
+            .Quantity.Should().Be(2);
     }
 
     [Fact]
@@ -336,8 +459,7 @@ public class FacilityInspectionServiceTests
         db.FacilityReservations.Add(reservation);
         await db.SaveChangesAsync();
 
-        var service = new FacilityInspectionService(
-            db, new FixedClock(), NullLogger<FacilityInspectionService>.Instance);
+        var service = CreateInspectionService(db);
 
         var act = async () => await service.CreateAsync(new FacilityInspection
         {
@@ -348,6 +470,63 @@ public class FacilityInspectionServiceTests
         });
 
         await act.Should().ThrowAsync<ArgumentException>().WithMessage("*Damage*");
+    }
+
+    [Fact]
+    public async Task Create_Unsatisfactory_OpensWorkOrderOnFacilityUnit()
+    {
+        var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<ApartmentsDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new ApartmentsDbContext(options);
+        db.Database.EnsureCreated();
+
+        var unit = new Unit
+        {
+            Id = Guid.NewGuid(), Number = "CC", IsFacility = true, Status = UnitStatus.Vacant, RowVersion = Guid.NewGuid()
+        };
+        var renter = new FacilityRenter
+        {
+            Id = Guid.NewGuid(), FirstName = "A", LastName = "B", Phone = "1", Email = "a@b.c",
+            MailingAddress = "x", RowVersion = Guid.NewGuid()
+        };
+        var reservation = new FacilityReservation
+        {
+            Id = Guid.NewGuid(), UnitId = unit.Id, FacilityRenterId = renter.Id,
+            StartUtc = DateTime.UtcNow, EndUtc = DateTime.UtcNow.AddHours(2),
+            Status = FacilityReservationStatus.Confirmed, RowVersion = Guid.NewGuid()
+        };
+        db.Units.Add(unit);
+        db.FacilityRenters.Add(renter);
+        db.FacilityReservations.Add(reservation);
+        await db.SaveChangesAsync();
+
+        var service = CreateInspectionService(db);
+        await service.CreateAsync(new FacilityInspection
+        {
+            FacilityReservationId = reservation.Id,
+            Type = FacilityInspectionType.PostRental,
+            IsSatisfactory = false,
+            DamageNotes = "Broken table",
+            InspectorDisplay = "Clerk"
+        });
+
+        var wo = await db.MaintenanceRequests.AsNoTracking().SingleAsync();
+        wo.UnitId.Should().Be(unit.Id);
+        wo.FacilityReservationId.Should().Be(reservation.Id);
+        wo.Description.Should().Contain("Broken table");
+        wo.Priority.Should().Be(MaintenancePriority.High);
+    }
+
+    private static FacilityInspectionService CreateInspectionService(ApartmentsDbContext db)
+    {
+        var clock = new FixedClock();
+        var ops = new UnitOperatingCostService(db, NullLogger<UnitOperatingCostService>.Instance);
+        var maintenance = new MaintenanceService(db, ops, clock, NullLogger<MaintenanceService>.Instance);
+        return new FacilityInspectionService(
+            db, maintenance, clock, NullLogger<FacilityInspectionService>.Instance);
     }
 }
 
@@ -420,5 +599,12 @@ public class FacilityLedgerBalanceTests
         (await ledger.HasFacilityChargesAsync(resA.Id)).Should().BeTrue();
         (await ledger.HasFacilityPaymentsAsync(resA.Id)).Should().BeTrue();
         (await ledger.HasFacilityPaymentsAsync(resB.Id)).Should().BeFalse();
+
+        var current = await ledger.GetLedgerAsync(occupancy: OccupancyFilter.Current);
+        current.Should().NotContain(l => l.Entry.FacilityRenterId != null);
+
+        var ccUnit = await ledger.GetLedgerAsync(unitId: unit.Id, occupancy: OccupancyFilter.All);
+        ccUnit.Should().Contain(l => l.Entry.FacilityRenterId == renterA.Id);
+        ccUnit.Should().Contain(l => l.Entry.FacilityRenterId == renterB.Id);
     }
 }

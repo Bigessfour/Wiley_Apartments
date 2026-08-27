@@ -159,6 +159,9 @@
     [SupplyParameterFromQuery(Name = "unitId")]
     public Guid? QueryUnitId { get; set; }
 
+    [SupplyParameterFromQuery(Name = "assetId")]
+    public Guid? QueryAssetId { get; set; }
+
     private List<Row> Rows { get; set; } = [];
     private List<UnitOption> UnitOptions { get; set; } = [];
     private List<AssetOption> AssetOptions { get; set; } = [];
@@ -214,6 +217,16 @@
             FilterUnitId = uid;
             FormUnitId = uid;
             FilterUnitLabel = UnitOptions.FirstOrDefault(o => o.Id == uid)?.Text ?? "selected unit";
+            ShowForm = true;
+            var assets = await AssetService.GetByUnitIdAsync(uid);
+            AssetOptions = assets
+                .Select(a => new AssetOption { Id = a.Id, Text = $"{a.Type} — {a.Serial}" })
+                .ToList();
+            if (QueryAssetId is Guid aid)
+            {
+                FormAssetId = aid;
+            }
+
             await LoadReservationOptionsAsync(uid);
         }
 

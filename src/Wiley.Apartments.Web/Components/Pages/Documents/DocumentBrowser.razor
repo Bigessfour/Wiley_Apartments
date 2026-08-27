@@ -23,10 +23,12 @@
 @inject IClerkToast Toast
 @inject ILogger<DocumentBrowser> Logger
 
-<PageTitle>Document vault</PageTitle>
+<PageTitle>@(CcOnly ? "CC documents" : "Document vault")</PageTitle>
 
-<PageHeader Title="Document vault"
-            Subtitle="NAS-backed vault: folder browse (SfFileManager) + metadata grid. PDF in-browser; Office/images via download (FR-020).">
+<PageHeader Title="@(CcOnly ? "Community Center documents" : "Document vault")"
+            Subtitle="@(CcOnly
+                ? "Vault records linked to CC renters, reservations, inspections, and inventory."
+                : "NAS-backed vault: folder browse (SfFileManager) + metadata grid. PDF in-browser; Office/images via download (FR-020).")">
     <SfButton CssClass="e-outline e-small" Content="Refresh" OnClick="LoadAsync" />
 </PageHeader>
 
@@ -52,8 +54,8 @@
 <div class="row g-2 mb-3" style="max-width: 960px;">
     <div class="col-md-3">
         <label class="form-label">Entity type</label>
-        <SfDropDownList TValue="DocumentEntityType" TItem="EntityTypeOption" DataSource="@EntityTypeOptions"
-                        @bind-Value="FilterEntityType">
+        <SfDropDownList TValue="DocumentEntityType?" TItem="EntityTypeOption" DataSource="@ActiveEntityTypeOptions"
+                        @bind-Value="FilterEntityType" ShowClearButton="true" Placeholder="All">
             <DropDownListFieldSettings Text="Text" Value="Value" />
         </SfDropDownList>
     </div>
@@ -158,8 +160,12 @@ else if (!string.IsNullOrEmpty(ViewerHint))
 
     private List<DocRow> Rows { get; set; } = [];
     private List<IdOption> UnitOptions { get; set; } = [];
+    [SupplyParameterFromQuery(Name = "cc")]
+    public int? QueryCc { get; set; }
+
+    private bool CcOnly => QueryCc == 1;
     private List<IdOption> TenantOptions { get; set; } = [];
-    private DocumentEntityType FilterEntityType { get; set; } = DocumentEntityType.Unit;
+    private DocumentEntityType? FilterEntityType { get; set; } = DocumentEntityType.Unit;
     private string? FilterCategory { get; set; }
     private DocumentEntityType UploadEntityType { get; set; } = DocumentEntityType.Unit;
     private Guid? UploadEntityId { get; set; }
@@ -183,6 +189,25 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         new() { Value = DocumentEntityType.FacilityInventoryItem, Text = "CC inventory" }
     ];
 
+    private static readonly List<EntityTypeOption> CcEntityTypeOptions =
+    [
+        new() { Value = DocumentEntityType.FacilityRenter, Text = "CC renter" },
+        new() { Value = DocumentEntityType.FacilityReservation, Text = "CC reservation" },
+        new() { Value = DocumentEntityType.FacilityInspection, Text = "CC inspection" },
+        new() { Value = DocumentEntityType.FacilityInventoryItem, Text = "CC inventory" }
+    ];
+
+    private IReadOnlyList<EntityTypeOption> ActiveEntityTypeOptions =>
+        CcOnly ? CcEntityTypeOptions : EntityTypeOptions;
+
+    private static readonly HashSet<DocumentEntityType> CcEntityTypes =
+    [
+        DocumentEntityType.FacilityRenter,
+        DocumentEntityType.FacilityReservation,
+        DocumentEntityType.FacilityInspection,
+        DocumentEntityType.FacilityInventoryItem
+    ];
+
     private static readonly List<CatOption> CategoryOptions =
         Enum.GetValues<DocumentCategory>()
             .Select(c => new CatOption { Value = c.ToString(), Text = c.ToString() })
@@ -203,6 +228,12 @@ else if (!string.IsNullOrEmpty(ViewerHint))
             .OrderBy(t => t.LastName)
             .Select(t => new IdOption { Id = t.Id, Text = $"{t.LastName}, {t.FirstName}" })
             .ToList();
+        if (CcOnly)
+        {
+            FilterEntityType = null;
+            UploadEntityType = DocumentEntityType.FacilityRenter;
+        }
+
         await LoadAsync();
     }
 
@@ -238,6 +269,10 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         {
             DocumentCategory? cat = Enum.TryParse<DocumentCategory>(FilterCategory, out var c) ? c : null;
             var docs = await DocumentService.QueryAsync(FilterEntityType, cat);
+            if (CcOnly && FilterEntityType is null)
+            {
+                docs = docs.Where(d => CcEntityTypes.Contains(d.EntityType)).ToList();
+            }
             Rows = docs.Select(d => new DocRow
             {
                 Id = d.Id,

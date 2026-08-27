@@ -606,6 +606,11 @@ else
             Logger.LogInformation(
                 "FacilityReservationDetail inspection saved reservation={ReservationId} type={Type}.",
                 Id, InspectType);
+            if (!InspectOk)
+            {
+                AgreementMessage = "Inspection saved. A work order was opened on the Community Center unit.";
+            }
+
             await LoadAsync();
         }
         catch (Exception ex)

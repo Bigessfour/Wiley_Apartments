@@ -11,6 +11,7 @@
 @using Wiley.Apartments.Domain
 @inject IScheduleService ScheduleService
 @inject IUnitService UnitService
+@inject IMaintenanceService MaintenanceService
 @inject IDateTimeService Clock
 @inject IClerkToast Toast
 @inject NavigationManager Navigation
@@ -66,7 +67,7 @@
                 <tr>
                     <td class="e-textlabel">Category</td>
                     <td colspan="4">
-                        <SfTooltip Content="Community Center rooms, default rates, and double-booking are on Community Center → Reservations. Edit rate catalog in Settings → Community Center rates."
+                        <SfTooltip Content="Kitchen and Hall can occupy the same time. Entire Facility blocks every room. Work orders need a unit. Change CC rentals on Community Center → Reservations."
                                    OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
                             <span class="cs-help-label">Category</span>
                         </SfTooltip>
@@ -138,11 +139,50 @@
                         <SfTextBox Multiline="true" @bind-Value="appt.Description" />
                     </td>
                 </tr>
+                <tr>
+                    <td class="e-textlabel">Remind (hours before)</td>
+                    <td colspan="4">
+                        <SfNumericTextBox TValue="int?"
+                                          @bind-Value="appt.ReminderHours"
+                                          Min="0"
+                                          Max="720"
+                                          Format="N0"
+                                          ShowClearButton="true"
+                                          Placeholder="Blank = none; 24 = one day before" />
+                    </td>
+                </tr>
                 </tbody>
             </table>
         </EditorTemplate>
     </ScheduleTemplates>
-    <ScheduleEventSettings DataSource="@DataSource">
+    <ScheduleEventSettings DataSource="@DataSource" EnableTooltip="true" EnableIndicator="true">
+        <TooltipTemplate>
+            @{
+                var tip = context as ScheduleAppointment;
+            }
+            @if (tip is not null)
+            {
+                <div class="cs-sched-tip">
+                    @if (!string.IsNullOrWhiteSpace(tip.RoomLabel))
+                    {
+                        <div><strong>@tip.RoomLabel</strong></div>
+                        @if (!string.IsNullOrWhiteSpace(tip.RenterLabel))
+                        {
+                            <div>@tip.RenterLabel</div>
+                        }
+                    }
+                    else
+                    {
+                        <div><strong>@tip.Subject</strong></div>
+                    }
+                    <div>@tip.StartTime.ToString("g") – @tip.EndTime.ToString("g")</div>
+                    @if (!string.IsNullOrWhiteSpace(tip.Description))
+                    {
+                        <div>@tip.Description</div>
+                    }
+                </div>
+            }
+        </TooltipTemplate>
         <Template>
             @{
                 var appt = context as ScheduleAppointment;
@@ -194,6 +234,7 @@
         new() { Value = nameof(ScheduledItemCategory.Cleaning), Text = "Cleaning" },
         new() { Value = nameof(ScheduledItemCategory.Vacancy), Text = "Vacancy" },
         new() { Value = nameof(ScheduledItemCategory.Inspection), Text = "Inspection" },
+        new() { Value = nameof(ScheduledItemCategory.WorkOrder), Text = "Work order" },
         new() { Value = nameof(ScheduledItemCategory.FacilityRental), Text = "CC rental" },
         new() { Value = nameof(ScheduledItemCategory.Other), Text = "Other" }
     ];
@@ -328,6 +369,15 @@
                     return;
                 }
 
+                if (ParseCategory(appt.Category) == ScheduledItemCategory.WorkOrder
+                    && NormalizeUnitId(appt.UnitId) is null
+                    && FilterUnitId is null)
+                {
+                    args.Cancel = true;
+                    ErrorMessage = "Work orders need a unit so costs stay on that apartment.";
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(appt.Subject))
                 {
                     args.Cancel = true;
@@ -363,12 +413,26 @@
                 foreach (var appt in args.AddedRecords)
                 {
                     var unitId = NormalizeUnitId(appt.UnitId) ?? FilterUnitId;
+                    var category = ParseCategory(appt.Category);
+                    var reminder = appt.ReminderHours is > 0
+                        ? TimeSpan.FromHours(appt.ReminderHours.Value)
+                        : (TimeSpan?)null;
+                    if (category == ScheduledItemCategory.WorkOrder && unitId is Guid woUnit)
+                    {
+                        await MaintenanceService.CreateAsync(
+                            woUnit,
+                            appt.Subject,
+                            MaintenancePriority.Normal,
+                            notes: appt.Description);
+                    }
+
                     await ScheduleService.CreateAsync(
                         appt.Subject,
-                        ParseCategory(appt.Category),
+                        category,
                         Clock.ToUtc(appt.StartTime),
                         endUtc: Clock.ToUtc(ResolveEnd(appt)),
                         dueUtc: Clock.ToUtc(appt.StartTime),
+                        reminderOffset: reminder,
                         unitId: unitId,
                         notes: appt.Description);
                 }
@@ -392,6 +456,9 @@
                         Clock.ToUtc(appt.StartTime),
                         endUtc: Clock.ToUtc(ResolveEnd(appt)),
                         dueUtc: Clock.ToUtc(appt.StartTime),
+                        reminderOffset: appt.ReminderHours is > 0
+                            ? TimeSpan.FromHours(appt.ReminderHours.Value)
+                            : null,
                         unitId: NormalizeUnitId(appt.UnitId),
                         notes: appt.Description);
                 }
@@ -443,6 +510,7 @@
                 ScheduledItemCategory.Cleaning => "cs-sched-cleaning",
                 ScheduledItemCategory.Vacancy => "cs-sched-vacancy",
                 ScheduledItemCategory.Inspection => "cs-sched-inspection",
+                ScheduledItemCategory.WorkOrder => "cs-sched-work-order",
                 ScheduledItemCategory.FacilityRental => string.IsNullOrEmpty(args.Data.SpaceCss)
                     ? "cs-sched-facility-rental"
                     : args.Data.SpaceCss,
@@ -505,6 +573,7 @@
             RoomLabel = roomLabel,
             RenterLabel = renterLabel,
             SpaceCss = reservation is null ? null : FacilitySpaceInfo.CalendarCss(reservation.Space),
+            ReminderHours = item.ReminderOffset is TimeSpan off ? (int)Math.Round(off.TotalHours) : null,
             IsReadonly = isCc,
             IsAllDay = false
         };
@@ -566,6 +635,7 @@
         public string? RoomLabel { get; set; }
         public string? RenterLabel { get; set; }
         public string? SpaceCss { get; set; }
+        public int? ReminderHours { get; set; }
         public bool IsReadonly { get; set; }
         public bool IsAllDay { get; set; }
     }

@@ -358,6 +358,7 @@ public class ApartmentsDbContext(DbContextOptions<ApartmentsDbContext> options) 
             entity.Property(e => e.DepositAmount).HasPrecision(18, 2);
             entity.Property(e => e.Notes).HasMaxLength(2000);
             entity.Property(e => e.GeneratedPdfRelativePath).HasMaxLength(512);
+            entity.Property(e => e.InventoryHeld);
             entity.Property(e => e.RowVersion).IsConcurrencyToken();
             entity.HasIndex(e => new { e.UnitId, e.IsDeleted, e.Status });
             entity.HasIndex(e => new { e.FacilityRenterId, e.IsDeleted });

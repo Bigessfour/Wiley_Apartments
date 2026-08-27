@@ -16,6 +16,8 @@ public class FacilityReservation
     public decimal DepositAmount { get; set; }
     public string? Notes { get; set; }
     public ICollection<FacilityReservationEquipment> Equipment { get; set; } = [];
+    /// <summary>True when equipment quantities have been subtracted from CC inventory for this booking.</summary>
+    public bool InventoryHeld { get; set; }
     public string? GeneratedPdfRelativePath { get; set; }
     public Guid? SignedDocumentId { get; set; }
     public Guid? ScheduledItemId { get; set; }

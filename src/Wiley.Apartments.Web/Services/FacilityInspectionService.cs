@@ -7,10 +7,12 @@ namespace Wiley.Apartments.Web.Services;
 
 public sealed class FacilityInspectionService(
     ApartmentsDbContext db,
+    IMaintenanceService maintenance,
     IDateTimeService clock,
     ILogger<FacilityInspectionService> logger) : IFacilityInspectionService
 {
     private readonly ApartmentsDbContext _db = db;
+    private readonly IMaintenanceService _maintenance = maintenance;
     private readonly IDateTimeService _clock = clock;
     private readonly ILogger<FacilityInspectionService> _logger = logger;
 
@@ -53,6 +55,25 @@ public sealed class FacilityInspectionService(
         _logger.LogInformation(
             "Created facility inspection {Id} for reservation {ReservationId} satisfactory={Ok}.",
             inspection.Id, inspection.FacilityReservationId, inspection.IsSatisfactory);
+
+        if (!inspection.IsSatisfactory)
+        {
+            var reservation = await _db.FacilityReservations
+                                  .AsNoTracking()
+                                  .FirstAsync(r => r.Id == inspection.FacilityReservationId, cancellationToken);
+            var desc = $"Unsatisfactory {inspection.Type} inspection: {inspection.DamageNotes}";
+            await _maintenance.CreateAsync(
+                reservation.UnitId,
+                desc,
+                MaintenancePriority.High,
+                notes: $"Opened from CC inspection {inspection.Id:N}",
+                facilityReservationId: reservation.Id,
+                cancellationToken: cancellationToken);
+            _logger.LogInformation(
+                "Opened work order from unsatisfactory inspection {InspectionId} reservation={ReservationId}.",
+                inspection.Id, reservation.Id);
+        }
+
         return inspection;
     }
 

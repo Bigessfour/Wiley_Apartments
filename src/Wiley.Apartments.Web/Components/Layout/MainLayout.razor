@@ -16,6 +16,7 @@
                Width="268px"
                Type="SidebarType.Auto"
                MediaQuery="(min-width: 900px)"
+               EnableGestures="true"
                ShowBackdrop="false"
                CloseOnDocumentClick="true">
         <ChildContent>
@@ -76,7 +77,7 @@
                 <NavLink class="nav-link" href="community-center/inventory" @onclick="CloseOnNavigate">
                     <span class="e-icons e-grid-view" aria-hidden="true"></span><span>CC inventory</span>
                 </NavLink>
-                <NavLink class="nav-link" href="documents" @onclick="CloseOnNavigate">
+                <NavLink class="nav-link" href="documents?cc=1" @onclick="CloseOnNavigate">
                     <span class="e-icons e-folder" aria-hidden="true"></span><span>CC documents</span>
                 </NavLink>
                 <div class="nav-section">Records</div>
