@@ -7,6 +7,7 @@
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Components.Shared
 @inject ITenantService TenantService
+@inject IUnitService UnitService
 @inject ILedgerService LedgerService
 @inject IOccupancyService OccupancyService
 @inject NavigationManager Navigation
@@ -33,6 +34,7 @@
         AllowSorting="true"
         AllowFiltering="true"
         Height="420">
+    <GridPageSettings PageSize="20" />
     <GridEvents TValue="TenantRow"
                 OnActionComplete="OnActionCompleteAsync"
                 OnRecordDoubleClick="OnRecordDoubleClick" />
@@ -113,10 +115,26 @@
     private string? ErrorMessage { get; set; }
     private bool CurrentOnly { get; set; } = true;
     private int TenantCount => Rows.Count;
+    private int OccupiedUnitCount { get; set; }
+    private int ResidentialUnitCount { get; set; }
 
-    private string HeaderSubtitle => CurrentOnly
-        ? $"{TenantCount} current tenants — Open or double-click a row for profile & deposit status"
-        : $"{TenantCount} tenants (including former) — Open or double-click a row for profile & deposit status";
+    private string HeaderSubtitle
+    {
+        get
+        {
+            if (CurrentOnly)
+            {
+                var vacant = Math.Max(0, ResidentialUnitCount - OccupiedUnitCount);
+                var residentWord = TenantCount == 1 ? "resident" : "residents";
+                var vacantBit = vacant == 0
+                    ? "all units occupied"
+                    : $"{vacant} vacant or make-ready";
+                return $"{TenantCount} current {residentWord} — {OccupiedUnitCount} of {ResidentialUnitCount} units occupied, {vacantBit}. Include former for past residents.";
+            }
+
+            return $"{TenantCount} tenants including former residents. Current only hides move-outs.";
+        }
+    }
 
     private string EmptyHint => CurrentOnly
         ? "No current tenants — use Include former to see past residents, or Add on the toolbar."
@@ -142,6 +160,9 @@
     private async Task ReloadAsync()
     {
         var tenants = (await TenantService.SearchAsync(currentOnly: CurrentOnly)).ToList();
+        var units = await UnitService.GetResidentialAsync();
+        ResidentialUnitCount = units.Count;
+        OccupiedUnitCount = units.Count(u => u.Status == UnitStatus.Occupied);
         Rows = [];
         foreach (var tenant in tenants)
         {

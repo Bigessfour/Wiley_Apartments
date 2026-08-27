@@ -5,6 +5,7 @@
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Popups
 @using Wiley.Apartments.Contracts
 @using Wiley.Apartments.Domain
 @inject IUnitService UnitService
@@ -57,7 +58,15 @@
                       AllowEditing="true"
                       AllowDeleting="true"
                       Mode="EditMode.Dialog"
-                      ShowDeleteConfirmDialog="true" />
+                      ShowDeleteConfirmDialog="true"
+                      Dialog="@(new DialogSettings { Width = "480px", CssClass = "unit-edit-dialog" })">
+        <HeaderTemplate>
+            @{
+                var unit = context as Unit;
+            }
+            <span>@DialogTitle(unit)</span>
+        </HeaderTemplate>
+    </GridEditSettings>
     <GridColumns>
         <GridColumn Field="@nameof(Unit.Id)"
                     IsPrimaryKey="true"
@@ -75,7 +84,21 @@
         <GridColumn Field="@nameof(Unit.Number)"
                     HeaderText="Unit #"
                     Width="100"
-                    ValidationRules="@(new ValidationRules { Required = true })" />
+                    ValidationRules="@(new ValidationRules { Required = true })">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Apartment number on the building, for example 301.">
+                        <SfTextBox @bind-Value="unit.Number"
+                                   Placeholder="Unit #"
+                                   FloatLabelType="FloatLabelType.Always"
+                                   Width="100%" />
+                    </FieldHint>
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.SqFt)"
                     HeaderText="Sq Ft"
                     TextAlign="TextAlign.Right"
@@ -87,14 +110,19 @@
                     var unit = (Unit)context;
                 }
                 <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Interior square footage of this apartment.">
                     <SfNumericTextBox TValue="decimal"
+                                      ID="SqFt"
                                       @bind-Value="unit.SqFt"
+                                      Placeholder="Sq ft"
+                                      FloatLabelType="FloatLabelType.Always"
                                       Format="N0"
                                       Decimals="0"
                                       Min="0"
                                       Step="1"
                                       ShowSpinButton="true"
                                       Width="100%" />
+                    </FieldHint>
                 </div>
             </EditTemplate>
         </GridColumn>
@@ -108,13 +136,18 @@
                     var unit = (Unit)context;
                 }
                 <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Number of bedrooms.">
                     <SfNumericTextBox TValue="int"
+                                      ID="Beds"
                                       @bind-Value="unit.Beds"
+                                      Placeholder="Beds"
+                                      FloatLabelType="FloatLabelType.Always"
                                       Format="N0"
                                       Min="0"
                                       Step="1"
                                       ShowSpinButton="true"
                                       Width="100%" />
+                    </FieldHint>
                 </div>
             </EditTemplate>
         </GridColumn>
@@ -128,13 +161,18 @@
                     var unit = (Unit)context;
                 }
                 <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Number of bathrooms.">
                     <SfNumericTextBox TValue="int"
+                                      ID="Baths"
                                       @bind-Value="unit.Baths"
+                                      Placeholder="Baths"
+                                      FloatLabelType="FloatLabelType.Always"
                                       Format="N0"
                                       Min="0"
                                       Step="1"
                                       ShowSpinButton="true"
                                       Width="100%" />
+                    </FieldHint>
                 </div>
             </EditTemplate>
         </GridColumn>
@@ -149,14 +187,20 @@
                     var unit = (Unit)context;
                 }
                 <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Listed monthly rent for this apartment.">
                     <SfNumericTextBox TValue="decimal"
+                                      ID="MonthlyRent"
                                       @bind-Value="unit.MonthlyRent"
+                                      Placeholder="Rent"
+                                      FloatLabelType="FloatLabelType.Always"
                                       Format="C2"
+                                      Currency="USD"
                                       Decimals="2"
                                       Min="0"
                                       Step="25"
                                       ShowSpinButton="true"
                                       Width="100%" />
+                    </FieldHint>
                 </div>
             </EditTemplate>
         </GridColumn>
@@ -171,26 +215,58 @@
                     var unit = (Unit)context;
                 }
                 <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Security deposit on file for this unit.">
                     <SfNumericTextBox TValue="decimal"
+                                      ID="SecurityDeposit"
                                       @bind-Value="unit.SecurityDeposit"
+                                      Placeholder="Deposit"
+                                      FloatLabelType="FloatLabelType.Always"
                                       Format="C2"
+                                      Currency="USD"
                                       Decimals="2"
                                       Min="0"
                                       Step="25"
                                       ShowSpinButton="true"
                                       Width="100%" />
+                    </FieldHint>
                 </div>
             </EditTemplate>
         </GridColumn>
         <GridColumn Field="@nameof(Unit.LeaseTerm)"
                     HeaderText="Term"
-                    Width="120" />
+                    Width="120">
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
+                    <FieldHint Hint="Lease term from the roster, for example Year or Month-to-Month.">
+                        <SfTextBox @bind-Value="unit.LeaseTerm"
+                                   Placeholder="Term"
+                                   FloatLabelType="FloatLabelType.Always"
+                                   Width="100%" />
+                    </FieldHint>
+                </div>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.IsHandicapAccessible)"
                     HeaderText="HC"
                     Width="70"
                     DisplayAsCheckBox="true"
                     EditType="EditType.BooleanEdit"
-                    TextAlign="TextAlign.Center" />
+                    TextAlign="TextAlign.Center">
+            <HeaderTemplate>
+                <span title="Handicap-accessible unit (Brookside HC flag).">HC</span>
+            </HeaderTemplate>
+            <EditTemplate>
+                @{
+                    var unit = (Unit)context;
+                }
+                <FieldHint Hint="Handicap-accessible unit (Brookside HC flag).">
+                    <SfCheckBox @bind-Checked="unit.IsHandicapAccessible" Label="HC" />
+                </FieldHint>
+            </EditTemplate>
+        </GridColumn>
         <GridColumn Field="@nameof(Unit.Status)"
                     HeaderText="Status"
                     Width="140"
@@ -199,12 +275,19 @@
                 @{
                     var unit = (Unit)context;
                 }
-                <SfDropDownList TValue="UnitStatus"
-                                TItem="UnitStatusOption"
-                                DataSource="@StatusOptions"
-                                @bind-Value="unit.Status">
-                    <DropDownListFieldSettings Value="Value" Text="Text" />
-                </SfDropDownList>
+                <div>
+                    <FieldHint Hint="Occupied, Vacant, Maintenance, or Make-Ready.">
+                    <SfDropDownList TValue="UnitStatus"
+                                    TItem="UnitStatusOption"
+                                    ID="Status"
+                                    DataSource="@StatusOptions"
+                                    Placeholder="Status"
+                                    FloatLabelType="FloatLabelType.Always"
+                                    @bind-Value="unit.Status">
+                        <DropDownListFieldSettings Value="Value" Text="Text" />
+                    </SfDropDownList>
+                    </FieldHint>
+                </div>
             </EditTemplate>
             <Template>
                 @{
@@ -229,21 +312,24 @@
                     var unit = (Unit)context;
                 }
                 <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <SfTextBox @bind-Value="unit.Notes"
+                    <FieldHint Hint="Floor plan, storage, and other layout notes.">
+                    <SfTextBox ID="Notes"
+                               @bind-Value="unit.Notes"
                                Multiline="true"
-                               Placeholder="Floor plan, storage, layout notes"
+                               Placeholder="Layout notes"
+                               FloatLabelType="FloatLabelType.Always"
                                Width="100%" />
+                    </FieldHint>
                 </div>
             </EditTemplate>
         </GridColumn>
-        <GridColumn HeaderText=""
+        <GridColumn HeaderText="Open"
                     Width="90"
                     AllowEditing="false"
                     AllowAdding="false"
+                    AllowFiltering="false"
+                    AllowSorting="false"
                     TextAlign="TextAlign.Center">
-            <EditTemplate>
-                <span></span>
-            </EditTemplate>
             <Template>
                 @{
                     var unit = context as Unit;
@@ -252,6 +338,9 @@
                           Content="Open"
                           OnClick="@(() => OpenUnit(unit!.Id))" />
             </Template>
+            <EditTemplate>
+                @* Empty template keeps this command column off the edit dialog. *@
+            </EditTemplate>
         </GridColumn>
     </GridColumns>
 </SfGrid>
@@ -287,6 +376,18 @@
 
             return baseText;
         }
+    }
+
+    private static string DialogTitle(Unit? unit)
+    {
+        if (unit is null || unit.Id == Guid.Empty)
+        {
+            return "Add unit";
+        }
+
+        return string.IsNullOrWhiteSpace(unit.Number)
+            ? "Edit unit"
+            : $"Unit {unit.Number}";
     }
 
     private readonly List<string> ToolbarItems =

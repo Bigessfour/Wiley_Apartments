@@ -5,6 +5,12 @@ namespace Wiley.Apartments.Web.Data;
 
 public static class ConcurrencyHelper
 {
+    /// <summary>
+    /// Blazor Server shares one DbContext per circuit. Drop tracked rows before a write
+    /// so a stale RowVersion from an earlier page does not fail SaveChanges.
+    /// </summary>
+    public static void DiscardTrackedEntities(DbContext db) => db.ChangeTracker.Clear();
+
     public static async Task SaveChangesOrThrowAsync(
         DbContext db,
         string entityName,

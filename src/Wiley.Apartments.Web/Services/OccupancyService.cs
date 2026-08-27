@@ -52,6 +52,7 @@ public sealed class OccupancyService(
     {
         var unit = await _db.Units.FindAsync([unitId], cancellationToken)
             ?? throw new InvalidOperationException($"Unit {unitId} was not found.");
+        await _db.Entry(unit).ReloadAsync(cancellationToken);
 
         var tenant = await _db.Tenants.FindAsync([tenantId], cancellationToken)
             ?? throw new InvalidOperationException($"Tenant {tenantId} was not found.");
@@ -122,6 +123,7 @@ public sealed class OccupancyService(
     {
         var unit = await _db.Units.FindAsync([unitId], cancellationToken)
             ?? throw new InvalidOperationException($"Unit {unitId} was not found.");
+        await _db.Entry(unit).ReloadAsync(cancellationToken);
 
         var occupancy = await _db.Occupancies
             .Where(o => o.UnitId == unitId && o.EndUtc == null)

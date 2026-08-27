@@ -1,0 +1,12 @@
+@using Syncfusion.Blazor.Popups
+<SfTooltip Content="@Hint" OpensOn="Hover" Position="Syncfusion.Blazor.Popups.Position.TopCenter">
+    @ChildContent
+</SfTooltip>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Hint { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -111,6 +111,10 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddSyncfusionBlazor();
         builder.Services.AddScoped<CircuitHandler, LoggingCircuitHandler>();
         builder.Services.AddScoped<CircuitHandler, CircuitAuthCookieHandler>();
+        builder.Services.AddSignalR(options =>
+        {
+            options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+        });
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents(options =>
             {

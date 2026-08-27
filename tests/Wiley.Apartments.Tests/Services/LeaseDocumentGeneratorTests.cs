@@ -23,9 +23,9 @@ public class LeaseDocumentGeneratorTests
         AgreementDate = new DateTime(2026, 8, 9),
         PremisesAddress = "Unit 3, Brookside Community Living, Wiley, CO",
         ResidentName = "Pat Nguyen",
-        HouseholdMembers = "Pat Nguyen, Sam Nguyen",
+        HouseholdMembers = "Pat Nguyen; Heather Spou",
         PostOfficeBox = "PO Box 12",
-        PhoneNumber = "719-555-0100",
+        PhoneNumber = "7196402230",
         ApartmentNumber = "3",
         LeaseStart = new DateTime(2026, 9, 1),
         LeaseEnd = new DateTime(2027, 8, 31),
@@ -71,13 +71,22 @@ public class LeaseDocumentGeneratorTests
         pdf.Length.Should().BeGreaterThan(1000);
         docx.Should().NotBeNull();
         using var loaded = new PdfLoadedDocument(pdf);
-        // Flattened fill — extract text
+        loaded.Pages.Count.Should().BeGreaterThan(1);
+        var cover = loaded.Pages[0].ExtractText();
+        cover.Should().Contain("Town of Wiley");
+        cover.Should().Contain("304 Main Street");
+        cover.Should().Contain("Wiley, CO 81092");
+        cover.Should().Contain("(719) 829-4974");
+        cover.Should().Contain("Heather Spou");
         var text = string.Join('\n', Enumerable.Range(0, loaded.Pages.Count)
             .Select(i => loaded.Pages[i].ExtractText()));
         text.Should().Contain("Pat Nguyen");
+        text.Should().Contain("Heather Spou");
+        text.Should().Contain("(719) 640-2230");
         text.Should().Contain("650.00");
         text.Should().NotContain("@@ResidentName@@");
         text.Should().NotContain("@@MonthlyRent@@");
+        text.Should().NotContain("PHONE NUMBER719");
     }
 
     [Fact]
@@ -110,6 +119,14 @@ public class LeaseDocumentGeneratorTests
             .Select(i => loaded.Pages[i].ExtractText()));
         text.Should().Contain("Pat Nguyen");
         text.Should().Contain("650.00");
+    }
+
+    [Fact]
+    public void FormatUsPhone_TenDigits_UsesNationalFormat()
+    {
+        LeaseDocumentGenerator.FormatUsPhone("7196402230").Should().Be("(719) 640-2230");
+        LeaseDocumentGenerator.FormatUsPhone("719-555-0100").Should().Be("(719) 555-0100");
+        LeaseDocumentGenerator.FormatUsPhone("").Should().BeEmpty();
     }
 
     [Fact]

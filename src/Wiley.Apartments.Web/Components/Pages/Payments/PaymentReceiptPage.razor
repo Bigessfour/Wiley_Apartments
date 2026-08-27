@@ -6,6 +6,7 @@
 @using Wiley.Apartments.Web.Components.Shared
 @inject IPaymentReceiptService ReceiptService
 @inject NavigationManager Navigation
+@inject IJSRuntime Js
 @inject ILogger<PaymentReceiptPage> Logger
 
 <PageTitle>Payment receipt</PageTitle>
@@ -15,9 +16,9 @@
     <SfButton CssClass="e-outline e-small" Content="← Ledger"
               OnClick="@(() => Navigation.NavigateTo(BackHref))" />
     <SfButton CssClass="e-primary e-small" Content="Print"
-              Disabled="@(!_viewerReady)" OnClick="PrintAsync" />
+              Disabled="@(!_pdfReady)" OnClick="PrintAsync" />
     <SfButton CssClass="e-outline e-small" Content="Save PDF"
-              Disabled="@(!_viewerReady)" OnClick="SaveAsync" />
+              Disabled="@(!_pdfReady)" OnClick="SaveAsync" />
     <SfButton CssClass="e-outline e-small" Content="Regenerate" Disabled="@Busy" OnClick="LoadAsync" />
 </PageHeader>
 
@@ -33,17 +34,15 @@ else if (_pdfBytes is { Length: > 0 })
 {
     <p class="small text-muted mb-2">
         Receipt <strong>@_receiptNumber</strong> — preview below.
-        Use <strong>Print</strong> or <strong>Save PDF</strong>, or the printer / download icons in the viewer toolbar.
+        Use <strong>Print</strong> or <strong>Save PDF</strong> above. The preview is the receipt the printer will use.
         @if (_documentId is Guid)
         {
             <span> Also saved to tenant documents (Receipt).</span>
         }
     </p>
-    <ClerkPdfViewer @ref="_viewer"
-                    PdfBytes="@_pdfBytes"
+    <ClerkPdfViewer PdfBytes="@_pdfBytes"
                     DownloadFileName="@_fileName"
-                    Height="780px"
-                    OnDocumentLoaded="OnViewerLoaded" />
+                    Height="780px" />
 }
 
 @code {
@@ -53,7 +52,6 @@ else if (_pdfBytes is { Length: > 0 })
     [SupplyParameterFromQuery(Name = "tenantId")]
     public Guid? QueryTenantId { get; set; }
 
-    private ClerkPdfViewer? _viewer;
     private byte[]? _pdfBytes;
     private string _fileName = "receipt.pdf";
     private string? _receiptNumber;
@@ -61,8 +59,7 @@ else if (_pdfBytes is { Length: > 0 })
     private string? ErrorMessage { get; set; }
     private bool Busy { get; set; }
     private Guid? _loadedId;
-    private bool _vaultSaved;
-    private bool _viewerReady;
+    private bool _pdfReady => _pdfBytes is { Length: > 0 };
 
     private string Subtitle =>
         string.IsNullOrEmpty(_receiptNumber)
@@ -78,38 +75,34 @@ else if (_pdfBytes is { Length: > 0 })
     {
         if (_loadedId != EntryId)
         {
-            _vaultSaved = false;
             await LoadAsync();
         }
     }
 
-    private Task OnViewerLoaded()
-    {
-        _viewerReady = true;
-        return Task.CompletedTask;
-    }
-
     private async Task PrintAsync()
     {
-        if (_viewer is not null)
+        if (_pdfBytes is not { Length: > 0 })
         {
-            await _viewer.PrintAsync();
+            return;
         }
+
+        await Js.InvokeVoidAsync("ClerkSuitePdf.print", Convert.ToBase64String(_pdfBytes));
     }
 
     private async Task SaveAsync()
     {
-        if (_viewer is not null)
+        if (_pdfBytes is not { Length: > 0 })
         {
-            await _viewer.DownloadAsync();
+            return;
         }
+
+        await Js.InvokeVoidAsync("ClerkSuitePdf.download", Convert.ToBase64String(_pdfBytes), _fileName);
     }
 
     private async Task LoadAsync()
     {
         Busy = true;
         ErrorMessage = null;
-        _viewerReady = false;
         try
         {
             var result = await ReceiptService.GenerateAsync(EntryId, saveToVault: true);
@@ -117,7 +110,6 @@ else if (_pdfBytes is { Length: > 0 })
             _fileName = result.FileName;
             _receiptNumber = result.ReceiptNumber;
             _documentId = result.DocumentId;
-            _vaultSaved = result.DocumentId is Guid;
 
             _loadedId = EntryId;
             Logger.LogInformation("Opened receipt page for payment {EntryId} ({ReceiptNumber}).", EntryId, _receiptNumber);

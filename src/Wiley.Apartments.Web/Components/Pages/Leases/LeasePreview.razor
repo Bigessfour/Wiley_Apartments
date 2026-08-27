@@ -39,6 +39,13 @@ else
         {
             <span class="text-danger small align-self-center">@PaymentPortalError</span>
         }
+        @if (Lease.Status == LeaseStatus.Draft)
+        {
+            <SfButton CssClass="e-outline" Content="Edit" Disabled="@Busy"
+                      OnClick="@(() => ShowPanel = "edit")" />
+        }
+        <SfButton CssClass="e-outline e-danger" Content="Delete" Disabled="@Busy"
+                  OnClick="@(() => ShowPanel = "delete")" />
         <SfButton CssClass="e-primary" Content="@(string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) ? "Generate PDF" : "Regenerate PDF")"
                   Disabled="@Busy" OnClick="GenerateAsync" />
         @if (_pdfBytes is { Length: > 0 })
@@ -72,6 +79,57 @@ else
             Succeeded by
             <a href="@($"/leases/{succId}")">renewal lease</a>
         </p>
+    }
+
+    @if (ShowPanel == "delete")
+    {
+        <div class="mb-4" style="max-width: 520px;">
+            <p class="mb-2">
+                Remove this lease from the list? Occupancy and the ledger are not changed.
+            </p>
+            <div class="d-flex gap-2">
+                <SfButton CssClass="e-danger e-small" Content="Delete lease" Disabled="@Busy" OnClick="DeleteAsync" />
+                <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+            </div>
+        </div>
+    }
+    else if (ShowPanel == "edit" && Lease.Status == LeaseStatus.Draft)
+    {
+        <div class="row g-2 mb-4" style="max-width: 640px;">
+            <div class="col-12">
+                <label class="form-label">Template</label>
+                <SfDropDownList TValue="string" TItem="LeaseTemplateInfo"
+                                DataSource="@Templates"
+                                @bind-Value="EditTemplate"
+                                Placeholder="Select template">
+                    <DropDownListFieldSettings Text="DisplayName" Value="FileName" />
+                </SfDropDownList>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Start</label>
+                <SfDatePicker TValue="DateTime?" @bind-Value="EditStart" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">End</label>
+                <SfDatePicker TValue="DateTime?" @bind-Value="EditEnd" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Rent</label>
+                <SfNumericTextBox TValue="decimal?" @bind-Value="EditRent" Format="C2" Min="0" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Deposit</label>
+                <SfNumericTextBox TValue="decimal?" @bind-Value="EditDeposit" Format="C2" Min="0" />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Custom clauses</label>
+                <SfTextBox @bind-Value="EditClauses" Multiline="true" RowCount="3" />
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <SfButton CssClass="e-primary e-small" Content="Save" Disabled="@Busy" OnClick="SaveDraftAsync" />
+                <SfButton CssClass="e-flat e-small" Content="Cancel" OnClick="@(() => ShowPanel = null)" />
+            </div>
+        </div>
     }
 
     @if (Lease.Status is LeaseStatus.Active or LeaseStatus.Amended)
@@ -209,20 +267,7 @@ else
 
     @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath) || _pdfBytes is not null)
     {
-        <p class="small text-muted mb-2">
-            @if (!string.IsNullOrEmpty(Lease.GeneratedPdfRelativePath))
-            {
-                <span>Generated: @Lease.GeneratedPdfRelativePath</span>
-            }
-            @if (!string.IsNullOrEmpty(Lease.GeneratedDocxRelativePath))
-            {
-                <span> · DOCX archive: @Lease.GeneratedDocxRelativePath</span>
-            }
-            @if (_pdfBytes is { Length: > 0 })
-            {
-                <span> · @_pdfBytes.Length.ToString("N0") bytes</span>
-            }
-        </p>
+        <p class="small text-muted mb-2">@(Lease.SignedDocumentId is Guid ? "Signed lease." : "Lease generated.")</p>
         <ClerkPdfViewer PdfBytes="@_pdfBytes" DownloadFileName="@PdfDownloadFileName" Height="680px" />
     }
 }
@@ -246,10 +291,31 @@ else
     private decimal? RenewDeposit { get; set; }
     private DateTime? TerminateEnd { get; set; }
     private string? LifecycleNote { get; set; }
+    private List<LeaseTemplateInfo> Templates { get; set; } = [];
+    private DateTime? EditStart { get; set; }
+    private DateTime? EditEnd { get; set; }
+    private decimal? EditRent { get; set; }
+    private decimal? EditDeposit { get; set; }
+    private string? EditClauses { get; set; }
+    private string? EditTemplate { get; set; }
     private Guid? _loadedLeaseId;
 
-    private string PdfDownloadFileName =>
-        Path.GetFileName(Lease?.GeneratedPdfRelativePath ?? "lease.pdf");
+    private string PdfDownloadFileName
+    {
+        get
+        {
+            if (Lease is null)
+            {
+                return "lease.pdf";
+            }
+
+            return LeaseDocumentFileName.PdfFileName(
+                Lease.Tenant?.LastName,
+                Lease.Tenant?.FirstName,
+                Lease.Unit?.Number,
+                Clock.ToDisplayTime(Lease.StartUtc).Date);
+        }
+    }
 
     private string PdfDownloadHref =>
         _pdfBytes is { Length: > 0 }
@@ -319,6 +385,20 @@ else
         RenewDeposit = Lease.Deposit;
         TerminateEnd = DateTime.Today;
         LifecycleNote = null;
+        EditStart = Clock.ToDisplayTime(Lease.StartUtc).Date;
+        EditEnd = Clock.ToDisplayTime(Lease.EndUtc).Date;
+        EditRent = Lease.Rent;
+        EditDeposit = Lease.Deposit;
+        EditClauses = Lease.CustomClauses;
+        if (Templates.Count == 0)
+        {
+            Templates = (await LeaseService.ListTemplatesAsync()).ToList();
+        }
+
+        EditTemplate = Templates.FirstOrDefault(t =>
+                Path.GetFileNameWithoutExtension(t.FileName)
+                    .Equals(Path.GetFileNameWithoutExtension(Lease.TemplateUsed), StringComparison.OrdinalIgnoreCase))
+            ?.FileName ?? Lease.TemplateUsed;
 
         await PreferDisplayPdfAsync();
     }
@@ -416,6 +496,62 @@ else
         }
     }
 
+    private async Task SaveDraftAsync()
+    {
+        if (EditStart is null || EditEnd is null || EditRent is null || EditDeposit is null)
+        {
+            ErrorMessage = "Enter start, end, rent, and deposit.";
+            return;
+        }
+
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            Lease = await LeaseService.UpdateDraftAsync(
+                LeaseId,
+                Clock.ToUtc(EditStart.Value.Date),
+                Clock.ToUtc(EditEnd.Value.Date),
+                EditRent.Value,
+                EditDeposit.Value,
+                EditClauses,
+                EditTemplate);
+            ShowPanel = null;
+            await Toast.ShowSuccessAsync("Lease updated. Generate PDF to refresh the preview.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LeasePreview operation failed.");
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        Busy = true;
+        ErrorMessage = null;
+        try
+        {
+            await LeaseService.SoftDeleteAsync(LeaseId);
+            await Toast.ShowSuccessAsync("Lease removed.");
+            Navigation.NavigateTo("/leases");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LeasePreview operation failed.");
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
     private async Task PreferDisplayPdfAsync()
     {
         _pdfBytes = null;
@@ -442,7 +578,7 @@ else
         var path = Path.Combine(root, Lease.GeneratedPdfRelativePath);
         if (!File.Exists(path))
         {
-            ErrorMessage = $"Generated PDF missing: {Lease.GeneratedPdfRelativePath}";
+            ErrorMessage = "Generated PDF is missing. Use Generate PDF to create it again.";
             return;
         }
 
@@ -453,7 +589,7 @@ else
             || _pdfBytes[2] != (byte)'D'
             || _pdfBytes[3] != (byte)'F')
         {
-            ErrorMessage = $"Generated file is not a valid PDF: {Lease.GeneratedPdfRelativePath}";
+            ErrorMessage = "Generated file is not a valid PDF. Use Generate PDF to create it again.";
             _pdfBytes = null;
         }
     }
@@ -468,14 +604,11 @@ else
             await PreferDisplayPdfAsync();
             if (_pdfBytes is { Length: > 0 })
             {
-                var occupied = Lease.Unit?.Status == UnitStatus.Occupied;
-                await Toast.ShowSuccessAsync(occupied
-                    ? "Lease PDF generated. Unit rent was copied from this lease; occupancy is started if the unit was vacant."
-                    : "Lease PDF generated.");
+                await Toast.ShowSuccessAsync("Lease generated.");
             }
             else if (string.IsNullOrEmpty(ErrorMessage))
             {
-                ErrorMessage = "Generate completed but PDF bytes could not be read from DocumentRoot.";
+                ErrorMessage = "Generate completed but the PDF could not be opened. Try Generate PDF again.";
             }
         }
         catch (Exception ex)

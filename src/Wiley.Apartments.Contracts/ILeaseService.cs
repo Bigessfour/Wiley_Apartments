@@ -28,6 +28,17 @@ public interface ILeaseService
         string? customClauses = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Update terms on a Draft lease (dates, rent, deposit, clauses, template). Active leases use Amend.</summary>
+    Task<Lease> UpdateDraftAsync(
+        Guid leaseId,
+        DateTime startUtc,
+        DateTime endUtc,
+        decimal rent,
+        decimal deposit,
+        string? customClauses = null,
+        string? templateFileName = null,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Fill Brookside template under DocumentRoot/leases. Remains Draft until signed. Copies rent onto the unit and starts occupancy when the unit is vacant.</summary>
     Task<Lease> GenerateDocumentsAsync(Guid leaseId, CancellationToken cancellationToken = default);
 

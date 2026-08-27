@@ -475,18 +475,67 @@ h1:focus {
   font-size: 0.92rem;
 }
 
+.unit-edit-dialog.e-dialog {
+  max-height: 90vh !important;
+  height: auto !important;
+}
+
+.unit-edit-dialog .e-dlg-content {
+  max-height: calc(90vh - 7.5rem) !important;
+  overflow-y: auto !important;
+}
+
+.e-gridform .form-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--cs-muted);
+  font-size: 0.8125rem;
+}
+
 .ledger-entry-form {
   background: color-mix(in srgb, var(--cs-surface, #fff) 92%, var(--cs-primary, #0f6e6e) 8%);
   border-color: color-mix(in srgb, var(--cs-primary, #0f6e6e) 35%, transparent) !important;
 }
 
-/* Lease/vault PDF viewer: Syncfusion 34.x still opens secondary designer bars unless hidden. */
+/* Lease/vault/receipt PDF viewer: Syncfusion 34.x still mounts designer/sidebar chrome.
+   The sidebar splitter stays display:block (~full viewer height) and pushes the page
+   canvas below the fold, which looks like “no preview”. Hide leftover chrome and
+   keep the page surface inside the 780px frame. */
+.clerk-pdf-viewer {
+  overflow: hidden;
+  position: relative;
+}
+
+.clerk-pdf-viewer .e-pdfviewer,
+.clerk-pdf-viewer .e-pv-main-container,
+.clerk-pdf-viewer .e-pv-viewer-main-container {
+  height: 100% !important;
+}
+
 .clerk-pdf-viewer .e-pv-annotation-toolbar,
 .clerk-pdf-viewer .e-pv-formdesigner-toolbar,
 .clerk-pdf-viewer .e-pv-redaction-toolbar,
 .clerk-pdf-viewer .e-pv-comment-panel,
-.clerk-pdf-viewer .e-pv-sidebar-toolbar {
+.clerk-pdf-viewer .e-pv-sidebar-toolbar,
+.clerk-pdf-viewer .e-pv-sidebar-toolbar-splitter,
+.clerk-pdf-viewer .e-pv-sidebar-content-container,
+.clerk-pdf-viewer .e-pv-comment-panel-resizer {
   display: none !important;
+}
+
+.clerk-pdf-viewer .e-pv-fileupload-element {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+.clerk-pdf-viewer .e-pv-viewer-container {
+  left: 0 !important;
+  width: 100% !important;
 }
 
 /* Schedule category colors (EventRendered CssClass — avoid Attributes NRE) */

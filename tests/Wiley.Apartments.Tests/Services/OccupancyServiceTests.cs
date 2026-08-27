@@ -122,4 +122,24 @@ public class OccupancyServiceTests
                 .WithMessage("*facility*");
         }
     }
+
+    [Fact]
+    public async Task StartAsync_SucceedsWhenTrackedUnitHasStaleRowVersion()
+    {
+        var (db, service, _) = Create();
+        await using (db)
+        {
+            var (unit, tenant) = await SeedAsync(db);
+            var tracked = await db.Units.FindAsync(unit.Id);
+            tracked!.Notes = "circuit stale";
+            db.Entry(tracked).Property(u => u.RowVersion).OriginalValue = Guid.NewGuid();
+
+            var occupancy = await service.StartAsync(unit.Id, tenant.Id);
+
+            occupancy.EndUtc.Should().BeNull();
+            var reloaded = await db.Units.AsNoTracking().SingleAsync(u => u.Id == unit.Id);
+            reloaded.Status.Should().Be(UnitStatus.Occupied);
+            reloaded.CurrentTenantId.Should().Be(tenant.Id);
+        }
+    }
 }

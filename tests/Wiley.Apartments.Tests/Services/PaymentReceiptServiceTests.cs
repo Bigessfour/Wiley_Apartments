@@ -215,4 +215,74 @@ public class PaymentReceiptServiceTests
         ledger.Verify(l => l.GetBalanceAsync(It.IsAny<Guid>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
         docs.VerifyAll();
     }
+
+    [Fact]
+    public async Task GenerateAsync_SucceedsWhenTrackedUnitHasStaleRowVersion()
+    {
+        var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        var options = new DbContextOptionsBuilder<ApartmentsDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new ApartmentsDbContext(options);
+        db.Database.EnsureCreated();
+
+        var clock = new FixedClock();
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-receipt-stale-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var unit = new Unit
+        {
+            Id = Guid.NewGuid(),
+            Number = "8",
+            SqFt = 500,
+            Beds = 1,
+            Baths = 1,
+            RowVersion = Guid.NewGuid()
+        };
+        var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Jane", LastName = "Ramirez" };
+        var paymentId = Guid.Parse("03400000-0000-0000-0000-000000000003");
+        db.Units.Add(unit);
+        db.Tenants.Add(tenant);
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = paymentId,
+            TenantId = tenant.Id,
+            UnitId = unit.Id,
+            EntryType = LedgerEntryType.Payment,
+            Amount = 100m,
+            DateUtc = clock.UtcNow,
+            Method = PaymentMethod.Cash
+        });
+        await db.SaveChangesAsync();
+
+        unit.Notes = "circuit stale";
+        db.Entry(unit).Property(u => u.RowVersion).OriginalValue = Guid.NewGuid();
+
+        var docs = new DocumentService(
+            db,
+            new Wiley.Apartments.Tests.Support.FixedDocumentPathResolver(root),
+            clock,
+            NullLogger<DocumentService>.Instance);
+        var ledger = new Mock<ILedgerService>();
+        ledger.Setup(l => l.GetBalanceAsync(tenant.Id, unit.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0m);
+        var http = new Mock<IHttpContextAccessor>();
+        http.Setup(h => h.HttpContext).Returns((HttpContext?)null);
+
+        var service = new PaymentReceiptService(
+            db,
+            ledger.Object,
+            docs,
+            clock,
+            new PaymentReceiptGenerator(),
+            http.Object,
+            NullLogger<PaymentReceiptService>.Instance);
+
+        var result = await service.GenerateAsync(paymentId, saveToVault: true);
+
+        result.PdfBytes.Should().NotBeEmpty();
+        result.DocumentId.Should().NotBeNull();
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
+    }
 }

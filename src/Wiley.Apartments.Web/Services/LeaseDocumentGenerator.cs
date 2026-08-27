@@ -149,6 +149,8 @@ public sealed class LeaseDocumentGenerator
         using var pdfStream = new MemoryStream();
         pdfDocument.Save(pdfStream);
         var pdfBytes = OverlayMergeValues(pdfStream.ToArray(), data);
+        pdfBytes = RewriteSectionTwo(pdfBytes, data);
+        pdfBytes = PrependLetterheadPage(pdfBytes, data);
         pdfBytes = AppendCustomClausesIfNeeded(pdfBytes, data.CustomClauses);
         return (docxBytes, pdfBytes);
     }
@@ -163,6 +165,8 @@ public sealed class LeaseDocumentGenerator
         {
             var pdf = FillPdf(template, data);
             pdf = OverlayMergeValues(pdf, data);
+            pdf = RewriteSectionTwo(pdf, data);
+            pdf = PrependLetterheadPage(pdf, data);
             return (null, pdf);
         }
 
@@ -265,8 +269,8 @@ public sealed class LeaseDocumentGenerator
             ["PremisesAddress"] = data.PremisesAddress.Trim(),
             ["ResidentName"] = data.ResidentName.Trim(),
             ["HouseholdMembers"] = data.HouseholdMembers.Trim(),
-            ["PostOfficeBox"] = data.PostOfficeBox.Trim(),
-            ["PhoneNumber"] = data.PhoneNumber.Trim(),
+            ["PostOfficeBox"] = string.IsNullOrWhiteSpace(data.PostOfficeBox) ? "—" : data.PostOfficeBox.Trim(),
+            ["PhoneNumber"] = FormatUsPhone(data.PhoneNumber),
             ["ApartmentNumber"] = data.ApartmentNumber.Trim(),
             ["LeaseTerm"] = $"{data.LeaseStart:MMMM d, yyyy} and end on {data.LeaseEnd:MMMM d, yyyy}",
             ["MonthlyRent"] = data.MonthlyRent.ToString("0.00"),
@@ -286,13 +290,13 @@ public sealed class LeaseDocumentGenerator
         Replace(document, "to _________________________________referred to as resident",
             $"to {values["ResidentName"]} referred to as resident");
         Replace(document, "Household members are:_____________________________________.",
-            $"Household members are:{values["HouseholdMembers"]}.");
+            $"Household members are: {values["HouseholdMembers"]}.");
         Replace(document, "POST OFFICE BOX____________________________________________",
-            $"POST OFFICE BOX{values["PostOfficeBox"]}");
+            $"POST OFFICE BOX: {values["PostOfficeBox"]}");
         Replace(document, "PHONE NUMBER_____________________________________________",
-            $"PHONE NUMBER{values["PhoneNumber"]}");
+            $"PHONE NUMBER: {values["PhoneNumber"]}");
         Replace(document, "APARTMENT NUMBER________________________________________",
-            $"APARTMENT NUMBER{values["ApartmentNumber"]}");
+            $"APARTMENT NUMBER: {values["ApartmentNumber"]}");
         Replace(document, "lease shall begin on ___________________ and end on_________________.",
             $"lease shall begin on {values["LeaseTerm"]}.");
         Replace(document, "rent for this initial period is_____",
@@ -310,4 +314,154 @@ public sealed class LeaseDocumentGenerator
 
     private static void Replace(WordDocument document, string find, string replace) =>
         document.Replace(find, replace, false, true);
+
+    internal const string TownName = "Town of Wiley";
+    internal const string TownStreet = "304 Main Street";
+    internal const string TownCityLine = "Wiley, CO 81092";
+    internal const string TownPhone = "(719) 829-4974";
+
+    /// <summary>Formats a 10-digit US number as (719) 555-0100; otherwise returns trimmed input.</summary>
+    internal static string FormatUsPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = phone.Trim();
+        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        if (digits.Length == 11 && digits[0] == '1')
+        {
+            digits = digits[1..];
+        }
+
+        return digits.Length == 10
+            ? $"({digits[..3]}) {digits[3..6]}-{digits[6..]}"
+            : trimmed;
+    }
+
+    /// <summary>
+    /// Cover cramped section 2 underscore fill with labeled occupant lines (household, mail, phone, unit).
+    /// </summary>
+    internal static byte[] RewriteSectionTwo(byte[] pdf, LeaseMergeData data)
+    {
+        var values = ToFieldValues(data);
+        using var input = new MemoryStream(pdf);
+        using var loaded = new PdfLoadedDocument(input);
+        if (!loaded.FindText("Household members are", out Dictionary<int, List<RectangleF>>? matches)
+            || matches is null
+            || matches.Count == 0)
+        {
+            using var passthrough = new MemoryStream();
+            loaded.Save(passthrough);
+            return passthrough.ToArray();
+        }
+
+        var (pageIndex, rects) = matches.First();
+        var start = rects.Where(r => r.Width > 1).OrderBy(r => r.Y).FirstOrDefault();
+        if (start.Width <= 1)
+        {
+            using var passthrough = new MemoryStream();
+            loaded.Save(passthrough);
+            return passthrough.ToArray();
+        }
+
+        var page = loaded.Pages[pageIndex];
+        var pageSize = page.Size;
+        var coverTop = Math.Max(start.Y - 2f, 0f);
+        var coverHeight = 72f;
+        if (loaded.FindText("Initial period", out Dictionary<int, List<RectangleF>>? endMatches)
+            && endMatches is not null
+            && endMatches.TryGetValue(pageIndex, out var endRects))
+        {
+            var end = endRects.Where(r => r.Width > 1 && r.Y > start.Y).OrderBy(r => r.Y).FirstOrDefault();
+            if (end.Width > 1)
+            {
+                coverHeight = Math.Max(36f, end.Y - coverTop - 4f);
+            }
+        }
+
+        var cover = new RectangleF(36f, coverTop, pageSize.Width - 72f, coverHeight);
+        page.Graphics.DrawRectangle(PdfBrushes.White, cover);
+
+        var font = new PdfStandardFont(PdfFontFamily.Helvetica, 10);
+        var bold = new PdfStandardFont(PdfFontFamily.Helvetica, 10, PdfFontStyle.Bold);
+        var lines = new[]
+        {
+            ("2. Household members:", values["HouseholdMembers"]),
+            ("    Post office box:", values["PostOfficeBox"]),
+            ("    Phone number:", values["PhoneNumber"]),
+            ("    Apartment number:", values["ApartmentNumber"])
+        };
+
+        float y = coverTop + 2f;
+        foreach (var (label, value) in lines)
+        {
+            page.Graphics.DrawString(label, bold, PdfBrushes.Black, new PointF(40f, y));
+            var valueBounds = new RectangleF(190f, y, pageSize.Width - 230f, 16f);
+            page.Graphics.DrawString(value, font, PdfBrushes.Black, valueBounds);
+            y += 14f;
+        }
+
+        using var output = new MemoryStream();
+        loaded.Save(output);
+        return output.ToArray();
+    }
+
+    /// <summary>Town letterhead as page 1: name, 304 Main Street, Wiley CO 81092, hall phone.</summary>
+    internal static byte[] PrependLetterheadPage(byte[] pdf, LeaseMergeData data)
+    {
+        using var coverDoc = new PdfDocument();
+        coverDoc.PageSettings.Size = PdfPageSize.Letter;
+        var coverPage = coverDoc.Pages.Add();
+        DrawLetterhead(coverPage, data);
+        using var coverStream = new MemoryStream();
+        coverDoc.Save(coverStream);
+        coverStream.Position = 0;
+
+        using var coverLoaded = new PdfLoadedDocument(coverStream);
+        using var bodyLoaded = new PdfLoadedDocument(new MemoryStream(pdf));
+        using var merged = new PdfDocument();
+        merged.ImportPage(coverLoaded, 0);
+        for (var i = 0; i < bodyLoaded.Pages.Count; i++)
+        {
+            merged.ImportPage(bodyLoaded, i);
+        }
+
+        using var output = new MemoryStream();
+        merged.Save(output);
+        return output.ToArray();
+    }
+
+    private static void DrawLetterhead(PdfPageBase page, LeaseMergeData data)
+    {
+        var g = page.Graphics;
+        var pageWidth = page.Size.Width;
+        var title = new PdfStandardFont(PdfFontFamily.Helvetica, 18, PdfFontStyle.Bold);
+        var sub = new PdfStandardFont(PdfFontFamily.Helvetica, 12, PdfFontStyle.Bold);
+        var body = new PdfStandardFont(PdfFontFamily.Helvetica, 11);
+        float y = 72f;
+
+        void Line(string text, PdfFont font, float gap = 6f)
+        {
+            g.DrawString(text, font, PdfBrushes.Black, new RectangleF(48f, y, pageWidth - 96f, 24f));
+            y += font.Size + gap;
+        }
+
+        Line(TownName, title, 10f);
+        Line("Wiley Housing Authority", sub, 8f);
+        Line("Brookside Community Living — Residential Lease", sub, 16f);
+        Line(TownStreet, body);
+        Line(TownCityLine, body);
+        Line($"Phone: {TownPhone}", body, 20f);
+        g.DrawLine(new PdfPen(Color.FromArgb(255, 31, 107, 92), 1.25f), 48f, y, pageWidth - 48f, y);
+        y += 18f;
+        Line($"Resident: {data.ResidentName.Trim()}", body);
+        Line($"Household: {data.HouseholdMembers.Trim()}", body);
+        Line($"Apartment: {data.ApartmentNumber.Trim()}", body);
+        Line($"Term: {data.LeaseStart:MMMM d, yyyy} through {data.LeaseEnd:MMMM d, yyyy}", body);
+        Line($"Phone: {FormatUsPhone(data.PhoneNumber)}", body, 22f);
+        Line("The following pages are the residential lease agreement.", body, 8f);
+        Line("Keep this letterhead page with the signed lease.", body);
+    }
 }

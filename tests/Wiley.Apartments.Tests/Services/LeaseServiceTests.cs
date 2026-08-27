@@ -142,7 +142,7 @@ public class LeaseServiceTests
             var lease = await service.GenerateDocumentsAsync(draft.Id);
 
             lease.Status.Should().Be(LeaseStatus.Draft);
-            lease.GeneratedPdfRelativePath.Should().NotBeNullOrWhiteSpace();
+            lease.GeneratedPdfRelativePath.Should().Be("leases/Nguyen-Pat-Unit3-2026-09-01.pdf");
             File.Exists(Path.Combine(workRoot, lease.GeneratedPdfRelativePath!)).Should().BeTrue();
             File.Exists(Path.Combine(workRoot, "templates", "brookside-year-lease.pdf")).Should().BeTrue();
 
@@ -161,6 +161,7 @@ public class LeaseServiceTests
             text.Should().NotContain("@@MonthlyRent@@");
 
             var regenerated = await service.GenerateDocumentsAsync(draft.Id);
+            regenerated.GeneratedPdfRelativePath.Should().Be(lease.GeneratedPdfRelativePath);
             var pdfAgain = await File.ReadAllBytesAsync(Path.Combine(workRoot, regenerated.GeneratedPdfRelativePath!));
             using var loadedAgain = new Syncfusion.Pdf.Parsing.PdfLoadedDocument(pdfAgain);
             var textAgain = string.Join('\n', Enumerable.Range(0, loadedAgain.Pages.Count)
@@ -228,6 +229,54 @@ public class LeaseServiceTests
             doc.EntityType.Should().Be(DocumentEntityType.Lease);
             File.Exists(Path.Combine(workRoot, doc.FilePathOnNas.Replace('/', Path.DirectorySeparatorChar)))
                 .Should().BeTrue();
+        }
+
+        try { Directory.Delete(workRoot, recursive: true); } catch { /* ignore */ }
+    }
+
+    [Fact]
+    public async Task GenerateDocumentsAsync_SucceedsWhenTrackedUnitHasStaleRowVersion()
+    {
+        var root = ResolveTemplatesDir();
+        if (root is null)
+        {
+            return;
+        }
+
+        var workRoot = Path.Combine(Path.GetTempPath(), "clerksuite-lease-stale-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(workRoot, "templates"));
+        File.Copy(
+            Path.Combine(root, "templates", "brookside-year-lease.docx"),
+            Path.Combine(workRoot, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(workRoot);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "9", SqFt = 700, Beds = 2, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "Pat", LastName = "Nguyen" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.pdf",
+                new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2027, 8, 31, 0, 0, 0, DateTimeKind.Utc),
+                650m,
+                650m);
+
+            var tracked = await db.Units.FindAsync(unit.Id);
+            tracked!.Notes = "circuit stale";
+            db.Entry(tracked).Property(u => u.RowVersion).OriginalValue = Guid.NewGuid();
+
+            var lease = await service.GenerateDocumentsAsync(draft.Id);
+
+            lease.GeneratedPdfRelativePath.Should().NotBeNullOrWhiteSpace();
+            var unitAfter = await db.Units.AsNoTracking().SingleAsync(u => u.Id == unit.Id);
+            unitAfter.MonthlyRent.Should().Be(650m);
+            unitAfter.Status.Should().Be(UnitStatus.Occupied);
         }
 
         try { Directory.Delete(workRoot, recursive: true); } catch { /* ignore */ }
@@ -421,5 +470,61 @@ public class LeaseServiceTests
             (await service.GetAllAsync()).Should().BeEmpty();
             (await service.GetByIdAsync(draft.Id)).Should().BeNull();
         }
+    }
+
+    [Fact]
+    public async Task UpdateDraftAsync_ChangesTerms_OnDraftOnly()
+    {
+        var yearSrc = ResolveTemplatesDir();
+        if (yearSrc is null)
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "clerksuite-lease-update-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "templates"));
+        File.Copy(
+            Path.Combine(yearSrc, "templates", "brookside-year-lease.docx"),
+            Path.Combine(root, "templates", "brookside-year-lease.docx"));
+
+        var (db, service, _) = Create(root);
+        await using (db)
+        {
+            var unit = new Unit { Id = Guid.NewGuid(), Number = "1", SqFt = 500, Beds = 1, Baths = 1 };
+            var tenant = new Tenant { Id = Guid.NewGuid(), FirstName = "A", LastName = "B" };
+            db.Units.Add(unit);
+            db.Tenants.Add(tenant);
+            await db.SaveChangesAsync();
+
+            var draft = await service.CreateDraftAsync(
+                unit.Id,
+                tenant.Id,
+                "brookside-year-lease.docx",
+                new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2027, 8, 31, 0, 0, 0, DateTimeKind.Utc),
+                100m,
+                100m);
+
+            var updated = await service.UpdateDraftAsync(
+                draft.Id,
+                new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(2027, 9, 30, 0, 0, 0, DateTimeKind.Utc),
+                225m,
+                250m,
+                "No smoking.");
+
+            updated.StartUtc.Should().Be(new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc));
+            updated.EndUtc.Should().Be(new DateTime(2027, 9, 30, 0, 0, 0, DateTimeKind.Utc));
+            updated.Rent.Should().Be(225m);
+            updated.Deposit.Should().Be(250m);
+            updated.CustomClauses.Should().Be("No smoking.");
+            updated.Status.Should().Be(LeaseStatus.Draft);
+
+            var unitAfter = await db.Units.FindAsync(unit.Id);
+            unitAfter!.MonthlyRent.Should().Be(225m);
+            unitAfter.SecurityDeposit.Should().Be(250m);
+        }
+
+        try { Directory.Delete(root, recursive: true); } catch { /* ignore */ }
     }
 }

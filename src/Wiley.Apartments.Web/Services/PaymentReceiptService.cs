@@ -30,6 +30,7 @@ public sealed class PaymentReceiptService(
         string uploadedBy = "clerk",
         CancellationToken cancellationToken = default)
     {
+        ConcurrencyHelper.DiscardTrackedEntities(_db);
         var entry = await _db.LedgerEntries
                         .AsNoTracking()
                         .Include(e => e.Tenant)
@@ -190,6 +191,7 @@ public sealed class PaymentReceiptService(
             savedToVault
         });
 
+        ConcurrencyHelper.DiscardTrackedEntities(_db);
         _db.AuditLogs.Add(new AuditLog
         {
             UserId = userId,

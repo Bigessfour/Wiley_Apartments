@@ -173,6 +173,74 @@ public sealed class LeaseService(
         return (await GetByIdAsync(lease.Id, cancellationToken))!;
     }
 
+    public async Task<Lease> UpdateDraftAsync(
+        Guid leaseId,
+        DateTime startUtc,
+        DateTime endUtc,
+        decimal rent,
+        decimal deposit,
+        string? customClauses = null,
+        string? templateFileName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var lease = await _db.Leases
+            .Include(l => l.Unit)
+            .Include(l => l.Tenant)
+            .FirstOrDefaultAsync(l => l.Id == leaseId && !l.IsDeleted, cancellationToken)
+            ?? throw new InvalidOperationException($"Lease {leaseId} was not found.");
+
+        if (lease.Status != LeaseStatus.Draft)
+        {
+            throw new InvalidOperationException(
+                "Only a Draft lease can be edited. Use Amend for an active lease.");
+        }
+
+        if (endUtc <= startUtc)
+        {
+            throw new ArgumentException("Lease end must be after start.");
+        }
+
+        if (rent < 0 || deposit < 0)
+        {
+            throw new ArgumentException("Rent and deposit cannot be negative.");
+        }
+
+        var clauses = string.IsNullOrWhiteSpace(customClauses) ? null : customClauses.Trim();
+        if (clauses is { Length: > 4000 })
+        {
+            throw new ArgumentException("Custom clauses cannot exceed 4000 characters.", nameof(customClauses));
+        }
+
+        if (!string.IsNullOrWhiteSpace(templateFileName))
+        {
+            var baseName = Path.GetFileNameWithoutExtension(templateFileName);
+            if (KnownTemplates.All(t => t.BaseName != baseName))
+            {
+                throw new ArgumentException("Unknown or unsupported lease template.", nameof(templateFileName));
+            }
+
+            var templates = await ListTemplatesAsync(cancellationToken);
+            var selected = templates.FirstOrDefault(t =>
+                t.FileName.Equals(templateFileName, StringComparison.OrdinalIgnoreCase)
+                || Path.GetFileNameWithoutExtension(t.FileName)
+                    .Equals(baseName, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException(
+                    $"Template '{templateFileName}' not found under DocumentRoot/templates. See deploy/synology/TEMPLATES.md.");
+            lease.TemplateUsed = selected.FileName;
+        }
+
+        lease.StartUtc = EnsureUtc(startUtc);
+        lease.EndUtc = EnsureUtc(endUtc);
+        lease.Rent = rent;
+        lease.Deposit = deposit;
+        lease.CustomClauses = clauses;
+        ConcurrencyHelper.BumpRowVersion(lease);
+        ApplyUnitFinancials(lease);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
+        _logger.LogInformation("Updated draft lease {LeaseId}.", lease.Id);
+        return (await GetByIdAsync(lease.Id, cancellationToken))!;
+    }
+
     public async Task<Lease> GenerateDocumentsAsync(
         Guid leaseId,
         CancellationToken cancellationToken = default)
@@ -234,25 +302,57 @@ public sealed class LeaseService(
                 "Register a SYNCFUSION_LICENSE_KEY that includes PDF/Word (not Blazor-only) via user-secrets.");
         }
 
-        var leasesDir = Path.Combine(ResolveDocumentRoot(), "leases");
+        var root = ResolveDocumentRoot();
+        var leasesDir = Path.Combine(root, "leases");
         Directory.CreateDirectory(leasesDir);
-        var stamp = _clock.UtcNow.ToString("yyyyMMddHHmmss");
-        var baseName = $"lease-{lease.Unit.Number}-{lease.Id:N}-{stamp}";
+        var oldPdf = lease.GeneratedPdfRelativePath;
+        var oldDocx = lease.GeneratedDocxRelativePath;
+        var preferred = LeaseDocumentFileName.BuildBaseName(
+            lease.Tenant.LastName,
+            lease.Tenant.FirstName,
+            lease.Unit.Number,
+            _clock.ToDisplayTime(lease.StartUtc).Date);
+        var baseName = AllocateLeaseDocumentBaseName(lease, preferred, root);
         var pdfRel = Path.Combine("leases", $"{baseName}.pdf").Replace('\\', '/');
-        await File.WriteAllBytesAsync(Path.Combine(ResolveDocumentRoot(), pdfRel), pdf, cancellationToken);
-        lease.GeneratedPdfRelativePath = pdfRel;
+        await File.WriteAllBytesAsync(Path.Combine(root, pdfRel), pdf, cancellationToken);
 
+        string? docxRel = null;
         if (docx is not null)
         {
-            var docxRel = Path.Combine("leases", $"{baseName}.docx").Replace('\\', '/');
-            await File.WriteAllBytesAsync(Path.Combine(ResolveDocumentRoot(), docxRel), docx, cancellationToken);
-            lease.GeneratedDocxRelativePath = docxRel;
+            docxRel = Path.Combine("leases", $"{baseName}.docx").Replace('\\', '/');
+            await File.WriteAllBytesAsync(Path.Combine(root, docxRel), docx, cancellationToken);
+        }
+
+        if (!string.Equals(oldPdf, pdfRel, StringComparison.OrdinalIgnoreCase))
+        {
+            TryDeleteRelativeFile(oldPdf);
+        }
+
+        if (docxRel is not null
+            && !string.Equals(oldDocx, docxRel, StringComparison.OrdinalIgnoreCase))
+        {
+            TryDeleteRelativeFile(oldDocx);
         }
 
         // Stay Draft until signed upload / activate workflow (T3.3 / T3.4).
+        // Reload after file write so a stale circuit-tracked Unit/Lease RowVersion
+        // cannot fail this SaveChanges (same error clerks saw on Generate PDF).
+        ConcurrencyHelper.DiscardTrackedEntities(_db);
+        lease = await _db.Leases
+            .Include(l => l.Unit)
+            .Include(l => l.Tenant)
+            .FirstAsync(l => l.Id == lease.Id, cancellationToken);
+        lease.TemplateUsed = Path.GetFileName(
+            templatePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(docxSibling)
+                ? docxSibling
+                : templatePath);
+        lease.GeneratedPdfRelativePath = pdfRel;
+        lease.GeneratedDocxRelativePath = docxRel ?? lease.GeneratedDocxRelativePath;
+
         lease.Status = LeaseStatus.Draft;
+        ConcurrencyHelper.BumpRowVersion(lease);
         ApplyUnitFinancials(lease);
-        await _db.SaveChangesAsync(cancellationToken);
+        await ConcurrencyHelper.SaveChangesOrThrowAsync(_db, "Lease", cancellationToken);
         await TryStartOccupancyFromLeaseAsync(lease, cancellationToken);
 
         _logger.LogInformation("Generated lease PDF for {LeaseId}: {Pdf}", lease.Id, pdfRel);
@@ -594,12 +694,33 @@ public sealed class LeaseService(
     {
         var tenant = lease.Tenant!;
         var unit = lease.Unit!;
-        var household = string.Join(", ",
-            tenant.HouseholdMembers.Select(m => m.FullName).Where(n => !string.IsNullOrWhiteSpace(n)));
-        if (string.IsNullOrWhiteSpace(household))
+        var residentName = $"{tenant.FirstName} {tenant.LastName}".Trim();
+        var householdNames = new List<string>();
+        if (!string.IsNullOrWhiteSpace(residentName))
         {
-            household = $"{tenant.FirstName} {tenant.LastName}".Trim();
+            householdNames.Add(residentName);
         }
+
+        foreach (var member in tenant.HouseholdMembers)
+        {
+            var name = member.FullName?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            if (householdNames.Any(existing =>
+                    string.Equals(existing, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            householdNames.Add(name);
+        }
+
+        var household = householdNames.Count == 0
+            ? residentName
+            : string.Join("; ", householdNames);
 
         var startLocal = _clock.ToDisplayTime(lease.StartUtc);
         var endLocal = _clock.ToDisplayTime(lease.EndUtc);
@@ -608,9 +729,9 @@ public sealed class LeaseService(
         {
             AgreementDate = _clock.ToDisplayTime(_clock.UtcNow),
             PremisesAddress = $"Unit {unit.Number}, Brookside Community Living, Wiley, CO",
-            ResidentName = $"{tenant.FirstName} {tenant.LastName}".Trim(),
+            ResidentName = residentName,
             HouseholdMembers = household,
-            PostOfficeBox = string.Empty,
+            PostOfficeBox = tenant.MailingAddress?.Trim() ?? string.Empty,
             PhoneNumber = tenant.Phone,
             ApartmentNumber = unit.Number,
             LeaseStart = startLocal,
@@ -620,6 +741,46 @@ public sealed class LeaseService(
             SecurityDeposit = lease.Deposit,
             CustomClauses = lease.CustomClauses
         };
+    }
+
+    private string AllocateLeaseDocumentBaseName(Lease lease, string preferredBase, string documentRoot)
+    {
+        var candidate = preferredBase;
+        var n = 2;
+        while (true)
+        {
+            var pdfRel = Path.Combine("leases", $"{candidate}.pdf").Replace('\\', '/');
+            var full = Path.Combine(documentRoot, pdfRel);
+            var ownedByThisLease = string.Equals(
+                lease.GeneratedPdfRelativePath, pdfRel, StringComparison.OrdinalIgnoreCase);
+            if (!File.Exists(full) || ownedByThisLease)
+            {
+                return candidate;
+            }
+
+            candidate = $"{preferredBase}-{n++}";
+        }
+    }
+
+    private void TryDeleteRelativeFile(string? relative)
+    {
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return;
+        }
+
+        try
+        {
+            var full = Path.Combine(ResolveDocumentRoot(), relative);
+            if (File.Exists(full))
+            {
+                File.Delete(full);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not delete previous lease file {Path}.", relative);
+        }
     }
 
     private string ResolveDocumentRoot() => _paths.GetDocumentRoot();

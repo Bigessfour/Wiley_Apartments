@@ -7,6 +7,7 @@
 @using Wiley.Apartments.Domain
 @inject ILeaseService LeaseService
 @inject NavigationManager Navigation
+@inject IClerkToast Toast
 @inject ILogger<LeaseList> Logger
 
 <PageTitle>Leases</PageTitle>
@@ -20,14 +21,28 @@
     <div class="alert alert-warning">@ErrorMessage</div>
 }
 
-<SfGrid TValue="Lease" DataSource="@Leases" AllowPaging="true" AllowSorting="true" AllowFiltering="true" Height="420">
-    <GridEvents TValue="Lease" OnRecordDoubleClick="OnLeaseDoubleClick" />
+<SfGrid @ref="GridRef"
+        TValue="Lease"
+        DataSource="@Leases"
+        Toolbar="@ToolbarItems"
+        AllowPaging="true"
+        AllowSorting="true"
+        AllowFiltering="true"
+        Height="420">
+    <GridEvents TValue="Lease"
+                OnActionComplete="OnActionCompleteAsync"
+                OnRecordDoubleClick="OnLeaseDoubleClick" />
     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
     <GridTemplates>
         <EmptyRecordTemplate>
             <div class="grid-empty-hint">No leases yet — use New lease above.</div>
         </EmptyRecordTemplate>
     </GridTemplates>
+    <GridEditSettings AllowAdding="false"
+                      AllowEditing="false"
+                      AllowDeleting="true"
+                      Mode="EditMode.Normal"
+                      ShowDeleteConfirmDialog="true" />
     <GridColumns>
         <GridColumn Field="@nameof(Lease.Id)" IsPrimaryKey="true" Visible="false" />
         <GridColumn HeaderText="Unit" Width="90">
@@ -56,7 +71,7 @@
         </GridColumn>
         <GridColumn Field="@nameof(Lease.TemplateUsed)" HeaderText="Template" Width="220" />
         <GridColumn Field="@nameof(Lease.Rent)" HeaderText="Rent" Width="100" Format="C2" />
-        <GridColumn HeaderText="" Width="100" TextAlign="TextAlign.Center">
+        <GridColumn HeaderText="" Width="100" TextAlign="TextAlign.Center" AllowEditing="false">
             <Template>
                 @{
                     var row = (Lease)context;
@@ -69,8 +84,11 @@
 </SfGrid>
 
 @code {
+    private SfGrid<Lease>? GridRef;
     private List<Lease> Leases { get; set; } = [];
     private string? ErrorMessage { get; set; }
+
+    private readonly List<string> ToolbarItems = ["Delete", "Search"];
 
     private void OnLeaseDoubleClick(RecordDoubleClickEventArgs<Lease> args)
     {
@@ -80,16 +98,39 @@
         }
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        Leases = (await LeaseService.GetAllAsync()).ToList();
+    }
+
+    private async Task OnActionCompleteAsync(ActionEventArgs<Lease> args)
     {
         try
         {
-            Leases = (await LeaseService.GetAllAsync()).ToList();
+            if (args.RequestType != Syncfusion.Blazor.Grids.Action.Delete || args.Data is null)
+            {
+                return;
+            }
+
+            await LeaseService.SoftDeleteAsync(args.Data.Id);
+            await Toast.ShowSuccessAsync("Lease removed.");
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "LeaseList operation failed.");
             ErrorMessage = ex.Message;
+            await ReloadAsync();
+            if (GridRef is not null)
+            {
+                await GridRef.Refresh();
+            }
         }
     }
 }
