@@ -8,7 +8,8 @@
 @inject IJSRuntime JsRuntime
 @inject IOptions<ClerkSuiteOptions> ClerkOptions
 @inject IUnitService UnitService
-@using Wiley.Apartments.Contracts
+@inject ClerkSuiteThemeState ThemeState
+@implements IDisposable
 
 <div class="clerksuite-shell">
     <SfSidebar @bind-IsOpen="SidebarOpen"
@@ -178,6 +179,12 @@
             ? url
             : string.Empty;
 
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += OnThemeStateChanged;
+        IsDarkMode = ThemeState.IsDark;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthState.GetAuthenticationStateAsync();
@@ -212,6 +219,7 @@
         {
             IsDarkMode = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
             _themeLoaded = true;
+            ThemeState.SetDark(IsDarkMode);
             StateHasChanged();
         }
         catch
@@ -228,8 +236,17 @@
         }
 
         IsDarkMode = args.Checked;
+        ThemeState.SetDark(IsDarkMode);
         await JsRuntime.InvokeVoidAsync("ClerkSuiteTheme.setDarkMode", IsDarkMode);
     }
+
+    private void OnThemeStateChanged()
+    {
+        IsDarkMode = ThemeState.IsDark;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => ThemeState.Changed -= OnThemeStateChanged;
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
 

@@ -12,7 +12,9 @@
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ClerkSuiteThemeState ThemeState
 @inject ILogger<OperatingCosts> Logger
+@implements IDisposable
 
 <PageTitle>Operating costs</PageTitle>
 
@@ -101,7 +103,7 @@
             }
             else
             {
-                <SfAccumulationChart Width="100%" Height="280px" Theme="@ChartTheme" EnableSmartLabels="true"
+                <SfAccumulationChart @key="ChartTheme" Width="100%" Height="280px" Theme="@ChartTheme" EnableSmartLabels="true"
                                      EnableAnimation="false" EnableBorderOnMouseMove="false">
                     <AccumulationChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Bottom">
                         <AccumulationChartLegendBorder Color="transparent" Width="0" />
@@ -114,7 +116,11 @@
                                                  InnerRadius="55%"
                                                  Radius="80%"
                                                  Type="AccumulationType.Pie">
-                            <AccumulationDataLabelSettings Visible="true" Name="Label" />
+                            <AccumulationDataLabelSettings Visible="true" Name="Label"
+                                                           Position="AccumulationLabelPosition.Outside">
+                                <AccumulationChartDataLabelFont Color="@ThemeState.GaugeLabelColor" Size="12px" />
+                                <AccumulationChartConnector Color="@ThemeState.GaugeLabelColor" Length="8%" />
+                            </AccumulationDataLabelSettings>
                         </AccumulationChartSeries>
                     </AccumulationChartSeriesCollection>
                 </SfAccumulationChart>
@@ -128,7 +134,7 @@
             }
             else
             {
-                <SfChart Width="100%" Height="280px" Theme="@ChartTheme">
+                <SfChart @key="ChartTheme" Width="100%" Height="280px" Theme="@ChartTheme">
                     <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
                     <ChartSeriesCollection>
                         <ChartSeries DataSource="@UnitBars" XName="Label" YName="Amount" Type="ChartSeriesType.Column" Name="Cost" />
@@ -173,7 +179,7 @@
     private bool Busy { get; set; }
     private string? ErrorMessage { get; set; }
     private string? SuccessMessage { get; set; }
-    private Theme ChartTheme { get; set; } = Theme.Fluent2;
+    private Theme ChartTheme => ThemeState.ChartTheme;
     private OperatingCostCategory FormCategory { get; set; } = OperatingCostCategory.Utility;
     private Guid? FormUnitId { get; set; }
     private decimal? FormAmount { get; set; }
@@ -295,28 +301,14 @@
 
     private async Task PrintAsync() => await Js.InvokeVoidAsync("print");
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (!firstRender)
-        {
-            return;
-        }
-
-        try
-        {
-            var isDark = await Js.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
-            var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
-            if (next != ChartTheme)
-            {
-                ChartTheme = next;
-                StateHasChanged();
-            }
-        }
-        catch
-        {
-            // Theme helper optional in test host.
-        }
+        ThemeState.Changed += OnThemeStateChanged;
     }
+
+    private void OnThemeStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeState.Changed -= OnThemeStateChanged;
 
     private sealed class ChartSlice
     {

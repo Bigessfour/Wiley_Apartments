@@ -13,8 +13,9 @@
 @inject IPortfolioProfitLossService ProfitLoss
 @inject IDateTimeService Clock
 @inject NavigationManager Navigation
-@inject IJSRuntime JsRuntime
+@inject ClerkSuiteThemeState ThemeState
 @inject ILogger<Home> Logger
+@implements IDisposable
 
 <PageTitle>ClerkSuite Dashboard</PageTitle>
 
@@ -50,6 +51,7 @@ else if (IsLoading || Snap is null)
 }
 else
 {
+    <div @key="ChartTheme">
     <div class="kpi-grid kpi-grid--viz">
         <SfCard CssClass="kpi-card kpi-card--accent kpi-card--gauge kpi-card--link" @onclick='() => Go("units")'>
             <CardContent>
@@ -62,19 +64,19 @@ else
                                 <CircularGaugeAxisMinorTicks Height="0" />
                                 <CircularGaugeAxisLabelStyle Format=" " />
                                 <CircularGaugeRanges>
-                                    <CircularGaugeRange Start="0" End="100" Color="#c5d8f0" StartWidth="12" EndWidth="12" Radius="90%" />
+                                    <CircularGaugeRange Start="0" End="100" Color="@ThemeState.GaugeTrackColor" StartWidth="12" EndWidth="12" Radius="90%" />
                                 </CircularGaugeRanges>
                                 <CircularGaugePointers>
                                     <CircularGaugePointer Value="@Snap.OccupancyPercent"
                                                           Type="PointerType.RangeBar"
                                                           PointerWidth="12"
-                                                          Color="#0f6cbd"
+                                                          Color="@ThemeState.AccentColor"
                                                           Radius="90%"
                                                           RoundedCornerRadius="6" />
                                 </CircularGaugePointers>
                                 <CircularGaugeAnnotations>
                                     <CircularGaugeAnnotation Content="@($"{Snap.OccupancyPercent:0.#}%")" Angle="180" Radius="0%" ZIndex="1">
-                                        <CircularGaugeAnnotationTextStyle Size="18px" FontWeight="600" />
+                                        <CircularGaugeAnnotationTextStyle Size="18px" FontWeight="600" Color="@ThemeState.GaugeLabelColor" />
                                     </CircularGaugeAnnotation>
                                 </CircularGaugeAnnotations>
                             </CircularGaugeAxis>
@@ -106,7 +108,7 @@ else
                                 <LinearGaugePointers>
                                     <LinearGaugePointer PointerValue="@Snap.CollectionRatePercent"
                                                         Type="Syncfusion.Blazor.LinearGauge.Point.Bar"
-                                                        Color="#0f6cbd"
+                                                        Color="@ThemeState.AccentColor"
                                                         Width="12" />
                                 </LinearGaugePointers>
                             </LinearGaugeAxis>
@@ -123,7 +125,7 @@ else
                                      Type="SparklineType.Area"
                                      Height="28px"
                                      Width="100%"
-                                     Fill="#0f6cbd"
+                                     Fill="@ThemeState.AccentColor"
                                      LineWidth="1.5"
                                      Theme="@ChartTheme">
                         </SfSparkline>
@@ -179,7 +181,11 @@ else
                                                      InnerRadius="55%"
                                                      Radius="80%"
                                                      Type="AccumulationType.Pie">
-                                <AccumulationDataLabelSettings Visible="true" Name="Status" />
+                                <AccumulationDataLabelSettings Visible="true" Name="Status"
+                                                               Position="AccumulationLabelPosition.Outside">
+                                    <AccumulationChartDataLabelFont Color="@ThemeState.GaugeLabelColor" Size="12px" />
+                                    <AccumulationChartConnector Color="@ThemeState.GaugeLabelColor" Length="8%" />
+                                </AccumulationDataLabelSettings>
                             </AccumulationChartSeries>
                         </AccumulationChartSeriesCollection>
                     </SfAccumulationChart>
@@ -221,8 +227,7 @@ else
                                          XName="Label"
                                          YName="Amount"
                                          Type="ChartSeriesType.Column"
-                                         Name="Collected"
-                                         Fill="#0f6cbd" />
+                                         Name="Collected" />
                         </ChartSeriesCollection>
                     </SfChart>
                 }
@@ -489,6 +494,7 @@ else
             </div>
         </section>
     </div>
+    </div>
 }
 
 @code {
@@ -502,7 +508,7 @@ else
     private List<DashboardStatusSlice> StatusSlices { get; set; } = [];
     private List<DashboardMonthAmount> CollectionChart { get; set; } = [];
     private List<SparkPoint> CollectionSparkData { get; set; } = [];
-    private Theme ChartTheme { get; set; } = Theme.Fluent2;
+    private Theme ChartTheme => ThemeState.ChartTheme;
 
     private string HeaderSubtitle
     {
@@ -531,30 +537,16 @@ else
         }
     }
 
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += OnThemeStateChanged;
+    }
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender)
-        {
-            return;
-        }
+    private void OnThemeStateChanged() => _ = InvokeAsync(StateHasChanged);
 
-        try
-        {
-            var isDark = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
-            var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
-            if (next != ChartTheme)
-            {
-                ChartTheme = next;
-                StateHasChanged();
-            }
-        }
-        catch
-        {
-            // Theme helper optional in test host.
-        }
-    }
+    public void Dispose() => ThemeState.Changed -= OnThemeStateChanged;
 
     private async Task LoadAsync()
     {

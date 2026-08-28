@@ -9,6 +9,7 @@
 @using Wiley.Apartments.Domain
 @using Wiley.Apartments.Web.Configuration
 @inject IJSRuntime JsRuntime
+@inject ClerkSuiteThemeState ThemeState
 @inject ILateFeeSettingsService LateFeeSettings
 @inject IFacilityRentalRateService CcRates
 @inject ILedgerService LedgerService
@@ -20,6 +21,7 @@
 @inject IHostEnvironment HostEnvironment
 @inject ILogger<Settings> Logger
 @using Microsoft.Extensions.Hosting
+@implements IDisposable
 
 <PageTitle>Settings</PageTitle>
 
@@ -248,6 +250,12 @@
             ? string.Empty
             : (err ?? PaymentPortalConfiguration.ItContactNote);
 
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += OnThemeStateChanged;
+        IsDarkMode = ThemeState.IsDark;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var settings = await LateFeeSettings.GetAsync();
@@ -269,6 +277,7 @@
         {
             IsDarkMode = await JsRuntime.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
             _themeLoaded = true;
+            ThemeState.SetDark(IsDarkMode);
             StateHasChanged();
         }
     }
@@ -281,8 +290,17 @@
         }
 
         IsDarkMode = args.Checked;
+        ThemeState.SetDark(IsDarkMode);
         await JsRuntime.InvokeVoidAsync("ClerkSuiteTheme.setDarkMode", IsDarkMode);
     }
+
+    private void OnThemeStateChanged()
+    {
+        IsDarkMode = ThemeState.IsDark;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => ThemeState.Changed -= OnThemeStateChanged;
 
     private string ThemeLabelClass(bool forDark) =>
         forDark == IsDarkMode ? "fw-semibold" : "text-muted";

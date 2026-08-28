@@ -66,6 +66,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IDocumentVaultMetadataSync, DocumentVaultMetadataSync>();
         builder.Services.AddScoped<ClerkToastService>();
         builder.Services.AddScoped<IClerkToast>(sp => sp.GetRequiredService<ClerkToastService>());
+        builder.Services.AddScoped<ClerkSuiteThemeState>();
         builder.Services.AddScoped<DocumentVaultAntiforgeryFilter>();
         builder.Services.AddHealthChecks()
             .AddCheck<DocumentRootHealthCheck>("document-root");

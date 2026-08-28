@@ -8,7 +8,9 @@
 @inject IPortfolioProfitLossService ProfitLoss
 @inject NavigationManager Navigation
 @inject IJSRuntime Js
+@inject ClerkSuiteThemeState ThemeState
 @inject ILogger<PortfolioProfitLoss> Logger
+@implements IDisposable
 
 <PageTitle>Portfolio P/L</PageTitle>
 
@@ -52,7 +54,7 @@ else
             }
             else
             {
-            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
+            <SfChart @key="ChartTheme" Width="100%" Height="100%" Theme="@ChartTheme">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelRotation="-45" />
                 <ChartSeriesCollection>
                     <ChartSeries DataSource="@UnitChart" XName="Label" YName="Income" Type="ChartSeriesType.StackingColumn" Name="Income" />
@@ -82,7 +84,7 @@ else
             }
             else
             {
-            <SfChart Width="100%" Height="100%" Theme="@ChartTheme">
+            <SfChart @key="ChartTheme" Width="100%" Height="100%" Theme="@ChartTheme">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
                 <ChartSeriesCollection>
                     <ChartSeries DataSource="@SeriesChart" XName="Label" YName="Income" Type="ChartSeriesType.Line" Name="Income" />
@@ -105,7 +107,7 @@ else
     private List<ChartPoint> SeriesChart { get; set; } = [];
     private List<UnitPlRow> UnitRows { get; set; } = [];
     private string? ErrorMessage { get; set; }
-    private Theme ChartTheme { get; set; } = Theme.Fluent2;
+    private Theme ChartTheme => ThemeState.ChartTheme;
 
     private static readonly List<PeriodOption> PeriodOptions =
     [
@@ -114,30 +116,16 @@ else
         new() { Value = ProfitLossPeriod.Year, Text = "Full year" }
     ];
 
+    protected override void OnInitialized()
+    {
+        ThemeState.Changed += OnThemeStateChanged;
+    }
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender)
-        {
-            return;
-        }
+    private void OnThemeStateChanged() => _ = InvokeAsync(StateHasChanged);
 
-        try
-        {
-            var isDark = await Js.InvokeAsync<bool>("ClerkSuiteTheme.isDarkMode");
-            var next = isDark ? Theme.Fluent2Dark : Theme.Fluent2;
-            if (next != ChartTheme)
-            {
-                ChartTheme = next;
-                StateHasChanged();
-            }
-        }
-        catch
-        {
-            // Theme helper optional in test host.
-        }
-    }
+    public void Dispose() => ThemeState.Changed -= OnThemeStateChanged;
 
     private async Task OnPeriodChanged(ChangeEventArgs<ProfitLossPeriod, PeriodOption> args)
     {

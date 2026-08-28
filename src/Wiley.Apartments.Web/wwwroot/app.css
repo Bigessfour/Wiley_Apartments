@@ -485,6 +485,12 @@ h1:focus {
   overflow-y: auto !important;
 }
 
+.unit-edit-form .form-text {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--cs-muted);
+}
+
 .e-gridform .form-label {
   display: block;
   margin-bottom: 0.25rem;

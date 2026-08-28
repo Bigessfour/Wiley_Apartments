@@ -54,18 +54,137 @@
             <div class="grid-empty-hint">No units yet — use Add on the toolbar.</div>
         </EmptyRecordTemplate>
     </GridTemplates>
+    @* Full dialog Template + HeaderTemplate: per-column EditTemplate makes HeaderTemplate
+       fall back to "Details of {primary key}" and drops Syncfusion field labels. *@
     <GridEditSettings AllowAdding="@CanAddUnit"
                       AllowEditing="true"
                       AllowDeleting="true"
                       Mode="EditMode.Dialog"
                       ShowDeleteConfirmDialog="true"
-                      Dialog="@(new DialogSettings { Width = "480px", CssClass = "unit-edit-dialog" })">
+                      Dialog="@(new DialogSettings { Width = "520px", CssClass = "unit-edit-dialog" })">
         <HeaderTemplate>
             @{
-                var unit = context as Unit;
+                var headerUnit = (Unit)context;
             }
-            <span>@DialogTitle(unit)</span>
+            <span>@DialogTitle(headerUnit)</span>
         </HeaderTemplate>
+        <Template>
+            @{
+                var unit = (Unit)context;
+            }
+            <div class="unit-edit-form">
+                <div class="mb-3">
+                    <SfTextBox ID="Number"
+                               @bind-Value="unit.Number"
+                               Placeholder="Unit #"
+                               FloatLabelType="FloatLabelType.Always"
+                               Width="100%" />
+                    <div class="form-text">Apartment number on the building, for example 301.</div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <SfNumericTextBox TValue="decimal"
+                                          ID="SqFt"
+                                          @bind-Value="unit.SqFt"
+                                          Placeholder="Sq ft"
+                                          FloatLabelType="FloatLabelType.Always"
+                                          Format="N0"
+                                          Decimals="0"
+                                          Min="0"
+                                          Step="1"
+                                          ShowSpinButton="true"
+                                          Width="100%" />
+                    </div>
+                    <div class="col-md-4">
+                        <SfNumericTextBox TValue="int"
+                                          ID="Beds"
+                                          @bind-Value="unit.Beds"
+                                          Placeholder="Beds"
+                                          FloatLabelType="FloatLabelType.Always"
+                                          Format="N0"
+                                          Min="0"
+                                          Step="1"
+                                          ShowSpinButton="true"
+                                          Width="100%" />
+                    </div>
+                    <div class="col-md-4">
+                        <SfNumericTextBox TValue="int"
+                                          ID="Baths"
+                                          @bind-Value="unit.Baths"
+                                          Placeholder="Baths"
+                                          FloatLabelType="FloatLabelType.Always"
+                                          Format="N0"
+                                          Min="0"
+                                          Step="1"
+                                          ShowSpinButton="true"
+                                          Width="100%" />
+                    </div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <SfNumericTextBox TValue="decimal"
+                                          ID="MonthlyRent"
+                                          @bind-Value="unit.MonthlyRent"
+                                          Placeholder="Rent"
+                                          FloatLabelType="FloatLabelType.Always"
+                                          Format="C2"
+                                          Currency="USD"
+                                          Decimals="2"
+                                          Min="0"
+                                          Step="25"
+                                          ShowSpinButton="true"
+                                          Width="100%" />
+                    </div>
+                    <div class="col-md-6">
+                        <SfNumericTextBox TValue="decimal"
+                                          ID="SecurityDeposit"
+                                          @bind-Value="unit.SecurityDeposit"
+                                          Placeholder="Deposit"
+                                          FloatLabelType="FloatLabelType.Always"
+                                          Format="C2"
+                                          Currency="USD"
+                                          Decimals="2"
+                                          Min="0"
+                                          Step="25"
+                                          ShowSpinButton="true"
+                                          Width="100%" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <SfTextBox ID="LeaseTerm"
+                               @bind-Value="unit.LeaseTerm"
+                               Placeholder="Term"
+                               FloatLabelType="FloatLabelType.Always"
+                               Width="100%" />
+                    <div class="form-text">Lease term from the roster, for example Year or Month-to-Month.</div>
+                </div>
+                <div class="mb-3">
+                    <SfDropDownList TValue="UnitStatus"
+                                    TItem="UnitStatusOption"
+                                    ID="Status"
+                                    DataSource="@StatusOptions"
+                                    Placeholder="Status"
+                                    FloatLabelType="FloatLabelType.Always"
+                                    @bind-Value="unit.Status"
+                                    Width="100%">
+                        <DropDownListFieldSettings Value="Value" Text="Text" />
+                    </SfDropDownList>
+                </div>
+                <div class="mb-3">
+                    <SfCheckBox @bind-Checked="unit.IsHandicapAccessible"
+                                Label="Handicap accessible (HC)" />
+                </div>
+                <div class="mb-1">
+                    <SfTextBox ID="Notes"
+                               @bind-Value="unit.Notes"
+                               Multiline="true"
+                               Placeholder="Layout notes"
+                               FloatLabelType="FloatLabelType.Always"
+                               Width="100%" />
+                    <div class="form-text">Floor plan, storage, and other layout notes.</div>
+                </div>
+            </div>
+        </Template>
     </GridEditSettings>
     <GridColumns>
         <GridColumn Field="@nameof(Unit.Id)"
@@ -84,171 +203,38 @@
         <GridColumn Field="@nameof(Unit.Number)"
                     HeaderText="Unit #"
                     Width="100"
-                    ValidationRules="@(new ValidationRules { Required = true })">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Apartment number on the building, for example 301.">
-                        <SfTextBox @bind-Value="unit.Number"
-                                   Placeholder="Unit #"
-                                   FloatLabelType="FloatLabelType.Always"
-                                   Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    ValidationRules="@(new ValidationRules { Required = true })" />
         <GridColumn Field="@nameof(Unit.SqFt)"
                     HeaderText="Sq Ft"
                     TextAlign="TextAlign.Right"
                     Format="N0"
                     Width="110"
-                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Interior square footage of this apartment.">
-                    <SfNumericTextBox TValue="decimal"
-                                      ID="SqFt"
-                                      @bind-Value="unit.SqFt"
-                                      Placeholder="Sq ft"
-                                      FloatLabelType="FloatLabelType.Always"
-                                      Format="N0"
-                                      Decimals="0"
-                                      Min="0"
-                                      Step="1"
-                                      ShowSpinButton="true"
-                                      Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
         <GridColumn Field="@nameof(Unit.Beds)"
                     HeaderText="Beds"
                     TextAlign="TextAlign.Right"
                     Width="90"
-                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Number of bedrooms.">
-                    <SfNumericTextBox TValue="int"
-                                      ID="Beds"
-                                      @bind-Value="unit.Beds"
-                                      Placeholder="Beds"
-                                      FloatLabelType="FloatLabelType.Always"
-                                      Format="N0"
-                                      Min="0"
-                                      Step="1"
-                                      ShowSpinButton="true"
-                                      Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
         <GridColumn Field="@nameof(Unit.Baths)"
                     HeaderText="Baths"
                     TextAlign="TextAlign.Right"
                     Width="90"
-                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Number of bathrooms.">
-                    <SfNumericTextBox TValue="int"
-                                      ID="Baths"
-                                      @bind-Value="unit.Baths"
-                                      Placeholder="Baths"
-                                      FloatLabelType="FloatLabelType.Always"
-                                      Format="N0"
-                                      Min="0"
-                                      Step="1"
-                                      ShowSpinButton="true"
-                                      Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    ValidationRules="@(new ValidationRules { Required = true, Min = 0 })" />
         <GridColumn Field="@nameof(Unit.MonthlyRent)"
                     HeaderText="Rent"
                     TextAlign="TextAlign.Right"
                     Format="C2"
                     Width="110"
-                    ValidationRules="@(new ValidationRules { Min = 0 })">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Listed monthly rent for this apartment.">
-                    <SfNumericTextBox TValue="decimal"
-                                      ID="MonthlyRent"
-                                      @bind-Value="unit.MonthlyRent"
-                                      Placeholder="Rent"
-                                      FloatLabelType="FloatLabelType.Always"
-                                      Format="C2"
-                                      Currency="USD"
-                                      Decimals="2"
-                                      Min="0"
-                                      Step="25"
-                                      ShowSpinButton="true"
-                                      Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    ValidationRules="@(new ValidationRules { Min = 0 })" />
         <GridColumn Field="@nameof(Unit.SecurityDeposit)"
                     HeaderText="Deposit"
                     TextAlign="TextAlign.Right"
                     Format="C2"
                     Width="110"
-                    ValidationRules="@(new ValidationRules { Min = 0 })">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Security deposit on file for this unit.">
-                    <SfNumericTextBox TValue="decimal"
-                                      ID="SecurityDeposit"
-                                      @bind-Value="unit.SecurityDeposit"
-                                      Placeholder="Deposit"
-                                      FloatLabelType="FloatLabelType.Always"
-                                      Format="C2"
-                                      Currency="USD"
-                                      Decimals="2"
-                                      Min="0"
-                                      Step="25"
-                                      ShowSpinButton="true"
-                                      Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    ValidationRules="@(new ValidationRules { Min = 0 })" />
         <GridColumn Field="@nameof(Unit.LeaseTerm)"
                     HeaderText="Term"
-                    Width="120">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Lease term from the roster, for example Year or Month-to-Month.">
-                        <SfTextBox @bind-Value="unit.LeaseTerm"
-                                   Placeholder="Term"
-                                   FloatLabelType="FloatLabelType.Always"
-                                   Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
-        </GridColumn>
+                    Width="120" />
         <GridColumn Field="@nameof(Unit.IsHandicapAccessible)"
                     HeaderText="HC"
                     Width="70"
@@ -258,37 +244,11 @@
             <HeaderTemplate>
                 <span title="Handicap-accessible unit (Brookside HC flag).">HC</span>
             </HeaderTemplate>
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <FieldHint Hint="Handicap-accessible unit (Brookside HC flag).">
-                    <SfCheckBox @bind-Checked="unit.IsHandicapAccessible" Label="HC" />
-                </FieldHint>
-            </EditTemplate>
         </GridColumn>
         <GridColumn Field="@nameof(Unit.Status)"
                     HeaderText="Status"
                     Width="140"
                     EditType="EditType.DropDownEdit">
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div>
-                    <FieldHint Hint="Occupied, Vacant, Maintenance, or Make-Ready.">
-                    <SfDropDownList TValue="UnitStatus"
-                                    TItem="UnitStatusOption"
-                                    ID="Status"
-                                    DataSource="@StatusOptions"
-                                    Placeholder="Status"
-                                    FloatLabelType="FloatLabelType.Always"
-                                    @bind-Value="unit.Status">
-                        <DropDownListFieldSettings Value="Value" Text="Text" />
-                    </SfDropDownList>
-                    </FieldHint>
-                </div>
-            </EditTemplate>
             <Template>
                 @{
                     var row = (Unit)context;
@@ -307,21 +267,6 @@
                 }
                 <span title="@notes">@preview</span>
             </Template>
-            <EditTemplate>
-                @{
-                    var unit = (Unit)context;
-                }
-                <div @onmousedown:stopPropagation="true" @onclick:stopPropagation="true">
-                    <FieldHint Hint="Floor plan, storage, and other layout notes.">
-                    <SfTextBox ID="Notes"
-                               @bind-Value="unit.Notes"
-                               Multiline="true"
-                               Placeholder="Layout notes"
-                               FloatLabelType="FloatLabelType.Always"
-                               Width="100%" />
-                    </FieldHint>
-                </div>
-            </EditTemplate>
         </GridColumn>
         <GridColumn HeaderText="Open"
                     Width="90"
@@ -338,9 +283,6 @@
                           Content="Open"
                           OnClick="@(() => OpenUnit(unit!.Id))" />
             </Template>
-            <EditTemplate>
-                @* Empty template keeps this command column off the edit dialog. *@
-            </EditTemplate>
         </GridColumn>
     </GridColumns>
 </SfGrid>
