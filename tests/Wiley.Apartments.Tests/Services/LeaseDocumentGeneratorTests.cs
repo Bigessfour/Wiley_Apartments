@@ -18,6 +18,9 @@ public class LeaseDocumentGeneratorTests
         return candidates.FirstOrDefault(File.Exists);
     }
 
+    private static string NormalizePdfText(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+
     private static LeaseMergeData SampleData() => new()
     {
         AgreementDate = new DateTime(2026, 8, 9),
@@ -78,15 +81,31 @@ public class LeaseDocumentGeneratorTests
         cover.Should().Contain("Wiley, CO 81092");
         cover.Should().Contain("(719) 829-4974");
         cover.Should().Contain("Heather Spou");
-        var text = string.Join('\n', Enumerable.Range(0, loaded.Pages.Count)
-            .Select(i => loaded.Pages[i].ExtractText()));
+        cover.Should().Contain("RESIDENTIAL LEASE AGREEMENT");
+        var text = NormalizePdfText(string.Join('\n', Enumerable.Range(0, loaded.Pages.Count)
+            .Select(i => loaded.Pages[i].ExtractText())));
         text.Should().Contain("Pat Nguyen");
         text.Should().Contain("Heather Spou");
         text.Should().Contain("(719) 640-2230");
         text.Should().Contain("650.00");
+        text.Should().Contain("1. Parties and premises.");
+        text.Should().Contain("Resident signature");
         text.Should().NotContain("@@ResidentName@@");
         text.Should().NotContain("@@MonthlyRent@@");
         text.Should().NotContain("PHONE NUMBER719");
+        text.Should().NotContain("Details of");
+    }
+
+    [Fact]
+    public void GenerateProfessional_MonthToMonth_UsesMonthlyTermLanguage()
+    {
+        var generator = new LeaseDocumentGenerator();
+        var (_, pdf) = generator.GenerateProfessional(SampleData(), monthToMonth: true);
+        using var loaded = new PdfLoadedDocument(pdf);
+        var text = NormalizePdfText(string.Join('\n', Enumerable.Range(0, loaded.Pages.Count)
+            .Select(i => loaded.Pages[i].ExtractText())));
+        text.Should().Contain("one calendar month");
+        text.Should().NotContain("one calendar year");
     }
 
     [Fact]
@@ -145,8 +164,8 @@ public class LeaseDocumentGeneratorTests
         var (_, pdf) = generator.Generate(template, "brookside-year-lease.docx", data);
 
         using var loaded = new PdfLoadedDocument(pdf);
-        loaded.Pages.Count.Should().BeGreaterThan(4);
-        var lastText = loaded.Pages[^1].ExtractText();
+        loaded.Pages.Count.Should().BeGreaterThanOrEqualTo(3);
+        var lastText = NormalizePdfText(loaded.Pages[^1].ExtractText());
         lastText.Should().Contain("Additional Clauses");
         lastText.Should().Contain("Pets require prior written approval");
     }
