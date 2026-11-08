@@ -52,10 +52,14 @@ PaymentPortalUrl=https://www.townofwiley.gov/government/departments/finance/util
 Staff deep-link only — configure `ClerkSuite__PaymentPortalUrl` to the town pay-bill entry
 (`secure.paystar.io` flow via townofwiley.gov).
 
-## Optional Postgres override
+## Optional Postgres override (local companion DB)
 
 ```bash
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.postgres.yml up -d
 ```
 
-Use only when town IT explicitly opts in (G4).
+Use only when town IT explicitly opts in (G4). Synology default remains **SQLite**.
+
+## AWS / Aurora (App Runner)
+
+Use [`deploy/docker-compose.prod.yml`](../docker-compose.prod.yml) + [`deploy/PRODUCTION-AURORA.md`](../PRODUCTION-AURORA.md). Set `ClerkSuite__DatabaseProvider=Postgres` and an Aurora connection string. Do **not** change Synology compose to Postgres for day-to-day clerk work.

@@ -81,10 +81,23 @@ public static class ClerkSuiteServiceExtensions
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=Data/clerksuite.db";
+        var databaseProvider = builder.Configuration[$"{ClerkSuiteOptions.SectionName}:DatabaseProvider"]
+            ?? "Sqlite";
 
         builder.Services.AddDbContext<ApartmentsDbContext>((sp, options) =>
         {
-            options.UseSqlite(connectionString);
+            // Default remains Sqlite for local Mac + Synology clerk workflow.
+            // Set ClerkSuite__DatabaseProvider=Postgres (+ Npgsql connection string) for Aurora/RDS.
+            if (databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
+                || databaseProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+            {
+                options.UseNpgsql(connectionString);
+            }
+            else
+            {
+                options.UseSqlite(connectionString);
+            }
+
             options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
         });
 

@@ -1,0 +1,47 @@
+# ClerkSuite production / App Runner style — Postgres (Aurora or RDS), not SQLite.
+#
+# Local/Synology clerk workflow is unchanged:
+#   deploy/docker-compose.yml + deploy/synology/docker-compose.yml → SQLite at /data/clerksuite.db
+#
+# Usage (external Aurora/RDS — preferred for AWS):
+#   cp deploy/env.prod.example deploy/.env.prod   # fill secrets; never commit
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
+#
+# Optional companion Postgres on the same host (dev/smoke only):
+#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.postgres.yml --env-file deploy/.env.prod up -d --build
+
+name: clerksuite-prod
+
+services:
+  clerksuite:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: clerksuite:${CLERKSUITE_VERSION:-latest}
+    container_name: clerksuite-prod
+    restart: unless-stopped
+    ports:
+      - ${CLERKSUITE_HOST_PORT:-8082}:8080
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ClerkSuite__DatabaseProvider: Postgres
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection}
+      ClerkSuite__DocumentRoot: ${ClerkSuite__DocumentRoot:-/docs}
+      SYNCFUSION_LICENSE_KEY: ${SYNCFUSION_LICENSE_KEY:-}
+      ClerkSuite__PaymentPortalUrl: ${ClerkSuite__PaymentPortalUrl:-https://www.townofwiley.gov/government/departments/finance/utility-billing}
+      ClerkSuite__LateFeesEnabled: ${ClerkSuite__LateFeesEnabled:-false}
+      TZ: America/Denver
+    volumes:
+      # Documents only — database lives on Aurora/RDS when Provider=Postgres
+      - ${DOCUMENTS_HOST_PATH:-clerksuite-docs}:/docs
+      - ${DATA_HOST_PATH:-clerksuite-dpkeys}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  clerksuite-docs:
+  clerksuite-dpkeys:
