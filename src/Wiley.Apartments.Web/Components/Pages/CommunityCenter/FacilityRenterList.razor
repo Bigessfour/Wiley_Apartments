@@ -70,6 +70,8 @@
             <EditTemplate>
                 @{
                     var renter = (FacilityRenter)context;
+                    // SfDropDownList TValue=string matches "(none)" via ""; coerce null so edit shows it.
+                    renter.IdType ??= string.Empty;
                 }
                 <SfDropDownList TValue="string"
                                 TItem="IdTypeOption"
