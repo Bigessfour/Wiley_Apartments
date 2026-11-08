@@ -47,7 +47,8 @@ jobs:
   # ---------------------------------------------------------------------------
   build-and-test:
     name: Build & Test
-    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
+    # Pin 24.04: ubuntu-latest is 26.04 and Playwright 1.51 cannot install chromium there.
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15
 
     steps:
@@ -113,7 +114,7 @@ jobs:
   # ---------------------------------------------------------------------------
   e2e:
     name: E2E (Playwright)
-    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-24.04' }}
     needs: build-and-test
     if: success()
     timeout-minutes: 25
@@ -198,7 +199,7 @@ jobs:
   # or E2E fails, or on workflow_dispatch when vars.CI_FORCE_OLLAMA == 'true'.
   ollama-ci-review:
     name: Ollama CI Review Agent
-    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-24.04' }}
     needs: [build-and-test, e2e]
     if: |
       always() && (
