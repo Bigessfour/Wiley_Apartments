@@ -94,6 +94,10 @@ public sealed class FacilityReservationService(
         FacilityReservation reservation,
         CancellationToken cancellationToken = default)
     {
+        // Drop rows left tracked by Create/Get so a stale Guid concurrency token
+        // from the same DbContext (Blazor circuit or in-memory tests) cannot fail SaveChanges.
+        ConcurrencyHelper.DiscardTrackedEntities(_db);
+
         var existing = await _db.FacilityReservations
                            .Include(r => r.Equipment)
                            .FirstOrDefaultAsync(r => r.Id == reservation.Id && !r.IsDeleted, cancellationToken)
@@ -119,15 +123,21 @@ public sealed class FacilityReservationService(
 
         // Keep a confirmed hold across notes/fee edits. Release+re-hold only when
         // equipment or confirmed status actually changes, and only persist once.
+        var equipmentChanged = !EquipmentEquals(existing.Equipment, reservation.Equipment);
         var keepHold = existing.InventoryHeld
             && existing.Status == FacilityReservationStatus.Confirmed
-            && EquipmentEquals(existing.Equipment, reservation.Equipment);
+            && !equipmentChanged;
         if (existing.InventoryHeld && !keepHold)
         {
             await ReleaseInventoryAsync(existing, cancellationToken);
         }
 
-        ReplaceEquipment(existing, reservation.Equipment);
+        // In-place sync — Clear()+Add same (ReservationId, ItemId) trips the unique
+        // index and EF reports a concurrency failure on FacilityReservationEquipment.
+        if (equipmentChanged)
+        {
+            ReplaceEquipment(existing, reservation.Equipment);
+        }
 
         if (existing.Status == FacilityReservationStatus.Confirmed && !keepHold)
         {
@@ -453,19 +463,33 @@ public sealed class FacilityReservationService(
         FacilityReservation existing,
         ICollection<FacilityReservationEquipment> incoming)
     {
-        existing.Equipment.Clear();
-        foreach (var line in incoming
-                     .Where(e => e.InventoryItemId != Guid.Empty && e.Quantity > 0)
-                     .GroupBy(e => e.InventoryItemId)
-                     .Select(g => new { ItemId = g.Key, Quantity = g.Sum(x => x.Quantity) }))
+        var desired = incoming
+            .Where(e => e.InventoryItemId != Guid.Empty && e.Quantity > 0)
+            .GroupBy(e => e.InventoryItemId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        foreach (var line in existing.Equipment.Where(e => !desired.ContainsKey(e.InventoryItemId)).ToList())
         {
-            existing.Equipment.Add(new FacilityReservationEquipment
+            existing.Equipment.Remove(line);
+        }
+
+        foreach (var (itemId, qty) in desired)
+        {
+            var line = existing.Equipment.FirstOrDefault(e => e.InventoryItemId == itemId);
+            if (line is null)
             {
-                Id = Guid.NewGuid(),
-                FacilityReservationId = existing.Id,
-                InventoryItemId = line.ItemId,
-                Quantity = line.Quantity
-            });
+                existing.Equipment.Add(new FacilityReservationEquipment
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityReservationId = existing.Id,
+                    InventoryItemId = itemId,
+                    Quantity = qty
+                });
+            }
+            else
+            {
+                line.Quantity = qty;
+            }
         }
     }
 
