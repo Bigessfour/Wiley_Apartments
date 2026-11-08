@@ -51,6 +51,7 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddScoped<IPaymentReceiptService, PaymentReceiptService>();
         builder.Services.AddScoped<IRentRollService, RentRollService>();
         builder.Services.AddScoped<IUnitOperatingCostService, UnitOperatingCostService>();
+        builder.Services.AddScoped<SharedContractOperationalEventExportService>();
         builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
         builder.Services.AddScoped<IFacilityRenterService, FacilityRenterService>();
         builder.Services.AddScoped<IFacilityReservationService, FacilityReservationService>();

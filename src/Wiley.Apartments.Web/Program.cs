@@ -50,6 +50,29 @@ try
         })
         .RequireAuthorization();
 
+    // Shared-contracts export for Wiley Widget ingest (read-only; does not alter ClerkSuite behavior).
+    // Returns bare OperationalEvent[] ready for POST /api/reference-data/events.
+    app.MapGet("/api/exports/shared-contracts/operational-events", async (
+            string? period,
+            Wiley.Apartments.Web.Services.SharedContractOperationalEventExportService export,
+            CancellationToken ct) =>
+        {
+            var month = string.IsNullOrWhiteSpace(period)
+                ? DateTime.UtcNow.ToString("yyyy-MM")
+                : period.Trim();
+            try
+            {
+                var events = await export.BuildForPeriodAsync(month, ct);
+                return Results.Json(events);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        })
+        .WithName("ExportSharedContractOperationalEvents")
+        .WithTags("SharedContracts");
+
     var urls = builder.Configuration["ASPNETCORE_URLS"]
         ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
         ?? "http://localhost:5077";
