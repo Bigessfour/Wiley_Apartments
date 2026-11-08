@@ -293,6 +293,59 @@ public class FacilityReservationServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_ClearingEquipment_ReleasesHold()
+    {
+        await using var db = CreateDb();
+        var (unit, renter, service, start, end) = await SeedCcAsync(db);
+        var item = new FacilityInventoryItem
+        {
+            Id = Guid.NewGuid(),
+            UnitId = unit.Id,
+            Name = "Banquet tables",
+            Category = FacilityInventoryCategory.Table,
+            Quantity = 10,
+            RowVersion = Guid.NewGuid()
+        };
+        db.FacilityInventoryItems.Add(item);
+        await db.SaveChangesAsync();
+
+        var created = await service.CreateAsync(new FacilityReservation
+        {
+            UnitId = unit.Id,
+            FacilityRenterId = renter.Id,
+            StartUtc = start,
+            EndUtc = end,
+            Space = FacilitySpace.MainHall,
+            Status = FacilityReservationStatus.Confirmed,
+            RentalFee = 150,
+            DepositAmount = 100,
+            Equipment =
+            [
+                new FacilityReservationEquipment { InventoryItemId = item.Id, Quantity = 3 }
+            ]
+        });
+
+        (await db.FacilityInventoryItems.AsNoTracking().SingleAsync(i => i.Id == item.Id))
+            .Quantity.Should().Be(7);
+        (await db.FacilityReservations.AsNoTracking().SingleAsync(r => r.Id == created.Id))
+            .InventoryHeld.Should().BeTrue();
+
+        var snapshot = await service.GetByIdAsync(created.Id);
+        snapshot!.Equipment = [];
+        await service.UpdateAsync(snapshot);
+
+        (await db.FacilityInventoryItems.AsNoTracking().SingleAsync(i => i.Id == item.Id))
+            .Quantity.Should().Be(10);
+        var updated = await db.FacilityReservations
+            .AsNoTracking()
+            .Include(r => r.Equipment)
+            .SingleAsync(r => r.Id == created.Id);
+        updated.Equipment.Should().BeEmpty();
+        // Confirmed bookings still mark InventoryHeld after re-hold (same as create with no gear).
+        updated.InventoryHeld.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Confirm_RejectsWhenInventoryQuantityIsInsufficient()
     {
         await using var db = CreateDb();

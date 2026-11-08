@@ -500,11 +500,7 @@ public sealed class FacilityReservationService(
             return;
         }
 
-        var lines = reservation.Equipment.Count > 0
-            ? reservation.Equipment.ToList()
-            : await _db.FacilityReservationEquipment
-                .Where(e => e.FacilityReservationId == reservation.Id)
-                .ToListAsync(cancellationToken);
+        var lines = await ResolveEquipmentLinesAsync(reservation, cancellationToken);
         foreach (var line in lines)
         {
             var item = await _db.FacilityInventoryItems
@@ -529,11 +525,7 @@ public sealed class FacilityReservationService(
             return;
         }
 
-        var lines = reservation.Equipment.Count > 0
-            ? reservation.Equipment.ToList()
-            : await _db.FacilityReservationEquipment
-                .Where(e => e.FacilityReservationId == reservation.Id)
-                .ToListAsync(cancellationToken);
+        var lines = await ResolveEquipmentLinesAsync(reservation, cancellationToken);
         foreach (var line in lines)
         {
             var item = await _db.FacilityInventoryItems
@@ -547,6 +539,33 @@ public sealed class FacilityReservationService(
         }
 
         reservation.InventoryHeld = false;
+    }
+
+    /// <summary>
+    /// Prefer the in-memory <see cref="FacilityReservation.Equipment"/> collection when it already
+    /// has lines, or when the navigation is loaded (including an intentional empty list after
+    /// <see cref="ReplaceEquipment"/>). Fall back to the DB only when the collection is empty and
+    /// was never loaded — so Confirm via <see cref="SetStatusAsync"/> still finds persisted rows,
+    /// while Create with no equipment resolves to an empty list.
+    /// </summary>
+    private async Task<List<FacilityReservationEquipment>> ResolveEquipmentLinesAsync(
+        FacilityReservation reservation,
+        CancellationToken cancellationToken)
+    {
+        if (reservation.Equipment.Count > 0)
+        {
+            return reservation.Equipment.ToList();
+        }
+
+        var entry = _db.Entry(reservation);
+        if (entry.State != EntityState.Detached && entry.Collection(r => r.Equipment).IsLoaded)
+        {
+            return reservation.Equipment.ToList();
+        }
+
+        return await _db.FacilityReservationEquipment
+            .Where(e => e.FacilityReservationId == reservation.Id)
+            .ToListAsync(cancellationToken);
     }
 
     private static string? Trim(string? value, int max)
