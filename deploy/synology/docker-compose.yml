@@ -1,30 +1,36 @@
 # ClerkSuite on Synology DS225+ — Option B (image built on Mac, loaded on NAS).
 # Project dir on NAS: /volume1/docker/clerksuite
 # Secrets: .env next to this file (chmod 600). Never commit .env.
+#
+# Database: Synology Community PostgreSQL 17 on host :5433 (clerksuite / clerksuite_app).
+# Host networking lets the container reach 127.0.0.1:5433 (PG listens localhost-only).
 services:
   clerksuite:
     image: clerksuite:latest
     container_name: clerksuite
     restart: unless-stopped
-    # Host 8082 — NAS :8080 is already used by tikr-web
-    ports:
-      - 8082:8080
+    network_mode: host
     # Compose v2 keys — Synology/non-Swarm often ignores deploy.resources.
     mem_limit: 1536m
     mem_reservation: 512m
     healthcheck:
-      test: ["CMD-SHELL", "timeout 3 bash -c 'echo >/dev/tcp/127.0.0.1/8080'"]
+      test: ["CMD-SHELL", "timeout 3 bash -c 'echo >/dev/tcp/127.0.0.1/8082'"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 60s
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:8082
       TZ: America/Denver
-      ConnectionStrings__DefaultConnection: Data Source=/data/clerksuite.db
-      ClerkSuite__DatabaseProvider: Sqlite
+      ClerkSuite__DatabaseProvider: Postgres
+      ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection}
       ClerkSuite__DocumentRoot: /docs
       ClerkSuite__LateFeesEnabled: "false"
+      # Local Identity auto sign-in is off. Staff use the ClerkSuite Cognito session.
+      ClerkSuite__OfficeNetworkSignIn: "false"
+      ClerkSuite__CognitoDomain: tow-gov-staff.auth.us-east-2.amazoncognito.com
+      ClerkSuite__CognitoClientId: 258binbcvsms0rfqj5g20qakki
       ClerkSuite__PaymentPortalUrl: ${PaymentPortalUrl:-https://www.townofwiley.gov/government/departments/finance/utility-billing}
       SYNCFUSION_LICENSE_KEY: ${SYNCFUSION_LICENSE_KEY}
       # Seeded on first boot only (skips if email already exists). Do not put real passwords in git.
@@ -32,6 +38,7 @@ services:
       SeedUsers__Users__0__Password: ${SeedUsers__Users__0__Password:-}
       SeedUsers__Users__0__DisplayName: ${SeedUsers__Users__0__DisplayName:-Town Clerk}
     volumes:
+      # Keep /data for Data Protection keys; SQLite file remains as offline backup only.
       - clerksuite-data:/data
       - ${DOCUMENTS_HOST_PATH}:/docs
     deploy:

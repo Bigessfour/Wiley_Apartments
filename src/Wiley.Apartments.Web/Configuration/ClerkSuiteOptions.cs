@@ -16,4 +16,25 @@ public class ClerkSuiteOptions
     /// Set <c>ClerkSuite__MaxUnits=0</c> only as an admin override for unlimited creates.
     /// </summary>
     public int MaxUnits { get; set; } = 16;
+
+    /// <summary>
+    /// When true, a clerk who can reach this host is signed in as the office clerk.
+    /// Town Hub can open the app directly. Leave false on any host that is not the office tailnet.
+    /// </summary>
+    public bool OfficeNetworkSignIn { get; set; }
+
+    /// <summary>
+    /// Optional email for <see cref="OfficeNetworkSignIn"/>. When empty, the first Identity user is used.
+    /// </summary>
+    public string? OfficeClerkEmail { get; set; }
+
+    /// <summary>
+    /// ClerkSuite hosted UI host, without a scheme. Empty skips the silent session probe.
+    /// </summary>
+    public string? CognitoDomain { get; set; }
+
+    /// <summary>
+    /// Public app client on the Town of Wiley staff pool. No client secret.
+    /// </summary>
+    public string CognitoClientId { get; set; } = Infrastructure.CognitoStaffAuth.DefaultClientId;
 }
