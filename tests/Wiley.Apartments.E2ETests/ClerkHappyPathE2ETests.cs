@@ -3,15 +3,12 @@ using Microsoft.Playwright;
 namespace Wiley.Apartments.E2ETests;
 
 /// <summary>
-/// Authenticated clerk smoke: login (dev seed) then land on daily surfaces.
-/// Development host seeds <c>clerk@dev.local</c> / <c>Password1!</c> via IdentitySeeder.
+/// Authenticated clerk smoke. Development host seeds clerk@dev.local.
+/// The staff page has no password form; the test uses the development sign-in endpoint.
 /// </summary>
 [Collection("E2E")]
 public class ClerkHappyPathE2ETests(E2EWebApplicationFactory factory) : IAsyncLifetime
 {
-    public const string DevClerkEmail = "clerk@dev.local";
-    public const string DevClerkPassword = "Password1!";
-
     private static readonly string[] HomeMarkers = ["Occupancy", "ClerkSuite", "Dashboard", "Collected"];
     private static readonly string[] UnitsMarkers = ["Units", "Town of Wiley", "Unit #"];
     private static readonly string[] PaymentsMarkers = ["ledger", "Record payment", "Post charge", "Tenant ledger"];
@@ -60,39 +57,25 @@ public class ClerkHappyPathE2ETests(E2EWebApplicationFactory factory) : IAsyncLi
     }
 
     [Fact]
-    public async Task Clerk_InvalidPassword_ShowsError_StaysOnLogin()
+    public async Task LoginPage_HasNoPasswordForm()
     {
         var page = await _browser!.NewPageAsync();
         page.SetDefaultTimeout(20_000);
 
         await page.GotoAsync($"{_factory.E2EBaseUrl}/Account/Login");
-        await page.Locator("input[autocomplete='username'], input[name='Input.Email'], input[type='email']").First
-            .FillAsync(DevClerkEmail);
-        await page.Locator("input[autocomplete='current-password'], input[type='password']").First
-            .FillAsync("WrongPassword1!");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
-        await page.WaitForTimeoutAsync(1500);
 
         page.Url.Should().Contain("/Account/Login");
+        (await page.Locator("input[type='password']").CountAsync()).Should().Be(0);
         var body = await page.ContentAsync();
-        body.Should().Contain("Invalid email or password");
+        body.Should().Contain("Sign in on ClerkSuite");
+        body.Should().NotContain("Invalid email or password");
     }
 
     private async Task SignInAsDevClerkAsync(IPage page)
     {
-        await page.GotoAsync($"{_factory.E2EBaseUrl}/Account/Login");
-        await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-
-        var email = page.Locator("input[autocomplete='username'], input[name='Input.Email'], input[type='email']").First;
-        var password = page.Locator("input[autocomplete='current-password'], input[type='password']").First;
-
-        await email.FillAsync(DevClerkEmail);
-        await password.FillAsync(DevClerkPassword);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
-
-        await page.WaitForURLAsync(
-            url => !url.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase),
-            new PageWaitForURLOptions { Timeout = 45_000 });
+        var response = await page.Context.APIRequest.PostAsync(
+            $"{_factory.E2EBaseUrl}/authentication/dev-sign-in");
+        response.Ok.Should().BeTrue(await response.TextAsync());
     }
 
     private async Task GotoAuthenticatedAsync(IPage page, string path, string[] anyOfMarkers)
@@ -109,7 +92,8 @@ public class ClerkHappyPathE2ETests(E2EWebApplicationFactory factory) : IAsyncLi
         while (DateTime.UtcNow < deadline)
         {
             lastBody = await page.ContentAsync();
-            if (lastBody.Contains("Invalid email or password", StringComparison.OrdinalIgnoreCase))
+            if (lastBody.Contains("Sign in on ClerkSuite", StringComparison.OrdinalIgnoreCase)
+                && lastBody.Contains("/Account/Login", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("Lost auth session mid happy-path.");
             }

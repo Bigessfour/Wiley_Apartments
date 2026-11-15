@@ -1,14 +1,8 @@
 @page "/Account/Login"
 @layout EmptyLayout
 @attribute [ExcludeFromInteractiveRouting]
-@using System.ComponentModel.DataAnnotations
-@using Microsoft.AspNetCore.Identity
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
-@using Syncfusion.Blazor.Inputs
-@inject SignInManager<ApplicationUser> SignInManager
-@inject NavigationManager Navigation
-@inject ILogger<Login> Logger
 @using Wiley.Apartments.Web.Infrastructure
 
 <PageTitle>Sign in — ClerkSuite</PageTitle>
@@ -18,74 +12,20 @@
         <CardContent>
             <div class="login-mark" aria-hidden="true">CS</div>
             <h1>ClerkSuite</h1>
-            <p class="text-muted mb-4">Town of Wiley Apartments — sign in to continue.</p>
-
-            @if (!string.IsNullOrEmpty(ErrorMessage))
-            {
-                <div class="alert alert-danger">@ErrorMessage</div>
-            }
-
-            @* Static SSR form — Identity cookie sign-in must run outside Interactive Server circuit. *@
-            <EditForm Model="Input" FormName="login" method="post" OnValidSubmit="HandleLoginAsync">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="text-danger" />
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    <InputText @bind-Value="Input.Email" class="form-control form-control-lg" placeholder="you@townofwiley.gov" autocomplete="username" />
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Password</label>
-                    <InputText @bind-Value="Input.Password" type="password" class="form-control form-control-lg" autocomplete="current-password" />
-                </div>
-                <SfButton CssClass="e-primary e-block"
-                          IsPrimary="true"
-                          Content="Sign in"
-                          HtmlAttributes="@SubmitButtonAttributes" />
-            </EditForm>
+            <p class="login-lead">Sign in on ClerkSuite</p>
+            <p>Use the Town Hub sign-in. This page does not ask for an apartments password.</p>
+            <SfButton CssClass="e-primary" HtmlAttributes="@SignInLink">Sign in on ClerkSuite</SfButton>
         </CardContent>
     </SfCard>
 </div>
 
 @code {
-    [SupplyParameterFromQuery]
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
     public string? ReturnUrl { get; set; }
 
-    [SupplyParameterFromForm]
-    public LoginInput Input { get; set; } = new();
-
-    private string? ErrorMessage { get; set; }
-
-    private static Dictionary<string, object> SubmitButtonAttributes { get; } =
-        new() { ["type"] = "submit" };
-
-    private async Task HandleLoginAsync()
+    private Dictionary<string, object> SignInLink => new()
     {
-        ErrorMessage = null;
-        var result = await SignInManager.PasswordSignInAsync(
-            Input.Email,
-            Input.Password,
-            isPersistent: true,
-            lockoutOnFailure: false);
-
-        if (result.Succeeded)
-        {
-            Logger.LogInformation("Sign-in succeeded for {Email}.", Input.Email);
-            Navigation.NavigateTo(
-                LoginRedirectHelper.GetSafeReturnUrl(ReturnUrl),
-                forceLoad: true);
-            return;
-        }
-
-        Logger.LogWarning("Sign-in failed for {Email}.", Input.Email);
-        ErrorMessage = "Invalid email or password.";
-    }
-
-    public sealed class LoginInput
-    {
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
-
-        [Required]
-        public string Password { get; set; } = string.Empty;
-    }
+        ["href"] = "/authentication/cognito-login?return="
+            + Uri.EscapeDataString(LoginRedirectHelper.GetSafeReturnUrl(ReturnUrl))
+    };
 }

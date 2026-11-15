@@ -2,17 +2,38 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @attribute [ExcludeFromInteractiveRouting]
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.Extensions.Options
+@using Wiley.Apartments.Web.Configuration
 @inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager Navigation
 @inject ILogger<Logout> Logger
 @inject IHttpContextAccessor HttpContextAccessor
+@using Wiley.Apartments.Web.Infrastructure
+@inject IOptions<ClerkSuiteOptions> Options
 
 @code {
     protected override async Task OnInitializedAsync()
     {
-        var user = HttpContextAccessor.HttpContext?.User?.Identity?.Name ?? "unknown";
+        var http = HttpContextAccessor.HttpContext;
+        var user = http?.User?.Identity?.Name ?? "unknown";
         await SignInManager.SignOutAsync();
         Logger.LogInformation("Sign-out completed for {User}.", user);
-        Navigation.NavigateTo("/Account/Login", forceLoad: true);
+
+        var logoutUri = http is null
+            ? Navigation.BaseUri
+            : $"{http.Request.Scheme}://{http.Request.Host}/";
+        var url = CognitoStaffAuth.BuildLogoutUrl(
+            Options.Value.CognitoDomain,
+            string.IsNullOrWhiteSpace(Options.Value.CognitoClientId)
+                ? CognitoStaffAuth.DefaultClientId
+                : Options.Value.CognitoClientId,
+            logoutUri);
+        if (string.IsNullOrEmpty(url))
+        {
+            Navigation.NavigateTo("/Account/Login", forceLoad: true);
+            return;
+        }
+
+        Navigation.NavigateTo(url, forceLoad: true);
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -88,11 +89,16 @@ public static class ClerkSuiteServiceExtensions
         builder.Services.AddDbContext<ApartmentsDbContext>((sp, options) =>
         {
             // Default remains Sqlite for local Mac + Synology clerk workflow.
-            // Set ClerkSuite__DatabaseProvider=Postgres (+ Npgsql connection string) for Aurora/RDS.
-            if (databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
-                || databaseProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+            // Set ClerkSuite__DatabaseProvider=Postgres (+ Npgsql connection string) for NAS/Aurora.
+            var usePostgres = databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase)
+                || databaseProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase);
+            if (usePostgres)
             {
                 options.UseNpgsql(connectionString);
+                // Historical migrations were authored for SQLite; model still matches at runtime.
+                // Ignore pending-model warning so MigrateAsync can apply the existing chain on Postgres.
+                options.ConfigureWarnings(w =>
+                    w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
             }
             else
             {
@@ -119,6 +125,13 @@ public static class ClerkSuiteServiceExtensions
             options.DefaultScheme = IdentityConstants.ApplicationScheme;
             options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
         }).AddIdentityCookies();
+
+        builder.Services.ConfigureApplicationCookie(options =>
+        {
+            // ClerkSuite on the office tailnet is http://mr-storage:8082. SameAsRequest keeps that cookie.
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.LoginPath = "/Account/Login";
+        });
 
         builder.Services.AddAuthorization();
         builder.Services.AddCascadingAuthenticationState();
@@ -186,6 +199,18 @@ public static class ClerkSuiteServiceExtensions
         }
 
         app.UseAuthentication();
+        app.Use(async (context, next) =>
+        {
+            if (CognitoStaffAuth.ShouldProbe(context))
+            {
+                var raw = (context.Request.Path.Value ?? "/") + context.Request.QueryString.Value;
+                var target = CognitoStaffAuth.SafeReturnPath(raw);
+                context.Response.Redirect("/authentication/cognito-start?return=" + Uri.EscapeDataString(target));
+                return;
+            }
+
+            await next();
+        });
         app.UseAuthorization();
         app.UseAntiforgery();
 

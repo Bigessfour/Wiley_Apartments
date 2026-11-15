@@ -33,8 +33,10 @@ public class UnitsPageE2ETests(E2EWebApplicationFactory factory) : IAsyncLifetim
         var response = await client.GetAsync("/units");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.RequestMessage!.RequestUri!.AbsolutePath.Should().Contain("/Account/Login");
         var body = await response.Content.ReadAsStringAsync();
-        body.Should().Contain("/Account/Login");
+        body.Should().Contain("Sign in on ClerkSuite");
+        body.Should().NotContain("type=\"password\"");
     }
 
     [Fact]

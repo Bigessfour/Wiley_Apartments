@@ -4,6 +4,9 @@ using Wiley.Apartments.Web.Infrastructure;
 
 try
 {
+    // SQLite-origin DateTimes are Unspecified; needed when ClerkSuite__DatabaseProvider=Postgres.
+    AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
     var builder = WebApplication.CreateBuilder(args);
     // Enable static web assets for `dotnet run` outside Development (avoids FileNotFound
     // for Syncfusion/_content and scoped CSS when ASPNETCORE_ENVIRONMENT=Production).
@@ -23,6 +26,7 @@ try
     var app = builder.Build();
     await app.InitializeClerkSuiteAsync();
     app.ConfigureClerkSuitePipeline();
+    app.MapCognitoStaffAuth();
 
     app.MapStaticAssets();
     app.MapControllers();
