@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Syncfusion.Blazor;
 using Wiley.Apartments.Contracts;
@@ -204,6 +205,17 @@ public static class ClerkSuiteServiceExtensions
         app.UseAuthentication();
         app.Use(async (context, next) =>
         {
+            var options = context.RequestServices.GetRequiredService<IOptions<ClerkSuiteOptions>>().Value;
+            if (HttpMethods.IsGet(context.Request.Method)
+                && context.Request.Path.StartsWithSegments("/Account/Login")
+                && context.User.Identity?.IsAuthenticated != true
+                && !string.IsNullOrWhiteSpace(options.CognitoDomain))
+            {
+                var safe = CognitoStaffAuth.SafeReturnPath(context.Request.Query["ReturnUrl"]);
+                context.Response.Redirect("/authentication/cognito-login?return=" + Uri.EscapeDataString(safe));
+                return;
+            }
+
             if (CognitoStaffAuth.ShouldProbe(context))
             {
                 var raw = (context.Request.Path.Value ?? "/") + context.Request.QueryString.Value;
