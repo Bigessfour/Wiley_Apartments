@@ -38,6 +38,12 @@ public class ClerkSuiteOptions
     /// </summary>
     public string CognitoClientId { get; set; } = Infrastructure.CognitoStaffAuth.DefaultClientId;
 
+    /// <summary>Region of <see cref="CognitoUserPoolId"/>. Used to verify the ID token issuer.</summary>
+    public string CognitoRegion { get; set; } = Infrastructure.CognitoStaffAuth.DefaultRegion;
+
+    /// <summary>Staff pool whose signing keys must match the ID token.</summary>
+    public string CognitoUserPoolId { get; set; } = Infrastructure.CognitoStaffAuth.DefaultUserPoolId;
+
     /// <summary>
     /// Shared secret for the operating-cost export script. Empty means only a signed-in clerk can export.
     /// Set <c>ClerkSuite__ExportKey</c> in the NAS env file. Never commit the value.

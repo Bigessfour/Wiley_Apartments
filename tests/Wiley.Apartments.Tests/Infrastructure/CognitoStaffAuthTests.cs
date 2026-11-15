@@ -1,5 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.IdentityModel.Tokens;
 using Wiley.Apartments.Web.Infrastructure;
 
 namespace Wiley.Apartments.Tests.Infrastructure;
@@ -49,6 +53,42 @@ public class CognitoStaffAuthTests
     }
 
     [Fact]
+    public void TryValidate_AcceptsTokenSignedByThePoolKey()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = new RsaSecurityKey(rsa);
+        var sub = Guid.NewGuid();
+        var token = SignedToken(key, sub, CognitoStaffAuth.DefaultClientId);
+
+        var ok = CognitoStaffAuth.TryValidate(
+            token,
+            Parameters(key),
+            out var readSub,
+            out var email,
+            out var groups);
+
+        ok.Should().BeTrue();
+        readSub.Should().Be(sub.ToString());
+        email.Should().Be("clerk@townofwiley.gov");
+        groups.Should().Contain("Staff");
+    }
+
+    [Fact]
+    public void TryValidate_RejectsTokenSignedByAnotherKey()
+    {
+        using var signer = RSA.Create(2048);
+        using var other = RSA.Create(2048);
+        var token = SignedToken(new RsaSecurityKey(signer), Guid.NewGuid(), CognitoStaffAuth.DefaultClientId);
+
+        CognitoStaffAuth.TryValidate(
+            token,
+            Parameters(new RsaSecurityKey(other)),
+            out _,
+            out _,
+            out _).Should().BeFalse();
+    }
+
+    [Fact]
     public void SafeReturnPath_DropsEmailAndTokens()
     {
         CognitoStaffAuth.SafeReturnPath("/units?email=clerk@townofwiley.gov").Should().Be("/");
@@ -69,6 +109,34 @@ public class CognitoStaffAuthTests
         url.Should().Contain("client_id=" + CognitoStaffAuth.DefaultClientId);
         url.Should().Contain("logout_uri=");
         url.Should().NotContain("access_token");
+    }
+
+    private static TokenValidationParameters Parameters(RsaSecurityKey key) => new()
+    {
+        ValidIssuer = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_bHk9UcenK",
+        ValidAudience = CognitoStaffAuth.DefaultClientId,
+        IssuerSigningKey = key,
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true
+    };
+
+    private static string SignedToken(RsaSecurityKey key, Guid sub, string audience)
+    {
+        var jwt = new JwtSecurityToken(
+            issuer: "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_bHk9UcenK",
+            audience: audience,
+            claims:
+            [
+                new Claim("sub", sub.ToString()),
+                new Claim("email", "clerk@townofwiley.gov"),
+                new Claim("cognito:groups", "Staff")
+            ],
+            notBefore: DateTime.UtcNow.AddMinutes(-1),
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.RsaSha256));
+        return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 
     private static string UnsignedToken(Dictionary<string, object?> payload)
