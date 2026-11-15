@@ -1,8 +1,8 @@
 # Production readiness gap report — Wiley Apartments (ClerkSuite) — 2026-11-15
 
-Commit: `45b59c9` · Branch: `master` · Auditor: Cursor agent (read-only)
+Commit: `a212e13` · Branch: `master` · Auditor: Cursor agent (read-only re-check)
 
-Working tree also has uncommitted edits under `deploy/`, `docs/cognito-sign-in.md`, and `scripts/deploy-to-nas.sh`. Findings below are from `45b59c9` plus live checks against the image that commit deployed (`clerksuite:45b59c9`).
+Re-checked 2026-11-15 against `a212e13` and the live Tailscale origin. No new Blocker. Section 6 is unchanged for the later audit.
 
 ## 1. Verdict
 
@@ -33,7 +33,7 @@ Counts after this change: Blockers 0, Must 0 in the repo (PRR-C9-01 is the GitHu
 - Community Center (feature 002) readiness is PASSED and the hub is in the app (`specs/002-community-center-facility/READINESS.md:3`).
 - Explicitly out of scope: tenant portal, listing syndication, QuickBooks sync, native apps (`README.md:44-45`); DocuSign, public booking, and clerk-vs-admin RBAC (`docs/handover/INCOMPLETE-SUBPROCESSES.md:5`).
 - Production host is the Synology container on Tailscale HTTPS port 8443, proxying to HTTP `127.0.0.1:8082`. Postgres is on `127.0.0.1:5433`.
-- `README.md:10` still says Phase 3 is in progress. That contradicts the 2026-08-10 done record.
+- README status now points at the 2026-08-10 done record and the Cognito sign-in doc.
 - No open GitHub issues, pull requests, or milestones (`gh issue list`, `gh pr list`, milestones API, all empty on 2026-11-15).
 
 | Feature                              | Promised where                                 | Implemented?                                                                      | Tested?                                                                                                               |
@@ -42,10 +42,10 @@ Counts after this change: Blockers 0, Must 0 in the repo (PRR-C9-01 is the GitHu
 | Tenants (FR-006–008)                 | `spec.md:229-231`                              | `TenantList.razor`, `TenantDetail.razor`                                          | E2E unauthenticated redirect tests; no new E2E run this audit                                                         |
 | Leases from templates (FR-009+)      | `spec.md:236`                                  | `LeaseList.razor`, `LeaseWizard.razor`                                            | Unit tests include `LeaseServiceTests.cs`                                                                             |
 | Payments, deposits, receipts         | `SPECKIT-DONE.md:16-17`                        | `LedgerPage.razor`, `PaymentReceiptPage.razor`                                    | Integration + unit                                                                                                    |
-| Documents vault                      | README                                         | `DocumentBrowser.razor`, `DocumentVaultFileManagerController.cs:16` `[Authorize]` | Controller is authorized; upload size is not capped                                                                   |
+| Documents vault                      | README                                         | `DocumentBrowser.razor`, `DocumentVaultFileManagerController.cs` `[Authorize]` | Upload rejects more than 32 MiB                                                                                       |
 | Community Center                     | `READINESS.md` PASSED                          | `/community-center` pages, all `[Authorize]`                                      | Integration tests present                                                                                             |
 | Staff Cognito session                | `README.md:14-19`, `docs/cognito-sign-in.md`   | Hosted UI + PKCE in `CognitoStaffAuth.cs`                                         | `CognitoStaffAuthTests.cs`, `CognitoProbeIntegrationTests.cs`; signed-in browser walkthrough not completed this audit |
-| Shared-contract export               | `Program.cs:57-78`                             | Implemented                                                                       | Reachable with no cookie (see PRR-C3-01)                                                                              |
+| Shared-contract export               | `Program.cs` export route                      | Staff session or `X-ClerkSuite-Export-Key`                                        | Live no-key GET returned 401 on 2026-11-15; integration tests cover wrong key and matching key                        |
 
 ## 3. Architecture summary
 
@@ -59,7 +59,7 @@ Clerk browser
             pool us-east-2_bHk9UcenK, client 258binbcvsms0rfqj5g20qakki
 ```
 
-Single points of failure: one NAS, one Postgres instance, one Tailscale node, one Cognito pool. Trust boundary: the tailnet HTTPS proxy to loopback HTTP, and the anonymous export on that same origin.
+Single points of failure: one NAS, one Postgres instance, one Tailscale node, one Cognito pool. Trust boundary: the tailnet HTTPS proxy to loopback HTTP. The operating-cost export is no longer anonymous.
 
 ## 4. Scorecard
 
@@ -67,13 +67,13 @@ Single points of failure: one NAS, one Postgres instance, one Tailscale node, on
 | --- | ----------------------- | ---- | ------- | ---- | -------- | --- | ------ |
 | C1  | Scope                   | 1    | 1       | 0    | 0        | 0   | Amber  |
 | C2  | Functional completeness | 1    | 0       | 0    | 0        | 0   | Green  |
-| C3  | Security                | 2    | 2       | 2    | 1        | 0   | Red    |
-| C4  | Data / backup           | 0    | 0       | 1    | 1        | 0   | Red    |
+| C3  | Security                | 4    | 1       | 0    | 1        | 0   | Amber  |
+| C4  | Data / backup           | 0    | 1       | 0    | 1        | 0   | Amber  |
 | C5  | Reliability             | 1    | 1       | 0    | 0        | 0   | Amber  |
-| C6  | Observability           | 1    | 0       | 1    | 1        | 0   | Red    |
+| C6  | Observability           | 1    | 1       | 0    | 1        | 0   | Amber  |
 | C7  | Performance             | 0    | 0       | 0    | 1        | 0   | Amber  |
 | C8  | Testing                 | 1    | 1       | 0    | 0        | 0   | Amber  |
-| C9  | CI/CD                   | 1    | 0       | 2    | 0        | 0   | Red    |
+| C9  | CI/CD                   | 3    | 0       | 0    | 0        | 0   | Green  |
 | C10 | Accessibility           | 0    | 1       | 0    | 1        | 0   | Amber  |
 | C11 | Documentation           | 1    | 1       | 0    | 0        | 0   | Amber  |
 | C12 | Licensing               | 1    | 0       | 0    | 1        | 0   | Amber  |
@@ -82,6 +82,8 @@ Single points of failure: one NAS, one Postgres instance, one Tailscale node, on
 Rating rule: Red = any Blocker or a Fail on a Must. Amber = Partials or Should/Nice only. Green = Pass/N/A.
 
 ## 5. Prioritized gap list
+
+Re-check on `a212e13`: no open Blocker. The rows below are the original findings. Closure evidence is in section 1a. Section 6 is not closed.
 
 | ID         | Category | Item                                                                           | Evidence                                                                                                                                                                                                                                                                                                                                      | Severity | Owner                               | Effort | Suggested fix                                                                                                         |
 | ---------- | -------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |

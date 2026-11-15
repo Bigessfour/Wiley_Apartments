@@ -3,20 +3,8 @@ name: CI
 on:
   push:
     branches: [main, master]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "specs/**"
-      - "LICENSE"
-      - ".gitignore"
   pull_request:
     branches: [main, master]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "specs/**"
-      - "LICENSE"
-      - ".gitignore"
   # No workflow_dispatch inputs (CKV_GHA_7). Self-hosted / model via repo vars:
   #   CI_USE_SELF_HOSTED=true  → runners labeled self-hosted,linux,clerksuite-ci
   #   OLLAMA_MODEL             → e.g. qwen2.5-coder:3b (default 1.5b)
