@@ -51,9 +51,15 @@ public static class CognitoStaffAuthEndpoints
                 verifier,
                 CognitoStaffAuth.RedirectUri(http.Request),
                 cancellationToken);
-            if (CognitoStaffAuth.TryReadIdentity(idToken, ClientId(options.Value), out var sub, out var email, out var groups))
+            var identity = await CognitoStaffAuth.TryValidateIdTokenAsync(
+                idToken,
+                ClientId(options.Value),
+                options.Value.CognitoRegion,
+                options.Value.CognitoUserPoolId,
+                cancellationToken);
+            if (identity is not null)
             {
-                await CognitoStaffAuth.SignInAsync(http, sub, email, groups);
+                await CognitoStaffAuth.SignInAsync(http, identity.Value.Sub, identity.Value.Email, identity.Value.Groups);
             }
 
             return Results.Redirect(returnPath);

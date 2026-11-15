@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -5,6 +7,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using Wiley.Apartments.Web.Configuration;
 
 namespace Wiley.Apartments.Web.Infrastructure;
@@ -16,6 +21,13 @@ namespace Wiley.Apartments.Web.Infrastructure;
 public static class CognitoStaffAuth
 {
     public const string DefaultClientId = "258binbcvsms0rfqj5g20qakki";
+    public const string DefaultRegion = "us-east-2";
+    public const string DefaultUserPoolId = "us-east-2_bHk9UcenK";
+
+    public readonly record struct ClerkIdentity(string Sub, string? Email, IReadOnlyList<string> Groups);
+
+    private static readonly ConcurrentDictionary<string, ConfigurationManager<OpenIdConnectConfiguration>> Metadata =
+        new();
     public const string CheckedCookie = "clerksuite-cognito-checked";
     public const string PkceCookie = "clerksuite-pkce";
     public const string ReturnCookie = "clerksuite-auth-return";
@@ -208,6 +220,107 @@ public static class CognitoStaffAuth
             return false;
         }
         catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    public static string Issuer(string? region, string? userPoolId) =>
+        $"https://cognito-idp.{(string.IsNullOrWhiteSpace(region) ? DefaultRegion : region)}.amazonaws.com/{(string.IsNullOrWhiteSpace(userPoolId) ? DefaultUserPoolId : userPoolId)}";
+
+    /// <summary>
+    /// Checks the Cognito signature, issuer, audience, and lifetime, then reads the clerk claims.
+    /// </summary>
+    public static async Task<ClerkIdentity?> TryValidateIdTokenAsync(
+        string? idToken,
+        string clientId,
+        string? region,
+        string? userPoolId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(idToken))
+        {
+            return null;
+        }
+
+        try
+        {
+            var issuer = Issuer(region, userPoolId);
+            var address = issuer + "/.well-known/openid-configuration";
+            var manager = Metadata.GetOrAdd(
+                address,
+                static value => new ConfigurationManager<OpenIdConnectConfiguration>(
+                    value,
+                    new OpenIdConnectConfigurationRetriever()));
+            var config = await manager.GetConfigurationAsync(cancellationToken);
+            var parameters = new TokenValidationParameters
+            {
+                ValidIssuer = config.Issuer,
+                ValidAudience = clientId,
+                IssuerSigningKeys = config.SigningKeys,
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ClockSkew = TimeSpan.FromMinutes(2)
+            };
+            return TryValidate(idToken, parameters, out var sub, out var email, out var groups)
+                ? new ClerkIdentity(sub, email, groups)
+                : null;
+        }
+        catch (SecurityTokenException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public static bool TryValidate(
+        string? idToken,
+        TokenValidationParameters parameters,
+        out string sub,
+        out string? email,
+        out IReadOnlyList<string> groups)
+    {
+        sub = "";
+        email = null;
+        groups = [];
+        if (string.IsNullOrWhiteSpace(idToken))
+        {
+            return false;
+        }
+
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            handler.InboundClaimTypeMap.Clear();
+            var principal = handler.ValidateToken(idToken, parameters, out _);
+            var subClaim = principal.FindFirst("sub")?.Value;
+            if (!Guid.TryParse(subClaim, out var subGuid))
+            {
+                return false;
+            }
+
+            sub = subGuid.ToString();
+            email = principal.FindFirst("email")?.Value;
+            groups = principal.FindAll("cognito:groups")
+                .Select(claim => claim.Value)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+            return true;
+        }
+        catch (SecurityTokenException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
         {
             return false;
         }
