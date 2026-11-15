@@ -30,6 +30,22 @@ public class CognitoProbeIntegrationTests
         second.Headers.Location!.OriginalString.Should().NotContain("/authentication/cognito-start");
     }
 
+    [Fact]
+    public async Task Login_WhenHostedUiIsConfigured_RedirectsToClerkSuiteLogin()
+    {
+        await using var factory = new ProbeFactory();
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        var response = await client.GetAsync("/Account/Login?ReturnUrl=/units");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location!.OriginalString.Should().StartWith("/authentication/cognito-login?return=");
+        response.Headers.Location!.OriginalString.Should().Contain("%2Funits");
+    }
+
     private sealed class ProbeFactory : ClerkSuiteWebApplicationFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)

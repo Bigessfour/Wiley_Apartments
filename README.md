@@ -16,7 +16,7 @@ maintenance, appliance/carpet inventory, and documents.
 
 ## Sign-in
 
-Staff use the Town of Wiley staff pool (`Townofwiley-staff`, `us-east-2_bHk9UcenK`) and the `townofwiley-staff-web` app client. A browser that already has that hosted-UI session is signed in from the token claims. A cold visit shows **Sign in on ClerkSuite** and does not ask for an apartments password. Details: [docs/cognito-sign-in.md](docs/cognito-sign-in.md).
+Staff use the Town of Wiley staff pool (`Townofwiley-staff`, `us-east-2_bHk9UcenK`) and the `townofwiley-staff-web` app client. A browser that already has that hosted-UI session is signed in from the token claims. A cold visit is sent to the ClerkSuite hosted login. Details: [docs/cognito-sign-in.md](docs/cognito-sign-in.md).
 
 ## Governance
 
