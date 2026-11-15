@@ -37,4 +37,10 @@ public class ClerkSuiteOptions
     /// Public app client on the Town of Wiley staff pool. No client secret.
     /// </summary>
     public string CognitoClientId { get; set; } = Infrastructure.CognitoStaffAuth.DefaultClientId;
+
+    /// <summary>
+    /// Shared secret for the operating-cost export script. Empty means only a signed-in clerk can export.
+    /// Set <c>ClerkSuite__ExportKey</c> in the NAS env file. Never commit the value.
+    /// </summary>
+    public string? ExportKey { get; set; }
 }

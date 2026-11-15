@@ -95,8 +95,10 @@ public sealed class DocumentVaultFileManagerController : Controller
         return result;
     }
 
+    public const long MaxUploadBytes = 32L * 1024 * 1024;
+
     [HttpPost("Upload")]
-    [DisableRequestSizeLimit]
+    [RequestSizeLimit(34 * 1024 * 1024)]
     [ServiceFilter(typeof(DocumentVaultAntiforgeryFilter))]
     public async Task<IActionResult> Upload(
         string path,
@@ -105,6 +107,18 @@ public sealed class DocumentVaultFileManagerController : Controller
         string action,
         CancellationToken cancellationToken)
     {
+        uploadFiles ??= [];
+        var totalBytes = uploadFiles.Sum(file => file.Length);
+        if (totalBytes > MaxUploadBytes)
+        {
+            Response.Clear();
+            Response.ContentType = "application/json; charset=utf-8";
+            Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+            Response.HttpContext.Features.Get<IHttpResponseFeature>()!.ReasonPhrase =
+                "File is larger than 32 MB. Choose a smaller file.";
+            return Content("");
+        }
+
         DocumentRootAvailability.EnsureWritable(_documentRoot);
         _provider.RootFolder(_documentRoot);
         try

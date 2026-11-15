@@ -42,11 +42,28 @@ permissions:
   checks: write
 
 jobs:
+  secrets-guard:
+    name: Secret scan (TruffleHog)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog
+        uses: trufflesecurity/trufflehog@v3.88.7
+        with:
+          path: ./
+          extra_args: --only-verified
+
   # ---------------------------------------------------------------------------
   # 1. Build + Unit + Integration
   # ---------------------------------------------------------------------------
   build-and-test:
     name: Build & Test
+    needs: [secrets-guard]
     # Pin 24.04: ubuntu-latest is 26.04 and Playwright 1.51 cannot install chromium there.
     runs-on: ${{ (github.event_name == 'workflow_dispatch' && vars.CI_USE_SELF_HOSTED == 'true') && fromJSON('["self-hosted","linux","clerksuite-ci"]') || 'ubuntu-24.04' }}
     timeout-minutes: 15

@@ -110,6 +110,17 @@ ssh mr-storage sudo /usr/local/bin/tailscale serve --bg --yes --https=8443 http:
 
 The production app trusts `X-Forwarded-Proto` and `X-Forwarded-Host` only when the proxy is loopback. That makes the Cognito redirect URI `https://mr-storage.tail57aa13.ts.net:8443/authentication/login-callback`. `http://mr-storage:8082/health` stays available for the container health check and is not the clerk path.
 
+## When the app is down
+
+`/health` stays anonymous and must return 200. The clerk path is `https://mr-storage.tail57aa13.ts.net:8443`. Container logs:
+
+```bash
+ssh mr-storage sudo /usr/local/bin/docker logs clerksuite --tail 80
+curl -fsS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8082/health
+```
+
+Who is notified when health fails is a separate audit item. This section only records where to look.
+
 ## First-run checklist
 
 - [ ] Container `clerksuite` is Up

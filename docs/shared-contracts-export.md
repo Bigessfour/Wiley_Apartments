@@ -24,9 +24,12 @@ Returns a bare **`OperationalEvent[]`** (Widget ingest shape — not a PayloadBa
 
 Widget expects the same array:
 
+The export requires a signed-in staff cookie or the header `X-ClerkSuite-Export-Key`. The key lives in the NAS env as `ClerkSuite__ExportKey` and in the shell as `APARTMENTS_EXPORT_KEY`. Do not commit it.
+
 ```bash
 # 1) Export from Apartments
 curl -s "http://127.0.0.1:5077/api/exports/shared-contracts/operational-events?period=2026-10" \
+  -H "X-ClerkSuite-Export-Key: ${APARTMENTS_EXPORT_KEY}" \
   -o /tmp/apartments-events.json
 
 # 2) Ingest into Widget
@@ -39,10 +42,10 @@ curl -s -w "\n%{http_code}\n" -X POST "http://127.0.0.1:5231/api/reference-data/
 One-liner script (from this repo):
 
 ```bash
-PERIOD=2026-10 ./scripts/post-operating-costs-to-widget.sh
+APARTMENTS_EXPORT_KEY=... PERIOD=2026-10 ./scripts/post-operating-costs-to-widget.sh
 ```
 
-Env overrides: `APARTMENTS_BASE`, `WIDGET_API` / `WILEY_WORKSPACE_API_BASE_ADDRESS`.
+The script exits if `APARTMENTS_EXPORT_KEY` is unset. Other env overrides: `APARTMENTS_BASE`, `WIDGET_API` / `WILEY_WORKSPACE_API_BASE_ADDRESS`.
 
 ## Optional S3 drop (Terraform bucket)
 
@@ -51,6 +54,7 @@ Wiley Widget Terraform (`wiley-co-web/infra/terraform`) can create a private buc
 ```bash
 BUCKET=$(cd ../Wiley-Widget\(Blazor\)/wiley-co-web/infra/terraform && terraform output -raw contracts_bucket_name)
 curl -s "${APARTMENTS_BASE:-http://127.0.0.1:5077}/api/exports/shared-contracts/operational-events?period=${PERIOD:-2026-10}" \
+  -H "X-ClerkSuite-Export-Key: ${APARTMENTS_EXPORT_KEY}" \
   | aws s3 cp - "s3://${BUCKET}/shared-contracts/events/apartments/${PERIOD:-2026-10}.json" --profile tow
 ```
 

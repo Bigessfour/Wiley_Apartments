@@ -2,21 +2,21 @@
 
 Covers the two data planes clerks depend on:
 
-| Plane            | Location                                                                 | Typical DSM coverage                                                                                          |
-| ---------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| SQLite DB volume | Docker volume `clerksuite_clerksuite-data` → host `/volume1/@docker/volumes/clerksuite_clerksuite-data/_data/clerksuite.db` | **Active Backup** (installed on DS225+) and/or Hyper Backup / Snapshot Replication covering Docker volumes |
-| Document vault   | Host `/volume1/apartments/docs`                                          | Active Backup / Hyper Backup / Shared Folder Sync / snapshots on the `apartments` share                       |
+| Plane | Location | Typical DSM coverage |
+| ----- | -------- | -------------------- |
+| Postgres database | Host `127.0.0.1:5433`, database `clerksuite`, role `clerksuite_app`. The container uses host networking. | Hyper Backup or a `pg_dump` of that database. Do not treat the Docker volume SQLite file as the live database. |
+| Document vault | Host `/volume1/apartments/docs` | Active Backup / Hyper Backup / Shared Folder Sync / snapshots on the `apartments` share |
 
-**Do not** back up the DB file over SMB as the live write path. Keep SQLite on the Docker volume; back up that volume (or its host bind path).
+The Docker volume `clerksuite-data` still holds Data Protection keys and an offline SQLite file. It is not the clerk database. Do not back up a live database file over SMB.
 
 ### Agent preflight (2026-08-10)
 
 | Check | Result |
 | ----- | ------ |
 | Document share present | `/volume1/apartments/docs` with `leases`, `templates`, `uploads`, `appliances`, `tenants` |
-| DB file on Docker volume | `/volume1/@docker/volumes/clerksuite_clerksuite-data/_data/clerksuite.db` |
+| Live database | Postgres `clerksuite` on `127.0.0.1:5433` |
 | DSM backup package | `ActiveBackup` package present on Mr_Storage (Hyper Backup package name not listed) |
-| Live restore drill | **Not run** — requires maintenance window + IT operator sign-off below |
+| Live restore drill | **Not signed.** Leave the table in section E blank until the special audit. |
 
 ---
 
@@ -24,7 +24,7 @@ Covers the two data planes clerks depend on:
 
 1. Confirm Active Backup and/or Hyper Backup (or Snapshot Replication) includes:
    - Document share: `/volume1/apartments/docs`
-   - Docker volume backing `clerksuite_clerksuite-data` (or `/volume1/@docker/volumes/clerksuite_clerksuite-data`)
+   - Postgres data for database `clerksuite` on `127.0.0.1:5433` (dump or the Postgres data directory)
 2. Note retention (daily + weekly) and last successful job time in DSM.
 3. Record who can run restores (town IT / mayor / clerk with DSM access).
 
@@ -37,7 +37,7 @@ Run this on a maintenance window. Goal: prove DB + docs come back and FR-2 / FR-
 ### A. Snapshot / backup point
 
 1. In DSM, identify a known-good Hyper Backup version (or Btrfs snapshot) that includes both planes above.
-2. Stop ClerkSuite so the DB file is quiet:
+2. Stop ClerkSuite so Postgres is quiet:
 
    ```bash
    ssh mr-storage
@@ -54,10 +54,10 @@ Run this on a maintenance window. Goal: prove DB + docs come back and FR-2 / FR-
    ls /volume1/apartments/docs/{leases,templates,uploads,appliances}
    ```
 
-### C. Restore database volume
+### C. Restore Postgres
 
-1. Restore the Docker volume content that maps to `/data` (file `clerksuite.db` + WAL/SHM if present).
-2. Confirm ownership/permissions allow the container user to read/write the file.
+1. Restore database `clerksuite` on `127.0.0.1:5433` from the dump or snapshot. Role `clerksuite_app` must be able to connect.
+2. Do not restore `clerksuite.db` from the Docker volume over this database. That file is an offline leftover.
 3. Start the app:
 
    ```bash
@@ -87,7 +87,7 @@ From a clerk PC on Tailscale / LAN:
 | ---------------------------------------------------------- | ---- | -------- | ---- |
 | Hyper Backup / Active Backup covers DB volume + `/volume1/apartments/docs` |      |          |      |
 | Restore docs share                                         |      |          |      |
-| Restore `clerksuite.db` volume                             |      |          |      |
+| Restore Postgres `clerksuite` on `127.0.0.1:5433`          |      |          |      |
 | App healthy on :8082                                       |      |          |      |
 | FR-2 tenant sample OK                                      |      |          |      |
 | FR-5 document sample OK                                    |      |          |      |
@@ -98,6 +98,5 @@ From a clerk PC on Tailscale / LAN:
 
 ## Notes
 
-- Production URL: `http://mr-storage:8082` (or reverse-proxy HTTPS). Port **8082** avoids conflict with `tikr-web` on 8080.
-- Optional Postgres override is not the default; if ever enabled, back up that DB container/volume instead of SQLite.
-- After a failed restore, keep the pre-restore tarball/snapshot until clerks confirm data looks right.
+- Clerk URL: `https://mr-storage.tail57aa13.ts.net:8443`. Port **8082** is the container listener and avoids `tikr-web` on 8080.
+- After a failed restore, keep the pre-restore dump or snapshot until clerks confirm data looks right.

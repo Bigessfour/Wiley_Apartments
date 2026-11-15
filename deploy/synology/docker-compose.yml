@@ -31,6 +31,8 @@ services:
       ClerkSuite__OfficeNetworkSignIn: "false"
       ClerkSuite__CognitoDomain: tow-gov-staff.auth.us-east-2.amazoncognito.com
       ClerkSuite__CognitoClientId: 258binbcvsms0rfqj5g20qakki
+      # Set only in the NAS .env. Empty disables the export header; a staff session is still required.
+      ClerkSuite__ExportKey: ${ClerkSuite__ExportKey:-}
       ClerkSuite__PaymentPortalUrl: ${PaymentPortalUrl:-https://www.townofwiley.gov/government/departments/finance/utility-billing}
       SYNCFUSION_LICENSE_KEY: ${SYNCFUSION_LICENSE_KEY}
       # Seeded on first boot only (skips if email already exists). Do not put real passwords in git.

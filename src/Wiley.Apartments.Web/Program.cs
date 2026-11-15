@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Options;
 using Serilog;
 using Wiley.Apartments.Web.Components;
+using Wiley.Apartments.Web.Configuration;
 using Wiley.Apartments.Web.Infrastructure;
 
 try
@@ -57,10 +59,17 @@ try
     // Shared-contracts export for Wiley Widget ingest (read-only; does not alter ClerkSuite behavior).
     // Returns bare OperationalEvent[] ready for POST /api/reference-data/events.
     app.MapGet("/api/exports/shared-contracts/operational-events", async (
+            HttpContext http,
             string? period,
+            IOptions<ClerkSuiteOptions> options,
             Wiley.Apartments.Web.Services.SharedContractOperationalEventExportService export,
             CancellationToken ct) =>
         {
+            if (!ExportAccess.IsAllowed(http, options.Value.ExportKey))
+            {
+                return Results.Unauthorized();
+            }
+
             var month = string.IsNullOrWhiteSpace(period)
                 ? DateTime.UtcNow.ToString("yyyy-MM")
                 : period.Trim();

@@ -7,7 +7,7 @@ maintenance, appliance/carpet inventory, and documents.
 
 **Repository**: [github.com/Bigessfour/Wiley_Apartments](https://github.com/Bigessfour/Wiley_Apartments)
 
-**Status**: Phase 3 **in progress** (T3.1–T3.3 leases + signed vault upload done) — T3.4 renew/terminate; Phase 3.5 Scheduler next ([tasks.md](specs/001-wiley-apartment-v1/tasks.md))
+**Status**: Spec Kit 001 recorded done 2026-08-10 ([SPECKIT-DONE.md](docs/handover/SPECKIT-DONE.md)). Staff sign in through the ClerkSuite Cognito session ([cognito-sign-in.md](docs/cognito-sign-in.md)).
 
 ## Users
 

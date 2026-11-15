@@ -14,10 +14,15 @@ WIDGET_API="${WIDGET_API:-${WILEY_WORKSPACE_API_BASE_ADDRESS:-http://127.0.0.1:5
 APARTMENTS_BASE="${APARTMENTS_BASE%/}"
 WIDGET_API="${WIDGET_API%/}"
 
+if [[ -z "${APARTMENTS_EXPORT_KEY:-}" ]]; then
+  echo "APARTMENTS_EXPORT_KEY is required. It matches ClerkSuite__ExportKey on the NAS and is not stored in git." >&2
+  exit 1
+fi
+
 EXPORT_URL="${APARTMENTS_BASE}/api/exports/shared-contracts/operational-events?period=${PERIOD}"
 
 echo "GET  ${EXPORT_URL}"
-PAYLOAD="$(curl -sS -f "${EXPORT_URL}")"
+PAYLOAD="$(curl -sS -f -H "X-ClerkSuite-Export-Key: ${APARTMENTS_EXPORT_KEY}" "${EXPORT_URL}")"
 COUNT="$(echo "${PAYLOAD}" | jq 'length')"
 echo "  → ${COUNT} OperationalEvent(s)"
 
