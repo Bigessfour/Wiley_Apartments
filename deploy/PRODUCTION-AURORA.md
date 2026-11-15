@@ -4,10 +4,10 @@ Same Blazor Interactive Server binary (`Wiley.Apartments.Web`) runs on Synology 
 
 ## Docker images
 
-| File | Role |
-| ---- | ---- |
-| [`Dockerfile`](../Dockerfile) (repo root) | App Runner / generic production build context |
-| [`deploy/Dockerfile`](./Dockerfile) | Same multi-stage publish (NAS scripts / compose) |
+| File                                      | Role                                             |
+| ----------------------------------------- | ------------------------------------------------ |
+| [`Dockerfile`](../Dockerfile) (repo root) | App Runner / generic production build context    |
+| [`deploy/Dockerfile`](./Dockerfile)       | Same multi-stage publish (NAS scripts / compose) |
 
 ```bash
 # From repo root
@@ -18,27 +18,27 @@ docker build -t clerksuite:latest -f deploy/Dockerfile .
 
 ## Compose profiles
 
-| Compose | Database | Use |
-| ------- | -------- | --- |
-| [`docker-compose.yml`](./docker-compose.yml) | **SQLite** `/data/clerksuite.db` | Local Mac smoke |
-| [`synology/docker-compose.yml`](./synology/docker-compose.yml) | **SQLite** | NAS clerk workflow (default) |
-| [`docker-compose.prod.yml`](./docker-compose.prod.yml) | **Postgres** (Aurora/RDS) | AWS / prod verification |
-| [`docker-compose.postgres.yml`](./docker-compose.postgres.yml) | Companion Postgres container | Optional local Postgres smoke (merge with compose) |
+| Compose                                                        | Database                                   | Use                                                |
+| -------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------- |
+| [`docker-compose.yml`](./docker-compose.yml)                   | **SQLite** `/data/clerksuite.db`           | Local Mac smoke                                    |
+| [`synology/docker-compose.yml`](./synology/docker-compose.yml) | **Postgres** on NAS `:5433` (`clerksuite`) | NAS clerk workflow (host network → localhost PG)   |
+| [`docker-compose.prod.yml`](./docker-compose.prod.yml)         | **Postgres** (Aurora/RDS)                  | AWS / prod verification                            |
+| [`docker-compose.postgres.yml`](./docker-compose.postgres.yml) | Companion Postgres container               | Optional local Postgres smoke (merge with compose) |
 
-**Do not** point Synology compose at Postgres unless town IT explicitly opts in.
+Synology compose uses the native Community PostgreSQL package (`clerksuite` / `clerksuite_app` on `127.0.0.1:5433`) with `network_mode: host`. SQLite under `/data/clerksuite.db` remains as an offline backup after cutover.
 
 ## Environment variables (Aurora / RDS)
 
-| Variable | Required | Example / notes |
-| -------- | -------- | --------------- |
-| `ClerkSuite__DatabaseProvider` | Yes (prod) | `Postgres` |
-| `ConnectionStrings__DefaultConnection` | Yes | Npgsql string with `SSL Mode=Require` for Aurora |
-| `ClerkSuite__DocumentRoot` | No | Default `/docs` |
-| `SYNCFUSION_LICENSE_KEY` | Yes in practice | Runtime only; never bake into image |
-| `ClerkSuite__PaymentPortalUrl` | No | Town pay-bill URL |
-| `ClerkSuite__LateFeesEnabled` | No | `false` by default |
-| `ASPNETCORE_ENVIRONMENT` | No | `Production` |
-| `ASPNETCORE_URLS` | App Runner | Usually `http://+:8080` (Dockerfile default) |
+| Variable                               | Required        | Example / notes                                  |
+| -------------------------------------- | --------------- | ------------------------------------------------ |
+| `ClerkSuite__DatabaseProvider`         | Yes (prod)      | `Postgres`                                       |
+| `ConnectionStrings__DefaultConnection` | Yes             | Npgsql string with `SSL Mode=Require` for Aurora |
+| `ClerkSuite__DocumentRoot`             | No              | Default `/docs`                                  |
+| `SYNCFUSION_LICENSE_KEY`               | Yes in practice | Runtime only; never bake into image              |
+| `ClerkSuite__PaymentPortalUrl`         | No              | Town pay-bill URL                                |
+| `ClerkSuite__LateFeesEnabled`          | No              | `false` by default                               |
+| `ASPNETCORE_ENVIRONMENT`               | No              | `Production`                                     |
+| `ASPNETCORE_URLS`                      | App Runner      | Usually `http://+:8080` (Dockerfile default)     |
 
 Template: [`deploy/env.prod.example`](./env.prod.example).
 
@@ -53,15 +53,23 @@ SYNCFUSION_LICENSE_KEY=***
 
 Mount or sync documents to `/docs` (EFS or S3 sync sidecar). Keep `/data` available for Data Protection keys if cookies/auth must survive restarts (or configure DP key storage for multi-instance carefully).
 
-## Local / Synology SQLite (unchanged)
+## Local Mac SQLite (dev)
 
 Omit `ClerkSuite__DatabaseProvider` or set `Sqlite`. Connection string remains:
 
 ```text
-ConnectionStrings__DefaultConnection=Data Source=/data/clerksuite.db
+ConnectionStrings__DefaultConnection=Data Source=Data/clerksuite.db
 ```
 
-(or `Data Source=Data/clerksuite.db` for `dotnet run` on Mac)
+## Synology Postgres (NAS)
+
+```text
+ClerkSuite__DatabaseProvider=Postgres
+ConnectionStrings__DefaultConnection=Host=127.0.0.1;Port=5433;Database=clerksuite;Username=clerksuite_app;Password=***;SSL Mode=Disable;Timeout=15
+ASPNETCORE_URLS=http://0.0.0.0:8082
+```
+
+One-shot SQLite→Postgres copy: `tools/MigrateSqliteToPostgres` (see deploy notes).
 
 ## Migrations caveat
 

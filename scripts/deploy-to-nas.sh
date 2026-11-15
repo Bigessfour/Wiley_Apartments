@@ -144,12 +144,20 @@ if [[ -f ${RECEIPT_TEMPLATE} ]]; then
 fi
 
 if [[ ${SKIP_ENV} == false ]]; then
-	echo "==> Ensuring remote .env from Keychain (values not printed)"
+	echo "==> Ensuring remote .env from Keychain + NAS Postgres password (values not printed)"
 	license="$(read_license_from_keychain)"
 	if [[ -z ${license} ]]; then
 		echo "ERROR: Syncfusion license not found in Keychain" >&2
 		exit 1
 	fi
+
+	pg_pass="$(nas_ssh 'sudo -n cat /root/wiley-postgres/clerksuite_app.pass' | tr -d '\r\n')"
+	if [[ -z ${pg_pass} ]]; then
+		echo "ERROR: missing /root/wiley-postgres/clerksuite_app.pass on ${NAS_HOST}" >&2
+		exit 1
+	fi
+	# Escape for .env (no surrounding quotes in compose interpolation)
+	pg_pass_escaped="${pg_pass//'%'/%%}"
 
 	env_tmp="$(mktemp)"
 	chmod 600 "${env_tmp}"
@@ -157,6 +165,7 @@ if [[ ${SKIP_ENV} == false ]]; then
 DOCUMENTS_HOST_PATH=/volume1/apartments/docs
 SYNCFUSION_LICENSE_KEY=${license}
 PaymentPortalUrl=https://www.townofwiley.gov/government/departments/finance/utility-billing
+ConnectionStrings__DefaultConnection=Host=127.0.0.1;Port=5433;Database=clerksuite;Username=clerksuite_app;Password=${pg_pass_escaped};SSL Mode=Disable;Timeout=15
 EOF
 	nas_upload "${env_tmp}" "/tmp/clerksuite.env"
 	rm -f "${env_tmp}"

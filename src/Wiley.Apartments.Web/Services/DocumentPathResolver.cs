@@ -28,20 +28,7 @@ public sealed class DocumentPathResolver(
     {
         lock (_gate)
         {
-            if (_cachedRoot is not null)
-            {
-                return _cachedRoot;
-            }
-        }
-
-        try
-        {
-            return GetDocumentRootAsync().GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Falling back to configured DocumentRoot.");
-            return ConfiguredDefaultRoot;
+            return _cachedRoot ?? ConfiguredDefaultRoot;
         }
     }
 

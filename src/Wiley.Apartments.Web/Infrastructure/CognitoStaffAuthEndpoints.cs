@@ -12,8 +12,9 @@ public static class CognitoStaffAuthEndpoints
         app.MapGet("/authentication/cognito-start", (HttpContext http, string? returnPath) =>
             Begin(http, returnPath, promptLogin: false));
 
+        // No prompt=login. An existing hosted-UI session is reused; Cognito shows the form only when there is none.
         app.MapGet("/authentication/cognito-login", (HttpContext http, string? returnPath) =>
-            Begin(http, returnPath, promptLogin: true));
+            Begin(http, returnPath, promptLogin: false));
 
         app.MapGet("/authentication/login-callback", async (
             HttpContext http,

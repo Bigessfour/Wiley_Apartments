@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Wiley.Apartments.Domain;
@@ -28,7 +29,10 @@ public sealed class UnitConcurrencyTests
         await db.SaveChangesAsync();
 
         var options = Options.Create(new ClerkSuiteOptions { MaxUnits = 16 });
-        var service = new UnitService(db, options, NullLogger<UnitService>.Instance);
+        var services = new ServiceCollection();
+        services.AddSingleton(db);
+        var scopes = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+        var service = new UnitService(db, scopes, options, NullLogger<UnitService>.Instance);
 
         var stale = new Unit
         {

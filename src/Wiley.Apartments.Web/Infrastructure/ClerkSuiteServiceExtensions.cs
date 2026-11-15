@@ -165,6 +165,8 @@ public static class ClerkSuiteServiceExtensions
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApartmentsDbContext>();
         await db.Database.MigrateAsync();
+        await PostgresIdentitySequenceRepair.AlignAsync(db);
+        await scope.ServiceProvider.GetRequiredService<IDocumentPathResolver>().GetDocumentRootAsync();
 
         var seeder = scope.ServiceProvider.GetRequiredService<IIdentitySeeder>();
         await seeder.SeedAsync();
