@@ -1,6 +1,8 @@
+using System.Net;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -179,6 +181,7 @@ public static class ClerkSuiteServiceExtensions
 
     public static WebApplication ConfigureClerkSuitePipeline(this WebApplication app)
     {
+        app.UseClerkSuiteForwardedHeaders();
         app.UseClerkSuiteSerilogRequestLogging();
 
         if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
@@ -215,5 +218,27 @@ public static class ClerkSuiteServiceExtensions
         app.UseAntiforgery();
 
         return app;
+    }
+
+    /// <summary>
+    /// Tailscale Serve on the NAS connects from loopback and sets the public scheme and host.
+    /// Development and test hosts are reached directly, so they ignore forwarded headers.
+    /// </summary>
+    private static void UseClerkSuiteForwardedHeaders(this WebApplication app)
+    {
+        if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+        {
+            return;
+        }
+
+        var forwarded = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+        };
+        forwarded.KnownNetworks.Clear();
+        forwarded.KnownProxies.Clear();
+        forwarded.KnownProxies.Add(IPAddress.Loopback);
+        forwarded.KnownProxies.Add(IPAddress.IPv6Loopback);
+        app.UseForwardedHeaders(forwarded);
     }
 }

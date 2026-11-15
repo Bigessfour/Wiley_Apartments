@@ -96,19 +96,19 @@ sudo /usr/local/bin/docker logs clerksuite --tail 80
 From Mac: `curl -sI http://mr-storage:8082`
 (Host port **8082** — NAS `:8080` is used by `tikr-web`.)
 
-## Optional HTTPS (reverse proxy)
+## Clerk HTTPS (Tailscale Serve)
 
-ClerkSuite listens on plain HTTP inside Docker (`8082` on the NAS). For TLS on the town LAN or Tailscale:
+ClerkSuite listens on plain HTTP inside Docker (`8082` on the NAS). Cognito will not accept `http://mr-storage:8082` as a callback. Clerks use the tailnet HTTPS name:
 
-1. **Synology Application Portal** — add a reverse-proxy rule:
-   - Source: `https://clerksuite.town.local` (or NAS hostname + custom port)
-   - Destination: `http://127.0.0.1:8082`
-   - Enable HSTS only if all clerks use HTTPS consistently.
-2. **Certificate** — use DSM Let's Encrypt or town IT certificate on the NAS reverse proxy (not in the app container).
-3. **Tailscale** — clerks can use `http://mr-storage:8082` on the tailnet without public exposure; HTTPS is optional when traffic stays on Tailscale.
-4. **App behavior** — when `ASPNETCORE_URLS` includes `https://`, ClerkSuite enables `UseHttpsRedirection` and HSTS in production (see `ConfigureClerkSuitePipeline`).
+`https://mr-storage.tail57aa13.ts.net:8443`
 
-Do not terminate TLS inside the ClerkSuite container unless town IT requires it; reverse proxy on DSM is the usual Synology pattern.
+DSM nginx already listens on 443, so Serve uses 8443. Do not put TLS inside the ClerkSuite container. Do not reset the existing TCP serve for Postgres on `:5433`.
+
+```bash
+ssh mr-storage sudo /usr/local/bin/tailscale serve --bg --yes --https=8443 http://127.0.0.1:8082
+```
+
+The production app trusts `X-Forwarded-Proto` and `X-Forwarded-Host` only when the proxy is loopback. That makes the Cognito redirect URI `https://mr-storage.tail57aa13.ts.net:8443/authentication/login-callback`. `http://mr-storage:8082/health` stays available for the container health check and is not the clerk path.
 
 ## First-run checklist
 
