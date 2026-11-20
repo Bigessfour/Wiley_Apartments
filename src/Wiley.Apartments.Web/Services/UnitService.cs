@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Wiley.Apartments.Contracts;
 using Wiley.Apartments.Domain;
@@ -9,12 +10,14 @@ namespace Wiley.Apartments.Web.Services;
 
 public sealed class UnitService(
     ApartmentsDbContext db,
+    IServiceScopeFactory scopes,
     IOptions<ClerkSuiteOptions> options,
     ILogger<UnitService> logger) : IUnitService
 {
     public const string CommunityCenterNumber = "CC";
 
     private readonly ApartmentsDbContext _db = db;
+    private readonly IServiceScopeFactory _scopes = scopes;
     private readonly ClerkSuiteOptions _options = options.Value;
     private readonly ILogger<UnitService> _logger = logger;
 
@@ -42,7 +45,10 @@ public sealed class UnitService(
 
     public async Task<Unit?> GetFacilityAsync(CancellationToken cancellationToken = default)
     {
-        var cc = await _db.Units
+        // The layout calls this while the dashboard is already querying the circuit's DbContext.
+        await using var scope = _scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApartmentsDbContext>();
+        var cc = await db.Units
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 u => u.IsFacility && u.Number == CommunityCenterNumber,
@@ -52,7 +58,7 @@ public sealed class UnitService(
             return cc;
         }
 
-        return await _db.Units
+        return await db.Units
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.IsFacility, cancellationToken);
     }

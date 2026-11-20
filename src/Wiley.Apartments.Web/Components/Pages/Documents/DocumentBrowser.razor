@@ -34,6 +34,8 @@
 
 <h2 class="h6 mt-3">NAS folder browse</h2>
 <div style="height: 420px;" class="mb-4 border rounded">
+    @if (_vaultReady)
+    {
     <SfFileManager TValue="FileManagerDirectoryContent" Height="100%">
         <FileManagerAjaxSettings Url="/api/document-vault/FileOperations"
                                  UploadUrl="/api/document-vault/Upload"
@@ -42,6 +44,11 @@
         <FileManagerUploadSettings UploadMode="UploadMode.HttpClient" />
         <FileManagerEvents TValue="FileManagerDirectoryContent" OnSend="OnFileManagerSend" />
     </SfFileManager>
+    }
+    else
+    {
+        <p class="text-muted p-3 mb-0">Loading vault folders.</p>
+    }
 </div>
 
 <h2 class="h6">Metadata index</h2>
@@ -171,6 +178,7 @@ else if (!string.IsNullOrEmpty(ViewerHint))
     private Guid? UploadEntityId { get; set; }
     private DocumentCategory UploadCategory { get; set; } = DocumentCategory.Other;
     private bool Busy { get; set; }
+    private bool _vaultReady;
     private string? ErrorMessage { get; set; }
     private string? ViewerHint { get; set; }
     private string? _viewLabel;
@@ -235,6 +243,7 @@ else if (!string.IsNullOrEmpty(ViewerHint))
         }
 
         await LoadAsync();
+        _vaultReady = true;
     }
 
     private void OnFileManagerSend(BeforeSendEventArgs args)

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Wiley.Apartments.Domain;
@@ -13,7 +14,10 @@ public class UnitServiceTests
     private static UnitService CreateService(ApartmentsDbContext db, int maxUnits = 0)
     {
         var options = Options.Create(new ClerkSuiteOptions { MaxUnits = maxUnits });
-        return new UnitService(db, options, NullLogger<UnitService>.Instance);
+        var services = new ServiceCollection();
+        services.AddSingleton(db);
+        var scopes = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+        return new UnitService(db, scopes, options, NullLogger<UnitService>.Instance);
     }
 
     private static ApartmentsDbContext CreateContext()

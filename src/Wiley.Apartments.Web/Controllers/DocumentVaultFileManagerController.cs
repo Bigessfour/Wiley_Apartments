@@ -27,8 +27,8 @@ public sealed class DocumentVaultFileManagerController : Controller
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private readonly string _documentRoot;
     private readonly PhysicalFileProvider _provider = new();
+    private readonly IDocumentPathResolver _paths;
     private readonly IDocumentVaultAuditService _audit;
     private readonly IDocumentVaultMetadataSync _metadata;
     private readonly ILogger<DocumentVaultFileManagerController> _logger;
@@ -39,20 +39,25 @@ public sealed class DocumentVaultFileManagerController : Controller
         IDocumentVaultMetadataSync metadata,
         ILogger<DocumentVaultFileManagerController> logger)
     {
-        _documentRoot = paths.GetDocumentRoot();
-        Directory.CreateDirectory(_documentRoot);
-        _provider.RootFolder(_documentRoot);
+        _paths = paths;
         _audit = audit;
         _metadata = metadata;
         _logger = logger;
+    }
+
+    private async Task EnsureRootAsync(CancellationToken cancellationToken)
+    {
+        var root = await _paths.GetDocumentRootAsync(cancellationToken);
+        Directory.CreateDirectory(root);
+        DocumentRootAvailability.EnsureWritable(root);
+        _provider.RootFolder(root);
     }
 
     [HttpPost("FileOperations")]
     [ServiceFilter(typeof(DocumentVaultAntiforgeryFilter))]
     public async Task<object> FileOperations([FromBody] FileManagerDirectoryContent args, CancellationToken cancellationToken)
     {
-        DocumentRootAvailability.EnsureWritable(_documentRoot);
-        _provider.RootFolder(_documentRoot);
+        await EnsureRootAsync(cancellationToken);
 
         if (args.Action is "delete" or "rename" && args.TargetPath is null && args.Path == "")
         {
@@ -119,8 +124,7 @@ public sealed class DocumentVaultFileManagerController : Controller
             return Content("");
         }
 
-        DocumentRootAvailability.EnsureWritable(_documentRoot);
-        _provider.RootFolder(_documentRoot);
+        await EnsureRootAsync(cancellationToken);
         try
         {
             var uploadResponse = _provider.Upload(path, uploadFiles, action, size, null);
@@ -149,17 +153,17 @@ public sealed class DocumentVaultFileManagerController : Controller
     }
 
     [HttpPost("Download")]
-    public IActionResult Download([FromForm] string downloadInput)
+    public async Task<IActionResult> Download([FromForm] string downloadInput, CancellationToken cancellationToken)
     {
-        _provider.RootFolder(_documentRoot);
+        await EnsureRootAsync(cancellationToken);
         var args = JsonSerializer.Deserialize<FileManagerDirectoryContent>(downloadInput, DownloadJsonOptions)!;
         return _provider.Download(args.Path, args.Names, args.Data);
     }
 
     [HttpPost("GetImage")]
-    public IActionResult GetImage([FromBody] FileManagerDirectoryContent args)
+    public async Task<IActionResult> GetImage([FromBody] FileManagerDirectoryContent args, CancellationToken cancellationToken)
     {
-        _provider.RootFolder(_documentRoot);
+        await EnsureRootAsync(cancellationToken);
         return _provider.GetImage(args.Path, args.Id, false, null, null);
     }
 
